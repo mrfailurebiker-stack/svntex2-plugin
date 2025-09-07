@@ -19,22 +19,30 @@ jobs:
 
       - name: Prepare rsync exclude file
         run: |
-          cat > exclude.txt <<'EOF'
-          .git/
-          .github/
-          *.sql
+          # Using include list approach: include needed paths, exclude rest
+          cat > include.txt <<'EOF'
+          + svntex2-plugin.php
+          + includes/***
+          + assets/***
+          + views/***
+          + README.md
+          - *
           EOF
-          cat exclude.txt
+          cat include.txt
 
-      - name: Deploy plugin directory
+      - name: Remote pre-clean (old duplicates)
+        run: |
+          ssh -p 65002 -o StrictHostKeyChecking=no u271371274@145.79.211.169 "if [ -d /home/u271371274/domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin/svntex2-plugin ]; then rm -rf /home/u271371274/domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin/svntex2-plugin; fi"
+
+      - name: Deploy plugin directory (filtered)
         run: |
           set -euxo pipefail
-          echo "Local file snapshot (depth 3)"; find . -maxdepth 3 -type f | sort | head -100
-          RSYNC_OPTS="-rlptgoDzv --delete --checksum --exclude-from=exclude.txt"
-          rsync $RSYNC_OPTS \
-            -e "ssh -p 65002 -o StrictHostKeyChecking=no" \
-            ./ \
-            u271371274@145.79.211.169:/home/u271371274/domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin/
+          echo "Local file snapshot (depth 2)"; find . -maxdepth 2 -type f | sort
+          TARGET=/home/u271371274/domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin/
+          RSYNC_OPTS="-rlptgoDzv --delete --delete-excluded --checksum --prune-empty-dirs --include-from=include.txt"
+          rsync $RSYNC_OPTS -e "ssh -p 65002 -o StrictHostKeyChecking=no" ./ u271371274@145.79.211.169:$TARGET
+          # Permissions hardening (best effort)
+          ssh -p 65002 -o StrictHostKeyChecking=no u271371274@145.79.211.169 "find $TARGET -type d -exec chmod 755 {} +; find $TARGET -type f -exec chmod 644 {} +"
 
       - name: List remote target (debug)
         run: |
