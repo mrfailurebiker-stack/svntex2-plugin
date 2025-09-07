@@ -15,3 +15,12 @@ add_shortcode('svntex_wallet_history', function($atts){
     $out .= '</tbody></table>';
     return $out;
 });
+
+// Debug summary shortcode
+add_shortcode('svntex_debug', function(){
+  if(!current_user_can('manage_options')) return '';
+  $uid = get_current_user_id();
+  $bal = svntex2_wallet_get_balance($uid);
+  $qualified = function_exists('svntex2_referrals_get_qualified_count') ? svntex2_referrals_get_qualified_count($uid) : 0;
+  return '<pre style="font-size:12px; background:#111; color:#0f0; padding:10px;">USER: '+$uid+'\nBAL:'+number_format($bal,2)+'\nQUALIFIED:'+ $qualified +'</pre>';
+});

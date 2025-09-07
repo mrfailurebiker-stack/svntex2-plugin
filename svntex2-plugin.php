@@ -43,7 +43,7 @@ require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/helpers.php';        // Wa
 require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/shortcodes.php';     // Shortcodes (dashboard + extras)
 require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/rest.php';           // REST endpoints
 // Newly scaffolded domain modules (placeholders / partial implementations)
-foreach ( [ 'referrals', 'kyc', 'withdrawals', 'cron', 'admin' ] as $module ) {
+foreach ( [ 'referrals', 'kyc', 'withdrawals', 'cron', 'admin', 'cli' ] as $module ) {
     $file = SVNTEX2_PLUGIN_DIR . 'includes/functions/' . $module . '.php';
     if ( file_exists( $file ) ) { require_once $file; }
 }
