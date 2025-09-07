@@ -139,23 +139,7 @@ add_shortcode('svntex_dashboard', function(){
     return '<p>Dashboard view missing.</p>';
 });
 
-// Registration shortcode (skeleton)
-add_shortcode('svntex_registration', function(){
-    wp_enqueue_style('svntex2-style');
-    wp_enqueue_script('svntex2-core');
-    ob_start();
-    ?>
-    <form class="svntex2-registration" method="post" novalidate>
-        <?php wp_nonce_field('svntex2_register','svntex2_nonce'); ?>
-        <div><label>Mobile* <input type="text" name="mobile" required></label></div>
-        <div><label>Email* <input type="email" name="email" required></label></div>
-        <div><label>Password* <input type="password" name="password" required></label></div>
-        <div><label>Referral ID <input type="text" name="referral"></label></div>
-        <button type="submit">Register</button>
-    </form>
-    <?php
-    return ob_get_clean();
-});
+// (Deprecated) Minimal registration shortcode replaced by advanced module in Auth class.
 
 // Handle basic registration POST (Phase 1 minimal) - extension point
 add_action('init', function(){
