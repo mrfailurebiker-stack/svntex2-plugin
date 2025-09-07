@@ -288,8 +288,9 @@ function svntex2_ajax_do_login(){
     if ( ! $user ) wp_send_json_error( ['message' => 'Account not found'] );
     $check = wp_check_password( $password, $user->user_pass, $user->ID );
     if ( ! $check ) wp_send_json_error( ['message' => 'Invalid password'] );
+    $remember = ! empty( $_POST['remember'] );
     wp_set_current_user( $user->ID );
-    wp_set_auth_cookie( $user->ID, true );
+    wp_set_auth_cookie( $user->ID, $remember );
     do_action( 'wp_login', $user->user_login, $user );
     $redirect = wc_get_page_permalink( 'myaccount' );
     wp_send_json_success( [ 'redirect' => $redirect ] );
