@@ -71,3 +71,48 @@ Shortcodes:
 
 ---
 Version: 0.2.1
+
+## Clean File Structure
+```
+svntex2-plugin/
+	svntex2-plugin.php        (main entry)
+	README.md
+	assets/
+		css/style.css
+		js/{auth.js,core.js,dashboard.js}
+	includes/
+		classes/
+			auth.php
+		functions/
+			admin.php
+			cli.php
+			cron.php
+			helpers.php
+			kyc.php
+			referrals.php
+			withdrawals.php
+			rest.php
+			shortcodes.php
+	views/
+		dashboard.php
+	legacy/  (old standalone prototype files retained temporarily)
+		customer-auth.js
+		customer-login.php
+		customer-registration.php
+		customer-ui.css
+		customer-schema.sql
+	scripts/
+		clean_plugin.sh
+```
+
+The `legacy/` folder holds earlier prototype assets no longer used by the active plugin. They can be deleted once confirmed unnecessary.
+
+## WooCommerce Integration Points
+- `svntex2_plugin.php` helper `svntex2_get_recent_orders()` uses `wc_get_orders()` (graceful if WC inactive).
+- Dashboard view lists recent orders & pricing via `wc_price()` if available.
+- Future modules will hook into order completion (e.g., referral qualification, PB/RB credits) using `woocommerce_order_status_completed`.
+
+## Next Refactor Targets
+- Introduce service classes for wallet, referral, kyc for cleaner separation.
+- Namespace functions to avoid global pollution (future `SVNTEX2\\` namespace).
+- Add PHPUnit tests for helpers (wallet arithmetic, referral linking) under a new `tests/` directory.
