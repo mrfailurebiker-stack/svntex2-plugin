@@ -1,10 +1,10 @@
 <?php
 // SVNTeX 2.0 Customer Login System
 // Security: input validation, password_verify, prepared statements, session management
-session_start();
-header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'login') {
+	if (session_status() === PHP_SESSION_NONE) session_start();
+	header('Content-Type: application/json');
 	require_once 'db_connect.php'; // Add your DB connection here
 	$response = ["success" => false, "errors" => []];
 
@@ -23,12 +23,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 	$user = $stmt->fetch(PDO::FETCH_ASSOC);
 
 	if (!$user) {
+		error_log("Login failed: User not found for $login");
 		$response['errors'][] = 'User not found.';
 		echo json_encode($response); exit;
 	}
 
 	// Account lockout check
 	if ($user['locked_until'] && strtotime($user['locked_until']) > time()) {
+		error_log("Login failed: Account locked for {$user['customer_id']}");
 		$response['errors'][] = 'Account locked. Try again later.';
 		echo json_encode($response); exit;
 	}
@@ -42,8 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 			$lockTime = date('Y-m-d H:i:s', strtotime('+15 minutes'));
 			$stmt = $pdo->prepare('UPDATE svntex_customers SET locked_until = ? WHERE id = ?');
 			$stmt->execute([$lockTime, $user['id']]);
+			error_log("Login failed: Account locked for {$user['customer_id']} after too many attempts");
 			$response['errors'][] = 'Account locked due to multiple failed attempts.';
 		} else {
+			error_log("Login failed: Invalid password for {$user['customer_id']}");
 			$response['errors'][] = 'Invalid password.';
 		}
 		echo json_encode($response); exit;
