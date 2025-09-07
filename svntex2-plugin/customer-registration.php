@@ -1,3 +1,6 @@
+<?php
+// SVNTeX 2.0 Customer Registration System & WooCommerce Dashboard Integration
+
 // Register SVNTeX Dashboard endpoint
 function svntex_add_dashboard_endpoint() {
     add_rewrite_endpoint('svntex-dashboard', EP_ROOT | EP_PAGES);
@@ -16,15 +19,8 @@ function svntex_frontend_dashboard_content() {
     echo '<div class="svntex-dashboard">Welcome to the SVNTeX Dashboard!</div>';
 }
 add_action('woocommerce_account_svntex-dashboard_endpoint', 'svntex_frontend_dashboard_content');
-<?php
-// Add this function to fix WooCommerce dashboard error
-function svntex_frontend_dashboard_content() {
-    echo '<div class="svntex-dashboard">Welcome to the SVNTeX Dashboard!</div>';
-}
-// Register the dashboard content function with WooCommerce
-add_action('woocommerce_account_svntex-dashboard_endpoint', 'svntex_frontend_dashboard_content');
-// SVNTeX 2.0 Customer Registration System
-// Security: CSRF, input validation, password_hash, prepared statements, session management
+
+// Registration logic
 session_start();
 header('Content-Type: application/json');
 
@@ -100,8 +96,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $response['customer_id'] = $customer_id;
     echo json_encode($response); exit;
 }
-
-// HTML Registration Form (for direct access)
 ?>
 <!DOCTYPE html>
 <html lang="en">
