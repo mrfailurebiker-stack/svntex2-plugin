@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
-define( 'SVNTEX2_VERSION',        '0.2.1' );
+define( 'SVNTEX2_VERSION',        '0.2.2' );
 define( 'SVNTEX2_PLUGIN_FILE',    __FILE__ );
 define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
@@ -223,6 +223,29 @@ if ( class_exists( 'SVNTEX2_Auth' ) ) { SVNTEX2_Auth::init(); }
 // 10. EXTENSION HOOKS (for future add-ons)
 // -----------------------------------------------------------------------------
 do_action( 'svntex2_initialized' );
+
+// -----------------------------------------------------------------------------
+// 10b. WOO My Account DASHBOARD INJECTION
+// -----------------------------------------------------------------------------
+/**
+ * Automatically inject the SVNTeX dashboard into WooCommerce My Account dashboard
+ * so site owners don't need to place the shortcode manually.
+ */
+add_action( 'init', 'svntex2_hook_wc_account_dashboard' );
+function svntex2_hook_wc_account_dashboard() {
+    if ( class_exists( 'WooCommerce' ) ) {
+        // Priority before most custom additions but after WC base content (default priority 10)
+        add_action( 'woocommerce_account_dashboard', 'svntex2_wc_account_inject', 9 );
+    }
+}
+
+function svntex2_wc_account_inject() {
+    if ( ! is_user_logged_in() ) { return; }
+    global $svntex2_wc_dash_done; // prevent duplicate rendering if shortcode placed manually as well
+    if ( ! empty( $svntex2_wc_dash_done ) ) { return; }
+    $svntex2_wc_dash_done = true;
+    echo do_shortcode( '[svntex_dashboard]' );
+}
 
 // -----------------------------------------------------------------------------
 // 11. FALLBACK: CREATE CORE JS IF MISSING (DEV SAFETY)
