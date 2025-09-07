@@ -23,4 +23,5 @@ jobs:
           rsync -avz --delete \
           -e "ssh -p 65002 -o StrictHostKeyChecking=no" \
           ./ \
-          u271371274@145.79.211.169:/home/u271371274/public_html/wp-content/plugins/svntex2-plugin/
+          u271371274@145.79.211.169:/home/u271371274/domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin/
+
