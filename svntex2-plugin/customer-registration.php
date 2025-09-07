@@ -1,4 +1,10 @@
 <?php
+// Add this function to fix WooCommerce dashboard error
+function svntex_frontend_dashboard_content() {
+    echo '<div class="svntex-dashboard">Welcome to the SVNTeX Dashboard!</div>';
+}
+// Register the dashboard content function with WooCommerce
+add_action('woocommerce_account_svntex-dashboard_endpoint', 'svntex_frontend_dashboard_content');
 // SVNTeX 2.0 Customer Registration System
 // Security: CSRF, input validation, password_hash, prepared statements, session management
 session_start();
