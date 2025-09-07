@@ -8,61 +8,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 	require_once 'db_connect.php'; // Add your DB connection here
 	$response = ["success" => false, "errors" => []];
 
-	// Sanitize inputs
-	$login = trim($_POST['login'] ?? '');
-	$password = $_POST['password'] ?? '';
+<?php
+// Prevent direct access
+if (!defined('ABSPATH')) {
+	exit;
+}
 
-	if (!$login) $response['errors'][] = 'Customer ID, email, or mobile required.';
-	if (!$password) $response['errors'][] = 'Password required.';
-
-	if ($response['errors']) { echo json_encode($response); exit; }
-
-	// Find user by customer_id, email, or mobile
-	$stmt = $pdo->prepare('SELECT * FROM svntex_customers WHERE customer_id = ? OR email = ? OR mobile = ?');
-	$stmt->execute([$login, $login, $login]);
-	$user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-	if (!$user) {
-		error_log("Login failed: User not found for $login");
-		$response['errors'][] = 'User not found.';
-		echo json_encode($response); exit;
-	}
-
-	// Account lockout check
-	if ($user['locked_until'] && strtotime($user['locked_until']) > time()) {
-		error_log("Login failed: Account locked for {$user['customer_id']}");
-		$response['errors'][] = 'Account locked. Try again later.';
-		echo json_encode($response); exit;
-	}
-
-	// Password check
-	if (!password_verify($password, $user['password_hash'])) {
-		// Increment failed attempts
-		$stmt = $pdo->prepare('UPDATE svntex_customers SET failed_attempts = failed_attempts + 1 WHERE id = ?');
-		$stmt->execute([$user['id']]);
-		if ($user['failed_attempts'] + 1 >= 5) {
-			$lockTime = date('Y-m-d H:i:s', strtotime('+15 minutes'));
-			$stmt = $pdo->prepare('UPDATE svntex_customers SET locked_until = ? WHERE id = ?');
-			$stmt->execute([$lockTime, $user['id']]);
-			error_log("Login failed: Account locked for {$user['customer_id']} after too many attempts");
-			$response['errors'][] = 'Account locked due to multiple failed attempts.';
-		} else {
-			error_log("Login failed: Invalid password for {$user['customer_id']}");
-			$response['errors'][] = 'Invalid password.';
-		}
-		echo json_encode($response); exit;
-	}
-
-	// Reset failed attempts
-	$stmt = $pdo->prepare('UPDATE svntex_customers SET failed_attempts = 0, locked_until = NULL WHERE id = ?');
-	$stmt->execute([$user['id']]);
-
-	// Optional: 2FA check placeholder
-	// ...
-
-	// Set session
-	$_SESSION['customer_id'] = $user['customer_id'];
-	$_SESSION['customer_email'] = $user['email'];
+function svntex2_customer_login_form() {
+	ob_start();
+	?>
+	<div class="login-container">
+		<form id="loginForm" autocomplete="off">
+			<h2>Login</h2>
+			<div class="form-group">
+				<label>Email or Mobile</label>
+				<input type="text" name="login" id="login" required>
+			</div>
+			<div class="form-group">
+				<label>Password</label>
+				<input type="password" name="password" id="password" required>
+			</div>
+			<button type="submit" class="submit-btn">Login</button>
+			<div id="loginErrors" class="form-errors"></div>
+		</form>
+	</div>
+	<script src="<?php echo plugin_dir_url(__FILE__); ?>customer-auth.js"></script>
+	<?php
+	return ob_get_clean();
+}
 
 	$response['success'] = true;
 	$response['customer_id'] = $user['customer_id'];
