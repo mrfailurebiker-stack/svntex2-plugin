@@ -42,8 +42,7 @@ function svntex2_registration_shortcode() {
 }
 
 add_shortcode('svntex2_login', 'svntex2_login_shortcode');
-    // Include registration module
-    require_once plugin_dir_path(__FILE__) . 'includes/customer-registration.php';
+function svntex2_login_shortcode() {
     ob_start();
     include plugin_dir_path(__FILE__) . 'customer-login.php';
     return ob_get_clean();
