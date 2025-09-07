@@ -18,10 +18,17 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Sync files to Hostinger via SSH
+      - name: Sync main plugin files to Hostinger via SSH
         run: |
           rsync -avz --delete \
           -e "ssh -p 65002 -o StrictHostKeyChecking=no" \
-          ./ \
+          ./svntex2-plugin/ \
           u271371274@145.79.211.169:/home/u271371274/domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin/
+
+      - name: Sync CSS files to Hostinger css folder via SSH
+        run: |
+          rsync -avz --delete \
+          -e "ssh -p 65002 -o StrictHostKeyChecking=no" \
+          ./svntex2-plugin/css/ \
+          u271371274@145.79.211.169:/home/u271371274/domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin/css/
 
