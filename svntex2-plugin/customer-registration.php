@@ -1,3 +1,21 @@
+// Register SVNTeX Dashboard endpoint
+function svntex_add_dashboard_endpoint() {
+    add_rewrite_endpoint('svntex-dashboard', EP_ROOT | EP_PAGES);
+}
+add_action('init', 'svntex_add_dashboard_endpoint');
+
+// Add SVNTeX Dashboard to WooCommerce account menu
+function svntex_account_menu_items($items) {
+    $items['svntex-dashboard'] = __('SVNTEX Dashboard', 'woocommerce');
+    return $items;
+}
+add_filter('woocommerce_account_menu_items', 'svntex_account_menu_items');
+
+// Content for SVNTeX Dashboard endpoint
+function svntex_frontend_dashboard_content() {
+    echo '<div class="svntex-dashboard">Welcome to the SVNTeX Dashboard!</div>';
+}
+add_action('woocommerce_account_svntex-dashboard_endpoint', 'svntex_frontend_dashboard_content');
 <?php
 // Add this function to fix WooCommerce dashboard error
 function svntex_frontend_dashboard_content() {
