@@ -2,33 +2,41 @@ name: Deploy Plugin via SSH
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.7.0
+        uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Sync main plugin files to Hostinger via SSH
+      - name: Prepare rsync exclude file
         run: |
-          rsync -avz --delete \
-          -e "ssh -p 65002 -o StrictHostKeyChecking=no" \
-          ./svntex2-plugin/ \
-          u271371274@145.79.211.169:/home/u271371274/domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin/
+          cat > exclude.txt <<'EOF'
+          .git/
+          .github/
+          svntex2-plugin/
+          scripts/
+          *.sh
+          *.sql
+          EOF
+          cat exclude.txt
 
-      - name: Sync CSS files to Hostinger css folder via SSH
+      - name: Deploy plugin directory
         run: |
-          rsync -avz --delete \
-          -e "ssh -p 65002 -o StrictHostKeyChecking=no" \
-          ./svntex2-plugin/css/ \
-          u271371274@145.79.211.169:/home/u271371274/domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin/css/
+          rsync -avz --delete --exclude-from=exclude.txt \
+            -e "ssh -p 65002 -o StrictHostKeyChecking=no" \
+            ./ \
+            u271371274@145.79.211.169:/home/u271371274/domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin/
+
+      - name: List remote target (debug)
+        run: |
+          ssh -p 65002 -o StrictHostKeyChecking=no u271371274@145.79.211.169 "ls -1 /home/u271371274/domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin | head"
 
