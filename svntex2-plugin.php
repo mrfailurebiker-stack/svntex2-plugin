@@ -1,43 +1,63 @@
 <?php
-/*
-Plugin Name: SVNTeX 2.0 Customer System
-Description: Core infrastructure for SVNTeX 2.0 (registration, wallet, referrals, KYC, withdrawals, PB/RB scaffolding).
-Version: 0.1.0
-Author: SVNTeX
-Text Domain: svntex2
-*/
+/**
+ * Plugin Name: SVNTeX 2.0 Customer System
+ * Description: Foundation for SVNTeX 2.0 – registration, wallet ledger, referrals, KYC, withdrawals, PB/RB scaffolding with WooCommerce integration.
+ * Version: 0.2.0
+ * Author: SVNTeX
+ * Text Domain: svntex2
+ * Requires at least: 6.0
+ * Requires PHP: 7.4
+ * License: GPLv2 or later
+ */
 
-if (!defined('ABSPATH')) { exit; }
+// -----------------------------------------------------------------------------
+// 0. HARD EXIT IF NOT IN WORDPRESS
+// -----------------------------------------------------------------------------
+if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-define('SVNTEX2_VERSION', '0.1.0');
-define('SVNTEX2_PLUGIN_FILE', __FILE__);
-define('SVNTEX2_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('SVNTEX2_PLUGIN_URL', plugin_dir_url(__FILE__));
+// -----------------------------------------------------------------------------
+// 1. CONSTANTS
+// -----------------------------------------------------------------------------
+define( 'SVNTEX2_VERSION',        '0.2.0' );
+define( 'SVNTEX2_PLUGIN_FILE',    __FILE__ );
+define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
+define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
+define( 'SVNTEX2_MIN_WC_VERSION', '7.0.0' );
 
-// Autoload simple classes (PSR-4 like light)
-spl_autoload_register(function($class){
-    if (strpos($class, 'SVNTEX2_') === 0) {
-        $file = SVNTEX2_PLUGIN_DIR . 'includes/classes/' . strtolower(str_replace('SVNTEX2_', '', $class)) . '.php';
-        if (file_exists($file)) require_once $file;
+// -----------------------------------------------------------------------------
+// 2. AUTOLOADER (Simple – looks for includes/classes/<lower>.php)
+// -----------------------------------------------------------------------------
+spl_autoload_register( function ( $class ) {
+    if ( strpos( $class, 'SVNTEX2_' ) === 0 ) {
+        $file = SVNTEX2_PLUGIN_DIR . 'includes/classes/' . strtolower( str_replace( 'SVNTEX2_', '', $class ) ) . '.php';
+        if ( file_exists( $file ) ) {
+            require_once $file;
+        }
     }
-});
+} );
 
-// Include functional modules
-require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/helpers.php';
-require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/shortcodes.php';
-require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/rest.php';
+// -----------------------------------------------------------------------------
+// 3. INCLUDE FUNCTIONAL MODULES
+// -----------------------------------------------------------------------------
+require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/helpers.php';      // Wallet + small helpers
+require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/shortcodes.php';   // Future extra shortcodes
+require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/rest.php';         // REST endpoints
 
-// Activation / Deactivation
-register_activation_hook(__FILE__, 'svntex2_activate');
-register_deactivation_hook(__FILE__, 'svntex2_deactivate');
+// -----------------------------------------------------------------------------
+// 4. ACTIVATION: CREATE TABLES (idempotent via dbDelta)
+// -----------------------------------------------------------------------------
+register_activation_hook( __FILE__, 'svntex2_activate' );
+register_deactivation_hook( __FILE__, 'svntex2_deactivate' );
 
-function svntex2_activate(){
-    require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-    global $wpdb;
+/**
+ * Run on activation – creates/updates required custom tables for ledgers, referrals, etc.
+ */
+function svntex2_activate() {
+    global $wpdb; require_once ABSPATH . 'wp-admin/includes/upgrade.php';
     $charset = $wpdb->get_charset_collate();
 
-    $tables = [];
-    $tables[] = "CREATE TABLE {$wpdb->prefix}svntex_wallet_transactions (
+    $sql = [];
+    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_wallet_transactions (
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         user_id BIGINT UNSIGNED NOT NULL,
         type VARCHAR(32) NOT NULL,
@@ -46,23 +66,20 @@ function svntex2_activate(){
         reference_id VARCHAR(64) NULL,
         meta LONGTEXT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        KEY user_id (user_id),
-        KEY type (type),
-        KEY created_at (created_at)
+        KEY user_id (user_id), KEY type (type), KEY created_at (created_at)
     ) $charset";
 
-    $tables[] = "CREATE TABLE {$wpdb->prefix}svntex_referrals (
+    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_referrals (
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         referrer_id BIGINT UNSIGNED NOT NULL,
         referee_id BIGINT UNSIGNED NOT NULL,
         qualified TINYINT(1) NOT NULL DEFAULT 0,
         first_purchase_amount DECIMAL(12,2) NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY pair (referrer_id, referee_id),
-        KEY referrer_id (referrer_id)
+        UNIQUE KEY pair (referrer_id, referee_id), KEY referrer_id (referrer_id)
     ) $charset";
 
-    $tables[] = "CREATE TABLE {$wpdb->prefix}svntex_kyc_submissions (
+    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_kyc_submissions (
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         user_id BIGINT UNSIGNED NOT NULL UNIQUE,
         status VARCHAR(20) NOT NULL DEFAULT 'pending',
@@ -78,7 +95,7 @@ function svntex2_activate(){
         KEY status (status)
     ) $charset";
 
-    $tables[] = "CREATE TABLE {$wpdb->prefix}svntex_withdrawals (
+    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_withdrawals (
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         user_id BIGINT UNSIGNED NOT NULL,
         amount DECIMAL(12,2) NOT NULL,
@@ -88,11 +105,10 @@ function svntex2_activate(){
         admin_note TEXT NULL,
         requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         processed_at DATETIME NULL,
-        KEY user_id (user_id),
-        KEY status (status)
+        KEY user_id (user_id), KEY status (status)
     ) $charset";
 
-    $tables[] = "CREATE TABLE {$wpdb->prefix}svntex_profit_distributions (
+    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_profit_distributions (
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         month_year CHAR(7) NOT NULL,
         company_profit DECIMAL(14,2) NOT NULL,
@@ -102,7 +118,7 @@ function svntex2_activate(){
         UNIQUE KEY month_year (month_year)
     ) $charset";
 
-    $tables[] = "CREATE TABLE {$wpdb->prefix}svntex_pb_payouts (
+    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_pb_payouts (
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         user_id BIGINT UNSIGNED NOT NULL,
         month_year CHAR(7) NOT NULL,
@@ -112,151 +128,103 @@ function svntex2_activate(){
         KEY user_month (user_id, month_year)
     ) $charset";
 
-    foreach($tables as $sql){
-        dbDelta($sql);
+    foreach ( $sql as $statement ) { dbDelta( $statement ); }
+    update_option( 'svntex2_version', SVNTEX2_VERSION );
+    flush_rewrite_rules();
+}
+
+/** Keep data on deactivate (future: remove crons). */
+function svntex2_deactivate() { flush_rewrite_rules(); }
+
+// -----------------------------------------------------------------------------
+// 5. DEPENDENCY CHECKS (WooCommerce)
+// -----------------------------------------------------------------------------
+add_action( 'plugins_loaded', 'svntex2_check_dependencies', 5 );
+function svntex2_check_dependencies() {
+    if ( defined( 'WC_VERSION') && version_compare( WC_VERSION, SVNTEX2_MIN_WC_VERSION, '<' ) ) {
+        add_action( 'admin_notices', function(){ echo '<div class="notice notice-error"><p><strong>SVNTeX 2.0:</strong> WooCommerce version too old. Please upgrade.</p></div>'; } );
+    } elseif ( ! class_exists( 'WooCommerce' ) ) {
+        add_action( 'admin_notices', function(){ echo '<div class="notice notice-warning"><p><strong>SVNTeX 2.0:</strong> WooCommerce not active – some features disabled.</p></div>'; } );
     }
-
-    // Add option for version tracking
-    update_option('svntex2_version', SVNTEX2_VERSION);
 }
 
-function svntex2_deactivate(){
-    // Intentionally keep data. Could add cron cleanup stop here later.
+// -----------------------------------------------------------------------------
+// 6. UTILITY HELPERS (FOUNDATION LEVEL)
+// -----------------------------------------------------------------------------
+/** Generate unique customer id. */
+function svntex2_generate_customer_id() : string {
+    for ( $i = 0; $i < 5; $i++ ) {
+        $candidate = 'SVN-' . str_pad( (string) wp_rand( 0, 999999 ), 6, '0', STR_PAD_LEFT );
+        if ( ! username_exists( $candidate ) ) { return $candidate; }
+    }
+    return 'SVN-' . wp_rand( 100000, 999999 );
 }
 
-// Enqueue global assets (dash / forms) - kept minimal for now
-add_action('wp_enqueue_scripts', function(){
-    wp_register_style('svntex2-style', SVNTEX2_PLUGIN_URL . 'assets/css/style.css', [], SVNTEX2_VERSION);
-    wp_register_script('svntex2-core', SVNTEX2_PLUGIN_URL . 'assets/js/core.js', ['jquery'], SVNTEX2_VERSION, true);
-    wp_register_script('svntex2-dashboard', SVNTEX2_PLUGIN_URL . 'assets/js/dashboard.js', ['jquery'], SVNTEX2_VERSION, true);
-});
+/** Get referral count meta (int). */
+function svntex2_get_referral_count( int $user_id ) : int {
+    $val = get_user_meta( $user_id, 'referral_count', true );
+    return ( $val === '' ) ? 0 : (int) $val;
+}
 
-// Dashboard shortcode (placeholder)
-add_shortcode('svntex_dashboard', function(){
-    if (!is_user_logged_in()) return '<p>Please <a href="'.esc_url(wp_login_url()).'">login</a>.</p>';
-    wp_enqueue_style('svntex2-style');
-    wp_enqueue_script('svntex2-dashboard');
-    wp_localize_script('svntex2-dashboard','SVNTEX2Dash', [
-        'rest_url' => esc_url_raw( rest_url('svntex2/v1/wallet/balance') ),
-        'nonce'    => wp_create_nonce('wp_rest'),
+/** Wallet balance wrapper (ledger based). */
+function svntex2_get_wallet_balance( int $user_id ) : float { return svntex2_wallet_get_balance( $user_id ); }
+
+/** Recent WooCommerce orders for a user (graceful fallback). */
+function svntex2_get_recent_orders( int $user_id, int $limit = 5 ) : array {
+    if ( ! function_exists( 'wc_get_orders' ) ) return [];
+    return wc_get_orders([
+        'customer_id' => $user_id,
+        'limit'       => $limit,
+        'orderby'     => 'date',
+        'order'       => 'DESC',
     ]);
+}
+
+// -----------------------------------------------------------------------------
+// 7. ASSET REGISTRATION & CONDITIONAL ENQUEUE
+// -----------------------------------------------------------------------------
+add_action( 'wp_enqueue_scripts', 'svntex2_register_assets' );
+function svntex2_register_assets() {
+    wp_register_style( 'svntex2-style', SVNTEX2_PLUGIN_URL . 'assets/css/style.css', [], SVNTEX2_VERSION );
+    wp_register_script( 'svntex2-core', SVNTEX2_PLUGIN_URL . 'assets/js/core.js', [ 'jquery' ], SVNTEX2_VERSION, true );
+    wp_register_script( 'svntex2-dashboard', SVNTEX2_PLUGIN_URL . 'assets/js/dashboard.js', [ 'jquery' ], SVNTEX2_VERSION, true );
+}
+
+// -----------------------------------------------------------------------------
+// 8. DASHBOARD SHORTCODE (CONNECTS UI + DATA + WC)
+// -----------------------------------------------------------------------------
+add_shortcode( 'svntex_dashboard', 'svntex2_dashboard_shortcode' );
+function svntex2_dashboard_shortcode() {
+    if ( ! is_user_logged_in() ) {
+        return '<p>' . esc_html__( 'Please log in to view your dashboard.', 'svntex2' ) . '</p>';
+    }
+    wp_enqueue_style( 'svntex2-style' );
+    wp_enqueue_script( 'svntex2-dashboard' );
+    wp_localize_script( 'svntex2-dashboard', 'SVNTEX2Dash', [
+        'rest_url' => esc_url_raw( rest_url( 'svntex2/v1/wallet/balance' ) ),
+        'nonce'    => wp_create_nonce( 'wp_rest' ),
+    ] );
     $file = SVNTEX2_PLUGIN_DIR . 'views/dashboard.php';
-    if (file_exists($file)) { ob_start(); include $file; return ob_get_clean(); }
-    return '<p>Dashboard view missing.</p>';
-});
-
-// (Deprecated) Minimal registration shortcode replaced by advanced module in Auth class.
-
-// Handle basic registration POST (Phase 1 minimal) - extension point
-add_action('init', function(){
-    if (!empty($_POST['svntex2_nonce']) && wp_verify_nonce($_POST['svntex2_nonce'], 'svntex2_register')) {
-        $email = sanitize_email($_POST['email'] ?? '');
-        $mobile = preg_replace('/\D/','', $_POST['mobile'] ?? '');
-        $password = $_POST['password'] ?? '';
-        $referral_code = sanitize_text_field($_POST['referral'] ?? '');
-        if (!$email || !$mobile || strlen($mobile) < 10 || strlen($password) < 8) {
-            $_SESSION['svntex2_reg_error'] = 'Invalid input provided.'; return; }
-        if (email_exists($email)) { $_SESSION['svntex2_reg_error'] = 'Email already registered.'; return; }
-        // Generate Customer ID
-        $customer_id = svntex2_generate_customer_id();
-        $user_id = wp_insert_user([
-            'user_login' => $customer_id,
-            'user_email' => $email,
-            'user_pass'  => $password,
-            'display_name' => $customer_id
-        ]);
-        if (is_wp_error($user_id)) { $_SESSION['svntex2_reg_error'] = 'Registration failed.'; return; }
-        update_user_meta($user_id, 'mobile', $mobile);
-        update_user_meta($user_id, 'customer_id', $customer_id);
-        if ($referral_code) update_user_meta($user_id,'referral_source',$referral_code);
-        wp_safe_redirect(add_query_arg('registered','1', wp_get_referer() ?: home_url()));
-        exit;
-    }
-});
-
-// Utility generator
-function svntex2_generate_customer_id(){
-    for($i=0;$i<5;$i++){
-        $candidate = 'SVN-' . str_pad(wp_rand(0,999999),6,'0',STR_PAD_LEFT);
-        if (!username_exists($candidate)) return $candidate;
-    }
-    return 'SVN-' . wp_rand(100000,999999);
+    if ( file_exists( $file ) ) { ob_start(); include $file; return ob_get_clean(); }
+    return '<p>' . esc_html__( 'Dashboard view missing.', 'svntex2' ) . '</p>';
 }
 
-// Minimal core JS inline file creation fallback if missing
-if (!file_exists(SVNTEX2_PLUGIN_DIR.'assets/js/core.js')) {
-    @wp_mkdir_p(SVNTEX2_PLUGIN_DIR.'assets/js');
-    @file_put_contents(SVNTEX2_PLUGIN_DIR.'assets/js/core.js', "console.log('SVNTeX core loaded');");
+// -----------------------------------------------------------------------------
+// 9. AUTH / REGISTRATION MODULE (ADVANCED) – Loaded via Autoloader
+// -----------------------------------------------------------------------------
+if ( class_exists( 'SVNTEX2_Auth' ) ) { SVNTEX2_Auth::init(); }
+
+// -----------------------------------------------------------------------------
+// 10. EXTENSION HOOKS (for future add-ons)
+// -----------------------------------------------------------------------------
+do_action( 'svntex2_initialized' );
+
+// -----------------------------------------------------------------------------
+// 11. FALLBACK: CREATE CORE JS IF MISSING (DEV SAFETY)
+// -----------------------------------------------------------------------------
+if ( ! file_exists( SVNTEX2_PLUGIN_DIR . 'assets/js/core.js' ) ) {
+    @wp_mkdir_p( SVNTEX2_PLUGIN_DIR . 'assets/js' );
+    @file_put_contents( SVNTEX2_PLUGIN_DIR . 'assets/js/core.js', "console.log('SVNTeX core loaded');" );
 }
 
-?>
-<?php
-/*
-Plugin Name: SVNTeX 2.0 Customer System
-Description: Modular customer registration and login system for SVNTeX, with secure backend, modern UI, and WooCommerce integration.
-Version: 2.0
-Author: SVNTeX Team
-*/
-
-// 1. Activation hook: create tables, flush rewrite rules
-register_activation_hook(__FILE__, 'svntex2_activate_plugin');
-function svntex2_activate_plugin() {
-    // You may want to run the schema SQL here, or use dbDelta for WordPress standards
-    // flush_rewrite_rules ensures custom endpoints work
-    flush_rewrite_rules();
-}
-
-// 2. Deactivation hook: flush rewrite rules
-register_deactivation_hook(__FILE__, 'svntex2_deactivate_plugin');
-function svntex2_deactivate_plugin() {
-    flush_rewrite_rules();
-}
-
-// 3. Enqueue JS/CSS for frontend forms
-add_action('wp_enqueue_scripts', 'svntex2_enqueue_assets');
-function svntex2_enqueue_assets() {
-    // Only enqueue on registration/login pages or via shortcode
-    wp_enqueue_style('svntex2-ui', plugins_url('customer-ui.css', __FILE__));
-    wp_enqueue_script('svntex2-auth', plugins_url('customer-auth.js', __FILE__), array('jquery'), null, true);
-}
-
-// 4. Include submodules (registration, login, etc.)
-require_once plugin_dir_path(__FILE__) . 'customer-registration.php';
-require_once plugin_dir_path(__FILE__) . 'customer-login.php';
-// You may want to move backend logic to includes/ for better structure
-
-// 5. Register shortcodes for registration and login forms
-add_shortcode('svntex2_registration', 'svntex2_registration_shortcode');
-function svntex2_registration_shortcode() {
-    ob_start();
-    include plugin_dir_path(__FILE__) . 'customer-registration.php';
-    return ob_get_clean();
-}
-
-add_shortcode('svntex2_login', 'svntex2_login_shortcode');
-function svntex2_login_shortcode() {
-    ob_start();
-    include plugin_dir_path(__FILE__) . 'customer-login.php';
-    return ob_get_clean();
-}
-
-// 6. Sample usage (add to any page/post):
-// [svntex2_registration]
-// [svntex2_login]
-
-// 7. Improvements for folder structure:
-// - Move backend logic to /includes/ (e.g., includes/registration-backend.php)
-// - Keep only entry-point and UI files in root
-// - Use /assets/ for JS/CSS
-// - Use /templates/ for HTML forms if needed
-
-// 8. Security notes:
-// - Always sanitize/validate user input in backend files
-// - Use WordPress nonces for AJAX requests if possible
-// - Restrict direct access to backend files
-
-// 9. Comments and modularity:
-// - Each section is commented for clarity
-// - All features are routed through this main file for WordPress compatibility
-
-?>
+// End of file.
