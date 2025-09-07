@@ -1,0 +1,71 @@
+/* svntex2-ui.css - Modern, beautiful, advanced UI for SVNTeX 2.0 */
+body {
+    font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+    background: linear-gradient(120deg, #e0f7fa 0%, #fff 100%);
+    margin: 0;
+    padding: 0;
+}
+.svntex2-card {
+    max-width: 400px;
+    margin: 40px auto;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    padding: 32px 24px;
+    transition: box-shadow 0.2s;
+}
+.svntex2-card:hover {
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+}
+.svntex2-title {
+    font-size: 2em;
+    color: #0077cc;
+    text-align: center;
+    margin-bottom: 24px;
+    font-weight: 700;
+}
+.svntex2-input {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: 8px;
+    border: 1px solid #b0bec5;
+    font-size: 1em;
+    background: #f5fafd;
+    transition: border-color 0.2s;
+}
+.svntex2-input:focus {
+    border-color: #0077cc;
+    outline: none;
+}
+.svntex2-btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    background: linear-gradient(90deg, #0077cc 60%, #00bfae 100%);
+    color: #fff;
+    font-size: 1.1em;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: background 0.2s;
+}
+.svntex2-btn:active {
+    background: linear-gradient(90deg, #005fa3 60%, #009e8e 100%);
+}
+.svntex2-status {
+    text-align: center;
+    margin: 12px 0;
+    font-size: 1em;
+    color: #d32f2f;
+}
+@media (max-width: 500px) {
+    .svntex2-card {
+        padding: 16px 8px;
+    }
+    .svntex2-title {
+        font-size: 1.3em;
+    }
+}

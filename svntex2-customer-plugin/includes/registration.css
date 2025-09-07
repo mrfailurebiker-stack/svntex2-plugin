@@ -1,0 +1,51 @@
+/* registration.css - Simple responsive styling for registration/login */
+.svntex2-card {
+    max-width: 400px;
+    margin: 40px auto;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    padding: 32px 24px;
+}
+.svntex2-title {
+    font-size: 2em;
+    color: #0077cc;
+    text-align: center;
+    margin-bottom: 24px;
+    font-weight: 700;
+}
+.svntex2-input {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: 8px;
+    border: 1px solid #b0bec5;
+    font-size: 1em;
+    background: #f5fafd;
+}
+.svntex2-btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    background: #0077cc;
+    color: #fff;
+    font-size: 1.1em;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 12px;
+}
+.svntex2-status {
+    text-align: center;
+    margin: 12px 0;
+    font-size: 1em;
+    color: #d32f2f;
+}
+@media (max-width: 500px) {
+    .svntex2-card {
+        padding: 16px 8px;
+    }
+    .svntex2-title {
+        font-size: 1.3em;
+    }
+}
