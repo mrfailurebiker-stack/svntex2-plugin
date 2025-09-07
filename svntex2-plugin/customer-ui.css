@@ -1,0 +1,139 @@
+/* SVNTeX 2.0 Customer Registration UI CSS */
+.registration-container {
+    max-width: 400px;
+    margin: 40px auto;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    padding: 32px 24px;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    transition: box-shadow 0.3s;
+}
+.registration-container:hover {
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+}
+form h2 {
+    text-align: center;
+    margin-bottom: 24px;
+    font-weight: 600;
+    color: #2d3748;
+    letter-spacing: 1px;
+}
+.form-group {
+    margin-bottom: 18px;
+    position: relative;
+}
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 15px;
+    color: #4a5568;
+    font-weight: 500;
+}
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1.5px solid #cbd5e0;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+    background: #f7fafc;
+}
+.form-group input:focus {
+    border-color: #3182ce;
+    box-shadow: 0 0 0 2px #bee3f8;
+}
+.input-error {
+    border-color: #e53e3e !important;
+    box-shadow: 0 0 0 2px #feb2b2 !important;
+    animation: shake 0.3s;
+}
+@keyframes shake {
+    0% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    50% { transform: translateX(4px); }
+    75% { transform: translateX(-4px); }
+    100% { transform: translateX(0); }
+}
+.otp-complete {
+    border-color: #38a169 !important;
+    box-shadow: 0 0 0 2px #c6f6d5 !important;
+    animation: pulse 0.4s;
+}
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 2px #c6f6d5; }
+    50% { box-shadow: 0 0 0 6px #68d391; }
+    100% { box-shadow: 0 0 0 2px #c6f6d5; }
+}
+.submit-btn {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(90deg, #3182ce 0%, #63b3ed 100%);
+    color: #fff;
+    font-size: 17px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+.submit-btn:active {
+    transform: scale(0.98);
+    background: linear-gradient(90deg, #2b6cb0 0%, #4299e1 100%);
+}
+.form-errors {
+    margin-top: 12px;
+    min-height: 24px;
+    font-size: 15px;
+    color: #e53e3e;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.form-errors.show {
+    opacity: 1;
+    animation: fadeIn 0.3s;
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+.success-msg {
+    color: #38a169;
+    background: #f0fff4;
+    border-radius: 6px;
+    padding: 8px;
+    margin-top: 8px;
+    animation: fadeIn 0.3s;
+}
+.error-msg {
+    color: #e53e3e;
+    background: #fff5f5;
+    border-radius: 6px;
+    padding: 8px;
+    margin-top: 8px;
+    animation: fadeIn 0.3s;
+}
+@media (max-width: 600px) {
+    .registration-container {
+        padding: 18px 8px;
+        max-width: 98vw;
+    }
+    form h2 {
+        font-size: 22px;
+    }
+    .form-group input {
+        font-size: 15px;
+    }
+    .submit-btn {
+        font-size: 15px;
+        padding: 10px;
+    }
+}
+/* Accessibility: Focus ring for keyboard navigation */
+.form-group input:focus-visible {
+    outline: 2px solid #3182ce;
+    outline-offset: 2px;
+}
