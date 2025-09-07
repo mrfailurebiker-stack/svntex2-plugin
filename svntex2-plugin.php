@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SVNTeX 2.0 Customer System
  * Description: Foundation for SVNTeX 2.0 – registration, wallet ledger, referrals, KYC, withdrawals, PB/RB scaffolding with WooCommerce integration.
- * Version: 0.2.0
+ * Version: 0.2.3
  * Author: SVNTeX
  * Text Domain: svntex2
  * Requires at least: 6.0
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
-define( 'SVNTEX2_VERSION',        '0.2.2' );
+define( 'SVNTEX2_VERSION',        '0.2.3' );
 define( 'SVNTEX2_PLUGIN_FILE',    __FILE__ );
 define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
@@ -270,6 +270,10 @@ add_action( 'register_init', function(){
 add_action( 'wp_ajax_nopriv_svntex2_do_login', 'svntex2_ajax_do_login' );
 function svntex2_ajax_do_login(){
     check_ajax_referer( 'svntex2_login', 'svntex2_login_nonce' );
+    // Simple rate limit: allow up to 20 attempts per IP per 10 minutes
+    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $rl_key = 'svntex2_login_rl_' . md5( $ip );
+    $attempts = (int) get_transient( $rl_key );
     $login_id = sanitize_text_field( $_POST['login_id'] ?? '' );
     $password = $_POST['password'] ?? '';
     if ( ! $login_id || ! $password ) wp_send_json_error( ['message' => 'Missing credentials'] );
@@ -287,7 +291,15 @@ function svntex2_ajax_do_login(){
     }
     if ( ! $user ) wp_send_json_error( ['message' => 'Account not found'] );
     $check = wp_check_password( $password, $user->user_pass, $user->ID );
-    if ( ! $check ) wp_send_json_error( ['message' => 'Invalid password'] );
+    if ( ! $check ) {
+        $attempts++;
+        set_transient( $rl_key, $attempts, 10 * MINUTE_IN_SECONDS );
+        if ( $attempts > 20 ) {
+            wp_send_json_error( ['message' => 'Too many attempts. Try later.'] );
+        }
+        wp_send_json_error( ['message' => 'Invalid password'] );
+    }
+    delete_transient( $rl_key );
     $remember = ! empty( $_POST['remember'] );
     wp_set_current_user( $user->ID );
     wp_set_auth_cookie( $user->ID, $remember );
@@ -300,6 +312,36 @@ function svntex2_ajax_do_login(){
 // 10. EXTENSION HOOKS (for future add-ons)
 // -----------------------------------------------------------------------------
 do_action( 'svntex2_initialized' );
+
+// -----------------------------------------------------------------------------
+// 10a. REFERRAL QUALIFICATION & COMMISSION ON ORDER COMPLETE
+// -----------------------------------------------------------------------------
+add_action( 'woocommerce_order_status_completed', function( $order_id ) {
+    if ( ! function_exists( 'wc_get_order' ) ) return;
+    $order = wc_get_order( $order_id );
+    if ( ! $order ) return;
+    $user_id = $order->get_user_id();
+    if ( ! $user_id ) return;
+    $ref_source = get_user_meta( $user_id, 'referral_source', true );
+    if ( ! $ref_source ) return;
+    // Find referrer by login (customer id) or email fallback
+    $referrer_user = get_user_by( 'login', $ref_source );
+    if ( ! $referrer_user ) $referrer_user = get_user_by( 'email', $ref_source );
+    if ( ! $referrer_user ) return;
+    $referrer_id = (int) $referrer_user->ID;
+    // Link if fresh
+    svntex2_referrals_link( $referrer_id, $user_id );
+    // Ensure not processed before
+    if ( get_post_meta( $order_id, '_svntex2_referral_processed', true ) ) return;
+    $total = (float) $order->get_total();
+    if ( $total <= 0 ) return;
+    svntex2_referrals_mark_qualified( $referrer_id, $user_id, $total );
+    $commission = round( $total * 0.05, 2 ); // 5% placeholder
+    if ( $commission > 0 ) {
+        svntex2_wallet_add_transaction( $referrer_id, 'referral_commission', $commission, 'order:'.$order_id, [ 'referee' => $user_id ] );
+    }
+    update_post_meta( $order_id, '_svntex2_referral_processed', 1 );
+}, 30 );
 
 // -----------------------------------------------------------------------------
 // 10b. WOO My Account DASHBOARD INJECTION
