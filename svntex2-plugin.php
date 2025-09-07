@@ -128,12 +128,18 @@ function svntex2_deactivate(){
 add_action('wp_enqueue_scripts', function(){
     wp_register_style('svntex2-style', SVNTEX2_PLUGIN_URL . 'assets/css/style.css', [], SVNTEX2_VERSION);
     wp_register_script('svntex2-core', SVNTEX2_PLUGIN_URL . 'assets/js/core.js', ['jquery'], SVNTEX2_VERSION, true);
+    wp_register_script('svntex2-dashboard', SVNTEX2_PLUGIN_URL . 'assets/js/dashboard.js', ['jquery'], SVNTEX2_VERSION, true);
 });
 
 // Dashboard shortcode (placeholder)
 add_shortcode('svntex_dashboard', function(){
     if (!is_user_logged_in()) return '<p>Please <a href="'.esc_url(wp_login_url()).'">login</a>.</p>';
     wp_enqueue_style('svntex2-style');
+    wp_enqueue_script('svntex2-dashboard');
+    wp_localize_script('svntex2-dashboard','SVNTEX2Dash', [
+        'rest_url' => esc_url_raw( rest_url('svntex2/v1/wallet/balance') ),
+        'nonce'    => wp_create_nonce('wp_rest'),
+    ]);
     $file = SVNTEX2_PLUGIN_DIR . 'views/dashboard.php';
     if (file_exists($file)) { ob_start(); include $file; return ob_get_clean(); }
     return '<p>Dashboard view missing.</p>';
