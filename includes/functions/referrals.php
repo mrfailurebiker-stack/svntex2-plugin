@@ -40,4 +40,27 @@ function svntex2_referrals_get_qualified_count($user_id){
     return (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE referrer_id=%d AND qualified=1", $user_id));
 }
 
+/**
+ * Determine commission rate for a referrer using tiered slabs.
+ * Default slabs are based on number of qualified referrals (can be filtered).
+ * Each slab: [ 'min' => int, 'max' => int|INF, 'rate' => float ]
+ */
+function svntex2_referrals_get_commission_rate( $referrer_id, $order = null, $referee_id = null ){
+    $qualified = svntex2_referrals_get_qualified_count( $referrer_id );
+    $slabs = apply_filters('svntex2_referral_commission_slabs', [
+        [ 'min' => 0,  'max' => 4,  'rate' => 0.05 ],
+        [ 'min' => 5,  'max' => 9,  'rate' => 0.07 ],
+        [ 'min' => 10, 'max' => 19, 'rate' => 0.08 ],
+        [ 'min' => 20, 'max' => INF,'rate' => 0.10 ],
+    ], $referrer_id, $qualified, $order, $referee_id );
+    foreach ( $slabs as $slab ) {
+        $min = isset($slab['min']) ? (int)$slab['min'] : 0;
+        $max = isset($slab['max']) ? $slab['max'] : INF;
+        if ( $qualified >= $min && $qualified <= $max ) {
+            return (float) $slab['rate'];
+        }
+    }
+    return defined('SVNTEX2_REFERRAL_RATE') ? (float) SVNTEX2_REFERRAL_RATE : 0;
+}
+
 ?>

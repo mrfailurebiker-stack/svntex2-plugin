@@ -340,7 +340,13 @@ add_action( 'woocommerce_order_status_completed', function( $order_id ) {
     $total = (float) $order->get_total();
     if ( $total <= 0 ) return;
     svntex2_referrals_mark_qualified( $referrer_id, $user_id, $total );
-    $rate = (float) apply_filters( 'svntex2_referral_commission_rate', SVNTEX2_REFERRAL_RATE, $order, $referrer_id, $user_id );
+    // Determine dynamic rate using tiered slabs then allow override via filter
+    if ( function_exists('svntex2_referrals_get_commission_rate') ) {
+        $base_rate = svntex2_referrals_get_commission_rate( $referrer_id, $order, $user_id );
+    } else {
+        $base_rate = SVNTEX2_REFERRAL_RATE;
+    }
+    $rate = (float) apply_filters( 'svntex2_referral_commission_rate', $base_rate, $order, $referrer_id, $user_id );
     if ( $rate > 0 ) {
         $commission = round( $total * $rate, 2 );
         if ( $commission > 0 ) {
