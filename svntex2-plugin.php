@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SVNTeX 2.0 Customer System
  * Description: Foundation for SVNTeX 2.0 – registration, wallet ledger, referrals, KYC, withdrawals, PB/RB scaffolding with WooCommerce integration.
- * Version: 0.2.3
+ * Version: 0.2.4
  * Author: SVNTeX
  * Text Domain: svntex2
  * Requires at least: 6.0
@@ -18,11 +18,15 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
-define( 'SVNTEX2_VERSION',        '0.2.3' );
+define( 'SVNTEX2_VERSION',        '0.2.4' );
 define( 'SVNTEX2_PLUGIN_FILE',    __FILE__ );
 define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
 define( 'SVNTEX2_MIN_WC_VERSION', '7.0.0' );
+// Default referral commission rate (0 = disabled). Make dynamic via filter 'svntex2_referral_commission_rate'.
+if ( ! defined( 'SVNTEX2_REFERRAL_RATE' ) ) {
+    define( 'SVNTEX2_REFERRAL_RATE', 0.10 ); // 10% referral commission
+}
 
 // Pretty slugs for custom auth pages (can be filtered)
 define( 'SVNTEX2_LOGIN_SLUG', 'customer-login' );
@@ -336,9 +340,12 @@ add_action( 'woocommerce_order_status_completed', function( $order_id ) {
     $total = (float) $order->get_total();
     if ( $total <= 0 ) return;
     svntex2_referrals_mark_qualified( $referrer_id, $user_id, $total );
-    $commission = round( $total * 0.05, 2 ); // 5% placeholder
-    if ( $commission > 0 ) {
-        svntex2_wallet_add_transaction( $referrer_id, 'referral_commission', $commission, 'order:'.$order_id, [ 'referee' => $user_id ] );
+    $rate = (float) apply_filters( 'svntex2_referral_commission_rate', SVNTEX2_REFERRAL_RATE, $order, $referrer_id, $user_id );
+    if ( $rate > 0 ) {
+        $commission = round( $total * $rate, 2 );
+        if ( $commission > 0 ) {
+            svntex2_wallet_add_transaction( $referrer_id, 'referral_commission', $commission, 'order:'.$order_id, [ 'referee' => $user_id, 'rate' => $rate ] );
+        }
     }
     update_post_meta( $order_id, '_svntex2_referral_processed', 1 );
 }, 30 );
