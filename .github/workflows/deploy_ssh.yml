@@ -22,21 +22,21 @@ jobs:
           cat > exclude.txt <<'EOF'
           .git/
           .github/
-          svntex2-plugin/
-          scripts/
-          *.sh
           *.sql
           EOF
           cat exclude.txt
 
       - name: Deploy plugin directory
         run: |
-          rsync -avz --delete --exclude-from=exclude.txt \
+          set -euxo pipefail
+          echo "Local file snapshot (depth 3)"; find . -maxdepth 3 -type f | sort | head -100
+          RSYNC_OPTS="-rlptgoDzv --delete --checksum --exclude-from=exclude.txt"
+          rsync $RSYNC_OPTS \
             -e "ssh -p 65002 -o StrictHostKeyChecking=no" \
             ./ \
             u271371274@145.79.211.169:/home/u271371274/domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin/
 
       - name: List remote target (debug)
         run: |
-          ssh -p 65002 -o StrictHostKeyChecking=no u271371274@145.79.211.169 "ls -1 /home/u271371274/domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin | head"
+          ssh -p 65002 -o StrictHostKeyChecking=no u271371274@145.79.211.169 "echo 'Remote top-level:'; ls -1 /home/u271371274/domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin | head; echo 'Recursive sample:'; find /home/u271371274/domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin -maxdepth 3 -type f | head -50"
 
