@@ -1,3 +1,8 @@
+// WooCommerce My Account dashboard integration
+function svntex_frontend_dashboard_content() {
+    echo do_shortcode('[svntex2_dashboard]');
+}
+add_action('woocommerce_account_dashboard', 'svntex_frontend_dashboard_content');
 <?php
 // Customer dashboard shortcode
 function svntex2_customer_dashboard() {
