@@ -24,3 +24,11 @@ add_shortcode('svntex_debug', function(){
   $qualified = function_exists('svntex2_referrals_get_qualified_count') ? svntex2_referrals_get_qualified_count($uid) : 0;
   return '<pre style="font-size:12px; background:#111; color:#0f0; padding:10px;">USER: '+$uid+'\nBAL:'+number_format($bal,2)+'\nQUALIFIED:'+ $qualified +'</pre>';
 });
+
+// Login shortcode
+add_shortcode('svntex_login', function(){
+  if ( is_user_logged_in() ) return '<p>You are logged in.</p>';
+  $file = SVNTEX2_PLUGIN_DIR . 'views/login.php';
+  if ( file_exists( $file ) ) { ob_start(); include $file; return ob_get_clean(); }
+  return '<p>Login view missing.</p>';
+});
