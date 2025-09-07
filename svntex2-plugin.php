@@ -24,6 +24,10 @@ define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
 define( 'SVNTEX2_MIN_WC_VERSION', '7.0.0' );
 
+// Pretty slugs for custom auth pages (can be filtered)
+define( 'SVNTEX2_LOGIN_SLUG', 'customer-login' );
+define( 'SVNTEX2_REGISTER_SLUG', 'customer-register' );
+
 // -----------------------------------------------------------------------------
 // 2. AUTOLOADER (Simple – looks for includes/classes/<lower>.php)
 // -----------------------------------------------------------------------------
@@ -218,6 +222,78 @@ function svntex2_dashboard_shortcode() {
 // 9. AUTH / REGISTRATION MODULE (ADVANCED) – Loaded via Autoloader
 // -----------------------------------------------------------------------------
 if ( class_exists( 'SVNTEX2_Auth' ) ) { SVNTEX2_Auth::init(); }
+
+// -----------------------------------------------------------------------------
+// 9b. CUSTOM LOGIN / REGISTRATION PAGES & REDIRECTS
+// -----------------------------------------------------------------------------
+add_action( 'init', 'svntex2_register_auth_rewrites' );
+function svntex2_register_auth_rewrites(){
+    add_rewrite_rule( '^'.SVNTEX2_LOGIN_SLUG.'/?$', 'index.php?svntex2_page=login', 'top' );
+    add_rewrite_rule( '^'.SVNTEX2_REGISTER_SLUG.'/?$', 'index.php?svntex2_page=register', 'top' );
+    add_rewrite_tag( '%svntex2_page%', '([^&]+)' );
+}
+
+// Template loader for custom pages
+add_action( 'template_redirect', 'svntex2_render_auth_pages' );
+function svntex2_render_auth_pages(){
+    $page = get_query_var('svntex2_page');
+    if ( ! $page ) return;
+    if ( $page === 'login' ) {
+        if ( is_user_logged_in() ) { wp_safe_redirect( wc_get_page_permalink( 'myaccount' ) ); exit; }
+        wp_enqueue_style( 'svntex2-style' );
+        $file = SVNTEX2_PLUGIN_DIR.'views/customer-login.php';
+    } elseif ( $page === 'register' ) {
+        if ( is_user_logged_in() ) { wp_safe_redirect( wc_get_page_permalink( 'myaccount' ) ); exit; }
+        wp_enqueue_style( 'svntex2-style' );
+        $file = SVNTEX2_PLUGIN_DIR.'views/customer-registration.php';
+    } else { return; }
+    status_header(200); nocache_headers();
+    if ( file_exists( $file ) ) { include $file; } else { echo '<p>Auth view missing.</p>'; }
+    exit;
+}
+
+// Redirect wp-login.php to custom page (except special cases)
+add_action( 'login_init', function(){
+    if ( isset( $_GET['action'] ) && in_array( $_GET['action'], ['lostpassword','rp','resetpass'], true ) ) return; // allow core flows
+    wp_safe_redirect( site_url( '/'.SVNTEX2_LOGIN_SLUG.'/' ) );
+    exit;
+});
+
+// Public registration redirect (if enabled)
+add_action( 'register_init', function(){
+    if ( ! get_option('users_can_register') ) return; // respect site setting
+    wp_safe_redirect( site_url( '/'.SVNTEX2_REGISTER_SLUG.'/' ) );
+    exit;
+});
+
+// AJAX login handler
+add_action( 'wp_ajax_nopriv_svntex2_do_login', 'svntex2_ajax_do_login' );
+function svntex2_ajax_do_login(){
+    check_ajax_referer( 'svntex2_login', 'svntex2_login_nonce' );
+    $login_id = sanitize_text_field( $_POST['login_id'] ?? '' );
+    $password = $_POST['password'] ?? '';
+    if ( ! $login_id || ! $password ) wp_send_json_error( ['message' => 'Missing credentials'] );
+
+    $user = null;
+    if ( is_email( $login_id ) ) {
+        $user = get_user_by( 'email', $login_id );
+    } else {
+        // Try username then meta (customer_id stored as username style)
+        $user = get_user_by( 'login', $login_id );
+        if ( ! $user ) {
+            $q = get_users( [ 'meta_key' => 'customer_id', 'meta_value' => $login_id, 'number' => 1, 'fields' => 'all' ] );
+            if ( $q ) $user = $q[0];
+        }
+    }
+    if ( ! $user ) wp_send_json_error( ['message' => 'Account not found'] );
+    $check = wp_check_password( $password, $user->user_pass, $user->ID );
+    if ( ! $check ) wp_send_json_error( ['message' => 'Invalid password'] );
+    wp_set_current_user( $user->ID );
+    wp_set_auth_cookie( $user->ID, true );
+    do_action( 'wp_login', $user->user_login, $user );
+    $redirect = wc_get_page_permalink( 'myaccount' );
+    wp_send_json_success( [ 'redirect' => $redirect ] );
+}
 
 // -----------------------------------------------------------------------------
 // 10. EXTENSION HOOKS (for future add-ons)
