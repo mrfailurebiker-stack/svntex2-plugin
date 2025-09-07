@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
-define( 'SVNTEX2_VERSION',        '0.2.0' );
+define( 'SVNTEX2_VERSION',        '0.2.1' );
 define( 'SVNTEX2_PLUGIN_FILE',    __FILE__ );
 define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
@@ -39,9 +39,14 @@ spl_autoload_register( function ( $class ) {
 // -----------------------------------------------------------------------------
 // 3. INCLUDE FUNCTIONAL MODULES
 // -----------------------------------------------------------------------------
-require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/helpers.php';      // Wallet + small helpers
-require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/shortcodes.php';   // Future extra shortcodes
-require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/rest.php';         // REST endpoints
+require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/helpers.php';        // Wallet + small helpers
+require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/shortcodes.php';     // Shortcodes (dashboard + extras)
+require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/rest.php';           // REST endpoints
+// Newly scaffolded domain modules (placeholders / partial implementations)
+foreach ( [ 'referrals', 'kyc', 'withdrawals', 'cron', 'admin' ] as $module ) {
+    $file = SVNTEX2_PLUGIN_DIR . 'includes/functions/' . $module . '.php';
+    if ( file_exists( $file ) ) { require_once $file; }
+}
 
 // -----------------------------------------------------------------------------
 // 4. ACTIVATION: CREATE TABLES (idempotent via dbDelta)
