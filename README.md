@@ -1,36 +1,27 @@
-# SVNTeX 2.0 Customer System (v0.2.1)
+# SVNTeX 2.0 Customer System (v0.2.5)
 
 Foundation plugin for the SVNTeX 2.0 customer / member platform.
 
-## Included (current)
-- Activation hook creating custom tables:
-	- Wallet ledger
-	- Referrals
-	- KYC submissions
-	- Withdrawals
-	- Profit distributions + PB payouts
-- Shortcodes:
-	- `[svntex_registration]` (OTP demo + registration)
-	- `[svntex_dashboard]` (modern dark mode dashboard)
-	- `[svntex_wallet_history]` (recent 25 ledger rows)
-	- `[svntex_debug]` (admin-only quick stats)
-- Wallet ledger helpers (add transaction, balance)
-- REST: `GET /wp-json/svntex2/v1/wallet/balance`
-- Referrals scaffold (link + qualification placeholder)
-- KYC helpers (submit/status)
-- Withdrawals scaffold (request + process with hold/refund)
-- Monthly distribution cron scaffold
-- WP-CLI commands: `svntex2:wallet:add`, `svntex2:wallet:last`, `svntex2:referral:link`
-- Admin menu placeholder
+## Implemented
+* Custom tables (ledger, referrals, KYC, withdrawals, profit distributions, PB payouts) with idempotent activation.
+* Wallet ledger with category support (income, topup, withdraw, general) and helpers.
+* Referral system: linking, qualification threshold (>= 2400 net excluding shipping), tiered commission via filter, one-time Referral Bonus (RB) on first qualifying order or top-up.
+* PB (Profit/Partnership Bonus) slab engine (spend-based, normalized company profit distribution) with activation thresholds (2 provisional / 6 active) and KYC + RB gating.
+* Custom login & registration pages with OTP demo flow and AJAX auth.
+* Withdrawal requests limited to income balance; automatic fee breakdown (2% TDS + 8% AMC) and ledger reflections (hold, complete, refund).
+* Admin dashboard (overview, referrals, KYC, withdrawals, distributions, reports) + CSV export including fee summary.
+* Monthly cron scheduling & PB distribution integration (previous month run, transient locks for idempotency).
+* REST endpoint for wallet balance and WP-CLI utilities.
+* Manual functional test plan (`TESTING.md`).
 
-## Pending / Next Phases
-- Real OTP provider integration & login flow
-- Wallet top-up endpoints + UI
-- PB/RB slab logic & referral qualification rules
-- KYC document upload form + admin review UI
-- Withdrawal front-end + admin approval screen
-- Profit distribution calculation algorithm (current scaffold only)
-- Security hardening (rate limits, encryption, audit log)
+## Remaining / Next
+* PB maintenance lifecycle (12‑month rolling, lifetime status, suspension/reactivation) & suspense payouts when KYC pending.
+* Admin UI for monthly profit inputs (currently via filters).
+* Automated revenue / remaining wallet computation.
+* Real OTP service + secure rate limiting & logging.
+* Front-end withdrawal & wallet top-up UI.
+* Automated test suite (PHPUnit) for slabs, fees, distribution normalization.
+* Security hardening (encryption of sensitive KYC data, audit logging, permissions review).
 
 ## Development Quick Start
 1. Clone repo into `wp-content/plugins/svntex2-plugin`.
@@ -70,7 +61,7 @@ Shortcodes:
 - Ensure server file permissions keep private key secret out of repo.
 
 ---
-Version: 0.2.1
+Version: 0.2.5
 
 ## Clean File Structure
 ```
@@ -95,7 +86,7 @@ svntex2-plugin/
 			shortcodes.php
 	views/
 		dashboard.php
-	legacy/  (old standalone prototype files retained temporarily)
+	legacy/  (old prototype, safe to remove in production)
 		customer-auth.js
 		customer-login.php
 		customer-registration.php
