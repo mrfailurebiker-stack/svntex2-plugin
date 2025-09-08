@@ -369,7 +369,11 @@ add_action('template_redirect', function(){
     // Allow site owners to disable override via filter
     if ( ! apply_filters('svntex2_override_my_account', true) ) return;
         // Mobile redirect: always show dashboard, never WooCommerce My Account
+        // But allow logout to work
         if ( wp_is_mobile() ) {
+            if ( isset($_GET['action']) && $_GET['action'] === 'logout' ) {
+                return;
+            }
             wp_redirect(home_url('/dashboard'));
             exit;
         }
