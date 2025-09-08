@@ -359,6 +359,46 @@ add_action('template_redirect', function(){
     }
 });
 
+// -----------------------------------------------------------------------------
+// 9c. OVERRIDE WOO MY ACCOUNT PAGE -> DEDICATED SVNTeX DASHBOARD (hide WC UI)
+// -----------------------------------------------------------------------------
+add_action('template_redirect', function(){
+    if ( ! function_exists('is_account_page') ) return;
+    if ( ! is_account_page() ) return;
+    if ( ! is_user_logged_in() ) return; // let login redirect logic handle guests
+    // Allow site owners to disable override via filter
+    if ( ! apply_filters('svntex2_override_my_account', true) ) return;
+    // Render ONLY SVNTeX dashboard (no WooCommerce navigation / endpoints)
+    wp_enqueue_style( 'svntex2-style' );
+    wp_enqueue_script( 'svntex2-dashboard' );
+    wp_localize_script( 'svntex2-dashboard', 'SVNTEX2Dash', [
+        'rest_url' => esc_url_raw( rest_url( 'svntex2/v1/wallet/balance' ) ),
+        'pb_meta_url' => esc_url_raw( rest_url( 'svntex2/v1/pb/meta' ) ),
+        'nonce'    => wp_create_nonce( 'wp_rest' ),
+    ] );
+    status_header(200); nocache_headers();
+    ?><!DOCTYPE html>
+    <html <?php language_attributes(); ?>>
+    <head>
+        <meta charset="<?php bloginfo('charset'); ?>" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <?php wp_head(); ?>
+        <style>
+            /* Ensure any residual WooCommerce containers are hidden if printed by other plugins */
+            .woocommerce-MyAccount-navigation, .woocommerce-MyAccount-content, .woocommerce nav.woocommerce-MyAccount-navigation { display:none !important; }
+            body.svntex-app-shell { overflow-x:hidden; }
+        </style>
+    </head>
+    <body <?php body_class('svntex-app-shell svntex-myaccount-override'); ?>>
+        <main class="svntex-dashboard-override" style="min-height:100vh;display:flex;flex-direction:column;">
+            <?php echo do_shortcode('[svntex_dashboard]'); ?>
+        </main>
+        <?php wp_footer(); ?>
+    </body>
+    </html><?php
+    exit;
+});
+
 // Redirect wp-login.php to custom page (except special cases)
 add_action( 'login_init', function(){
     if ( isset( $_GET['action'] ) && in_array( $_GET['action'], ['lostpassword','rp','resetpass'], true ) ) return; // allow core flows

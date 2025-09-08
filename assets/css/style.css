@@ -106,6 +106,10 @@ body:not(.dark) .btn-ghost, body:not(.dark) .btn-refresh { background:rgba(255,2
 .svntex-brand-bar { display:flex; align-items:center; justify-content:space-between; padding: clamp(1rem,2vw,1.6rem) clamp(1.1rem,3vw,2.2rem); position:relative; z-index:15; }
 .svntex-brand-bar .brand { font-size: clamp(1.25rem,2vw,1.85rem); font-weight:700; letter-spacing:.5px; background:linear-gradient(90deg,#db2777,#7e22ce); -webkit-background-clip:text; background-clip:text; color:transparent; text-decoration:none; }
 .svntex-brand-bar .brand:focus-visible { outline:2px solid #db2777; outline-offset:4px; border-radius:8px; }
+.svntex-myaccount-override .woocommerce { display:none !important; }
+.svntex-myaccount-override .woocommerce-MyAccount-navigation { display:none !important; }
+.svntex-myaccount-override .woocommerce-MyAccount-content { display:none !important; }
+.svntex-myaccount-override #primary, .svntex-myaccount-override .entry-content { margin:0; padding:0; }
 .svntex-brand-links { display:flex; gap:1rem; align-items:center; }
 .svntex-brand-links a { position:relative; text-decoration:none; font-weight:600; font-size:.85rem; color:var(--text-light); padding:.45rem .75rem; border-radius:12px; transition:.35s background, .35s color; }
 .svntex-brand-links a:hover { background:rgba(255,255,255,0.08); color:#fff; }
