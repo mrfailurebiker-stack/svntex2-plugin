@@ -60,6 +60,14 @@ $logout_url = esc_url( wp_logout_url( home_url() ) );
                     <span class="loading-indicator" hidden>Updating…</span>
                 </div>
                 <small class="muted">Live ledger value</small>
+                <form method="post" class="wallet-topup-form" data-topup-form style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                    <label style="flex:1 1 160px;min-width:140px;">
+                        <span class="screen-reader-text">Top-up Amount</span>
+                        <input type="number" step="0.01" name="topup_amount" placeholder="Amount" min="100" required style="width:100%;" />
+                    </label>
+                    <button type="submit" class="btn-accent-gradient" style="padding:.65rem 1.1rem;border-radius:10px;">Top Up</button>
+                    <span class="topup-msg muted" data-topup-msg style="flex-basis:100%;font-size:.7rem;"></span>
+                </form>
             </section>
             <section class="widget pb-widget" aria-label="Partnership Bonus Status" data-widget="pb-status">
                 <h2 class="widget-title">PB Status</h2>

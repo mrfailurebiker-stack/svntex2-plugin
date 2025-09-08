@@ -7,6 +7,28 @@ add_action('rest_api_init', function(){
         'permission_callback' => function(){ return is_user_logged_in(); },
         'callback' => function(){ return ['balance' => svntex2_wallet_get_balance(get_current_user_id())]; }
     ]);
+    // Wallet top-up endpoint (direct credit; integrate payment gateway externally later)
+    register_rest_route('svntex2/v1','/wallet/topup', [
+        'methods' => 'POST',
+        'permission_callback' => function(){ return is_user_logged_in(); },
+        'callback' => function( WP_REST_Request $req ){
+            $uid = get_current_user_id();
+            $amount = (float) $req->get_param('amount');
+            $min = (float) apply_filters('svntex2_wallet_topup_min', 100 );
+            $max = (float) apply_filters('svntex2_wallet_topup_max', 100000 );
+            if( $amount < $min ) return new WP_REST_Response( [ 'error' => 'Minimum top-up is '.$min ], 400 );
+            if( $amount > $max ) return new WP_REST_Response( [ 'error' => 'Maximum top-up is '.$max ], 400 );
+            // Simple rate limit: max 10 top-ups per hour
+            $rl_key = 'svntex2_topup_rl_'.$uid; $bucket = get_transient($rl_key); if(!is_array($bucket)) $bucket=[];
+            $now = time(); $bucket = array_filter($bucket, function($ts) use ($now){ return ($now - $ts) < HOUR_IN_SECONDS; });
+            if( count($bucket) >= 10 ) return new WP_REST_Response( [ 'error' => 'Too many top-ups, try later' ], 429 );
+            $allow = apply_filters('svntex2_wallet_topup_allowed', true, $uid, $amount );
+            if( ! $allow ) return new WP_REST_Response( [ 'error' => 'Top-up not allowed' ], 403 );
+            $balance = svntex2_wallet_add_transaction( $uid, 'wallet_topup', $amount, 'topup:'.uniqid(), [ 'source'=>'dashboard_rest' ], 'topup' );
+            $bucket[] = $now; set_transient($rl_key, $bucket, HOUR_IN_SECONDS );
+            return [ 'ok'=> true, 'balance' => $balance, 'amount' => $amount, 'display' => function_exists('wc_price') ? wc_price($balance) : number_format($balance,2) ];
+        }
+    ]);
     // PB Dashboard meta endpoint
     register_rest_route('svntex2/v1','/pb/meta', [
         'methods' => 'GET',

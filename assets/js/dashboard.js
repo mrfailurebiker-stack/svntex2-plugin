@@ -46,6 +46,32 @@
   // Auto refresh once on load after slight delay
   setTimeout(fetchBalance, 400);
 
+  // Wallet Top-up form
+  const topupForm = document.querySelector('[data-topup-form]');
+  if(topupForm){
+    const msgEl = topupForm.querySelector('[data-topup-msg]');
+    topupForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      if(!SVNTEX2Dash){ return; }
+      const amtInput = topupForm.querySelector('input[name=topup_amount]');
+      const raw = parseFloat(amtInput.value || '0');
+      if(!raw || raw <=0){ msgEl.textContent = 'Enter amount'; return; }
+      msgEl.textContent = 'Processing...';
+      try {
+        const res = await fetch(SVNTEX2Dash.rest_url.replace(/wallet\/balance$/,'wallet/topup'), {
+          method:'POST',
+          headers:{ 'X-WP-Nonce': SVNTEX2Dash.nonce, 'Content-Type':'application/json' },
+          body: JSON.stringify({ amount: raw })
+        });
+        const data = await res.json();
+        if(!res.ok || data.error){ msgEl.textContent = data.error || 'Failed'; return; }
+        msgEl.textContent = 'Top-up successful';
+        amtInput.value='';
+        fetchBalance();
+      } catch(err){ msgEl.textContent = 'Error'; }
+    });
+  }
+
   // PB META wiring
   async function fetchPBMeta(){
     if(!SVNTEX2Dash || !SVNTEX2Dash.pb_meta_url) return;
