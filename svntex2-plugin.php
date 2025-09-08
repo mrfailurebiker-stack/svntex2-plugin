@@ -652,3 +652,13 @@ add_action( 'wp_logout', function() {
     wp_redirect( home_url('/') ); // Always redirect to homepage after logout
     exit;
 });
+
+// -----------------------------------------------------------------------------
+// 13. WOO LOGOUT ENDPOINT REDIRECT (ENSURE HOMEPAGE)
+// -----------------------------------------------------------------------------
+add_action( 'template_redirect', function() {
+    if ( isset($_SERVER['REQUEST_URI']) && preg_match('#/my-account/logout/?#', $_SERVER['REQUEST_URI']) ) {
+        wp_redirect( home_url('/') );
+        exit;
+    }
+});
