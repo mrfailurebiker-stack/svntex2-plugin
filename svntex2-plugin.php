@@ -212,7 +212,40 @@ function svntex2_register_assets() {
     wp_register_style( 'svntex2-style', SVNTEX2_PLUGIN_URL . 'assets/css/style.css', [], SVNTEX2_VERSION );
     wp_register_script( 'svntex2-core', SVNTEX2_PLUGIN_URL . 'assets/js/core.js', [ 'jquery' ], SVNTEX2_VERSION, true );
     wp_register_script( 'svntex2-dashboard', SVNTEX2_PLUGIN_URL . 'assets/js/dashboard.js', [ 'jquery' ], SVNTEX2_VERSION, true );
+    // Landing / brand extension stylesheet (used for auth + landing + dashboard polish)
+    wp_register_style( 'svntex2-landing', SVNTEX2_PLUGIN_URL . 'assets/css/landing.css', [ 'svntex2-style' ], SVNTEX2_VERSION );
 }
+
+/**
+ * Determine if current request is within any SVNTeX brand UI context.
+ * Central place so future pages (withdrawal UI, KYC wizard, etc.) can be added once.
+ */
+function svntex2_is_brand_ui_context() : bool {
+    if ( is_admin() ) return false;
+    $auth_page = get_query_var( 'svntex2_page' );
+    if ( $auth_page === 'login' || $auth_page === 'register' ) return true;
+    if ( is_front_page() || is_home() ) return true; // landing
+    // My Account dashboard injection (presence of WooCommerce account page + logged in)
+    if ( function_exists( 'is_account_page' ) && is_account_page() && is_user_logged_in() ) return true;
+    return false;
+}
+
+// Unified enqueue – ensures BOTH primary and landing design layers always present in brand contexts.
+add_action( 'wp_enqueue_scripts', function(){
+    if ( ! svntex2_is_brand_ui_context() ) return;
+    wp_enqueue_style( 'svntex2-style' );
+    wp_enqueue_style( 'svntex2-landing' ); // gradient / feature card tokens reused
+    // Provide a JS settings object (extensible) once
+    wp_register_script( 'svntex2-brand-init', SVNTEX2_PLUGIN_URL . 'assets/js/brand-init.js', [], SVNTEX2_VERSION, true );
+    wp_add_inline_script( 'svntex2-brand-init', 'window.SVNTEX2_BRAND = { version: "'.esc_js( SVNTEX2_VERSION ).'" };' );
+    wp_enqueue_script( 'svntex2-brand-init' );
+}, 20 );
+
+// Add global body class for styling hooks
+add_filter( 'body_class', function( $classes ) {
+    if ( svntex2_is_brand_ui_context() ) { $classes[] = 'svntex-app-shell'; }
+    return $classes;
+});
 
 // -----------------------------------------------------------------------------
 // 8. DASHBOARD SHORTCODE (CONNECTS UI + DATA + WC)
