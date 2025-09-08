@@ -645,4 +645,10 @@ if ( ! file_exists( SVNTEX2_PLUGIN_DIR . 'assets/js/core.js' ) ) {
     @file_put_contents( SVNTEX2_PLUGIN_DIR . 'assets/js/core.js', "console.log('SVNTeX core loaded');" );
 }
 
-// End of file.
+// -----------------------------------------------------------------------------
+// 12. LOGOUT REDIRECT (ENSURE CONSISTENCY)
+// -----------------------------------------------------------------------------
+add_action( 'wp_logout', function() {
+    wp_redirect( home_url('/') ); // Always redirect to homepage after logout
+    exit;
+});
