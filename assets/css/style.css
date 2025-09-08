@@ -5,18 +5,100 @@
   - Dashboard Layout & Widgets
   - Forms & Utilities
   ===================================================================== */
-/* Basic initial styling - to be expanded */
-.svntex2-registration { max-width:480px; margin:1.5rem auto; padding:1rem; border:1px solid #e2e8f0; border-radius:8px; background:#fff; }
-.svntex2-registration div { margin-bottom:.75rem; }
-.svntex2-registration input { width:100%; padding:.5rem; border:1px solid #cbd5e1; border-radius:4px; }
-.svntex2-registration button { background:#2563eb; color:#fff; padding:.6rem 1rem; border:none; border-radius:4px; cursor:pointer; }
-.svntex2-registration .btn-otp { margin-left:.5rem; background:#475569; }
-.svntex2-registration .form-messages { margin-top:.75rem; font-size:.9rem; }
-.svntex2-registration .form-messages.error { color:#dc2626; }
-.svntex2-registration .form-messages.success { color:#16a34a; }
-.svntex2-dashboard { max-width:960px; margin:2rem auto; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-.dashboard-cards { display:flex; gap:1rem; flex-wrap:wrap; }
-.dashboard-cards .card { flex:1 1 200px; background:#f8fafc; border:1px solid #e2e8f0; padding:1rem; border-radius:8px; }
+/* Removed legacy minimal registration styles – replaced with unified brand system */
+/* ------------------------------------------------------------- */
+/* GLOBAL BRAND BACKGROUND ENHANCEMENTS                          */
+/* ------------------------------------------------------------- */
+body.svntex-app-shell, body.svntex-landing, body:has(.svntex-dashboard-wrapper) {
+  background: radial-gradient(circle at 12% 18%, rgba(219,39,119,0.22), transparent 60%),
+              radial-gradient(circle at 88% 72%, rgba(126,34,206,0.18), transparent 65%),
+              linear-gradient(140deg,#0f172a,#1e293b 55%, #0f172a);
+  background-attachment:fixed;
+}
+html.dark body.svntex-app-shell { background:linear-gradient(140deg,#0b1220,#172132); }
+
+/* Utility shapes (dashboard) */
+.svntex-dashboard-wrapper:before,
+.svntex-dashboard-wrapper:after { content:""; position:fixed; width:420px; height:420px; filter:blur(80px); opacity:.45; z-index:-1; pointer-events:none; }
+.svntex-dashboard-wrapper:before { top:-160px; left:-140px; background:radial-gradient(circle at 30% 35%, rgba(219,39,119,.55), transparent 70%); animation: dashFloat1 18s linear infinite alternate; }
+.svntex-dashboard-wrapper:after { bottom:-180px; right:-160px; background:radial-gradient(circle at 70% 55%, rgba(126,34,206,.55), transparent 70%); animation: dashFloat2 22s linear infinite alternate; }
+@keyframes dashFloat1 { to { transform:translate(90px,70px) scale(1.15); opacity:.35; } }
+@keyframes dashFloat2 { to { transform:translate(-120px,-60px) scale(1.12); opacity:.35; } }
+
+/* ------------------------------------------------------------- */
+/* NAVIGATION + SIDEBAR ENHANCEMENTS                              */
+/* ------------------------------------------------------------- */
+.dashboard-sidebar { position:relative; backdrop-filter:blur(8px); background:rgba(30,41,59,0.65); border-right:1px solid rgba(255,255,255,0.05); }
+body:not(.dark) .dashboard-sidebar { background:rgba(255,255,255,0.75); }
+.dashboard-sidebar:before { content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(236,72,153,0.15), transparent 45%, rgba(126,34,206,0.22)); pointer-events:none; }
+
+.nav-link { position:relative; font-weight:600; letter-spacing:.3px; color:var(--text-light); display:flex; align-items:center; gap:.75rem; }
+.nav-link .nav-ico { width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; opacity:.8; }
+.nav-link svg { width:18px; height:18px; stroke:currentColor; stroke-width:1.8; fill:none; }
+.nav-link:hover { background:rgba(236,72,153,0.08); color:var(--primary-blue); }
+.nav-link.active { background:linear-gradient(90deg,rgba(236,72,153,0.18),rgba(126,34,206,0.18)); color:#fff; font-weight:600; border-left-color:var(--primary-blue); }
+body:not(.dark) .nav-link.active { color:#111; }
+
+/* Micro underline on focus */
+.nav-link:focus-visible { outline:none; box-shadow:inset 0 0 0 2px rgba(236,72,153,0.55); }
+
+/* ------------------------------------------------------------- */
+/* WIDGET & PANEL MODERNIZATION                                  */
+/* ------------------------------------------------------------- */
+.widget { background: linear-gradient(155deg, rgba(255,255,255,0.07), rgba(148,163,184,0.05)); border:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(10px); }
+body.dark .widget { background: linear-gradient(160deg, rgba(30,41,59,0.9), rgba(51,65,85,0.55)); border-color:rgba(255,255,255,0.06); }
+.widget { transition: .55s transform, .55s box-shadow, .55s border-color; }
+.widget:hover { transform:translateY(-6px); box-shadow:0 18px 40px -18px rgba(236,72,153,.55),0 4px 14px -3px rgba(0,0,0,.35); border-color:rgba(236,72,153,0.45); }
+.widget .wallet-balance, .widget .referral-count { background:linear-gradient(90deg,#ec4899,#7e22ce); -webkit-background-clip:text; background-clip:text; color:transparent; }
+
+/* Panel sections */
+.panel { background:linear-gradient(140deg, rgba(255,255,255,0.05), rgba(126,34,206,0.12)); border:1px solid rgba(255,255,255,0.08); padding:2rem 1.6rem; border-radius:28px; position:relative; overflow:hidden; }
+body.dark .panel { background:linear-gradient(140deg, rgba(30,41,59,0.9), rgba(126,34,206,0.15)); }
+.panel:before { content:""; position:absolute; inset:0; background:radial-gradient(circle at 80% 20%, rgba(236,72,153,0.25), transparent 65%); pointer-events:none; }
+.panel-title { margin:0 0 .85rem; font-size:1.15rem; font-weight:600; letter-spacing:.5px; }
+
+/* ------------------------------------------------------------- */
+/* BUTTON ENHANCEMENTS (reuse accent gradient)                    */
+/* ------------------------------------------------------------- */
+button, .submit-btn, .btn-ghost, .btn-refresh { font-weight:600; letter-spacing:.4px; }
+button.gradient, .btn-accent-gradient { background:linear-gradient(90deg,#ec4899,#7e22ce); color:#fff; border:none; }
+button.gradient:hover, .btn-accent-gradient:hover { filter:brightness(1.1); }
+
+/* Refresh + dark toggle subtle glass */
+.btn-ghost, .btn-refresh { background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.15); backdrop-filter:blur(6px); }
+body:not(.dark) .btn-ghost, body:not(.dark) .btn-refresh { background:rgba(255,255,255,0.65); }
+
+/* ------------------------------------------------------------- */
+/* AUTH CARD ENHANCEMENTS (shapes + subtle motion)                */
+/* ------------------------------------------------------------- */
+.svntex-auth-shell { position:relative; }
+.svntex-auth-shell:before, .svntex-auth-shell:after { content:""; position:absolute; width:360px; height:360px; filter:blur(70px); opacity:.55; z-index:0; pointer-events:none; }
+.svntex-auth-shell:before { top:-140px; left:-120px; background:radial-gradient(circle at 35% 35%, rgba(236,72,153,.6), transparent 70%); animation: authFloat1 22s linear infinite alternate; }
+.svntex-auth-shell:after { bottom:-160px; right:-140px; background:radial-gradient(circle at 70% 50%, rgba(126,34,206,.55), transparent 70%); animation: authFloat2 26s linear infinite alternate; }
+@keyframes authFloat1 { to { transform:translate(80px,60px) scale(1.18); opacity:.38; } }
+@keyframes authFloat2 { to { transform:translate(-90px,-50px) scale(1.15); opacity:.38; } }
+.svntex-auth-card { z-index:1; backdrop-filter:blur(12px); }
+
+/* Input icons (optional placeholder icon style) */
+.svntex-auth-form .field { position:relative; }
+.svntex-auth-form .field.with-icon input { padding-left:2.5rem; }
+.svntex-auth-form .field.with-icon .fi { position:absolute; top:50%; left:.85rem; transform:translateY(-50%); width:18px; height:18px; opacity:.65; color:var(--text-light); }
+
+/* Links refinement */
+.svntex-auth-foot a { position:relative; }
+.svntex-auth-foot a:after { content:""; position:absolute; left:0; bottom:-2px; width:0; height:2px; background:linear-gradient(90deg,#ec4899,#7e22ce); transition:.35s width; }
+.svntex-auth-foot a:hover:after { width:100%; }
+
+/* Form success / error animations */
+.form-messages.success { animation: flashSuccess 3s ease-in-out; }
+@keyframes flashSuccess { 0%{filter:brightness(1.2);} 40%{filter:brightness(1);} 100%{filter:brightness(1);} }
+
+/* ------------------------------------------------------------- */
+/* RESPONSIVE FINER TUNING                                       */
+/* ------------------------------------------------------------- */
+@media (max-width:1020px){ .dashboard-widgets { gap:20px; } }
+@media (max-width:760px){ .dash-title { font-size:1.65rem; } .widget { padding:18px; } }
+@media (max-width:560px){ .panel { padding:1.35rem 1rem; border-radius:24px; } }
 /* Main Stylesheet for SVNTeX Dashboard and Forms */
 
 :root {
@@ -258,7 +340,7 @@ body.dark .svntex-auth-shell { background:#0f172a; }
 .svntex-auth-card:before { content:""; position:absolute; inset:0; background:linear-gradient(145deg, rgba(var(--auth-accent-rgb),0.08), transparent 60%); pointer-events:none; }
 body.dark .svntex-auth-card { background:#1e293b; border-color:#2b3b52; }
 
-.svntex-auth-title { margin:0 0 0.35rem; font-size: clamp(1.9rem,2.6vw,2.4rem); font-weight:700; letter-spacing:-.5px; background:linear-gradient(90deg,var(--auth-accent-start),var(--auth-accent-end)); -webkit-background-clip:text; color:transparent; }
+.svntex-auth-title { margin:0 0 0.35rem; font-size: clamp(1.9rem,2.6vw,2.4rem); font-weight:700; letter-spacing:-.5px; background:linear-gradient(90deg,var(--auth-accent-start),var(--auth-accent-end)); -webkit-background-clip:text; background-clip:text; color:transparent; }
 .svntex-auth-sub { margin:0 0 1.75rem; font-size:.95rem; color:var(--text-light); }
 
 .svntex-auth-form .field { margin-bottom:1.05rem; }
