@@ -350,9 +350,7 @@ function svntex2_render_auth_pages(){
 // Front page landing override (simple) – render modern landing if is home/front
 add_action('template_redirect', function(){
     if ( ! is_user_logged_in() && ( is_front_page() || is_home() ) ) {
-        // Avoid conflict if a static front page with content is set; allow override via filter
-        $enabled = apply_filters('svntex2_enable_landing', true);
-        if ( ! $enabled ) return;        
+        // Always show custom landing page for non-logged-in users
         $file = SVNTEX2_PLUGIN_DIR.'views/landing.php';
         if ( file_exists( $file ) ) {
             status_header(200); nocache_headers(); include $file; exit; }
@@ -369,10 +367,15 @@ add_action('template_redirect', function(){
     // Allow site owners to disable override via filter
     if ( ! apply_filters('svntex2_override_my_account', true) ) return;
         // Mobile redirect: always show dashboard, never WooCommerce My Account
-        // But allow logout to work (detect logout URL)
+        // But allow logout to work (detect logout URL more robustly)
         if ( wp_is_mobile() ) {
             $request_uri = $_SERVER['REQUEST_URI'] ?? '';
-            if ( strpos($request_uri, 'action=logout') !== false || strpos($request_uri, '/wp-login.php') !== false ) {
+            if (
+                strpos($request_uri, 'action=logout') !== false ||
+                strpos($request_uri, '/wp-login.php') !== false ||
+                strpos($request_uri, '/logout') !== false ||
+                strpos($request_uri, 'loggedout') !== false
+            ) {
                 return;
             }
             wp_redirect(home_url('/dashboard'));
