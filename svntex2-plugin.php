@@ -369,9 +369,10 @@ add_action('template_redirect', function(){
     // Allow site owners to disable override via filter
     if ( ! apply_filters('svntex2_override_my_account', true) ) return;
         // Mobile redirect: always show dashboard, never WooCommerce My Account
-        // But allow logout to work
+        // But allow logout to work (detect logout URL)
         if ( wp_is_mobile() ) {
-            if ( isset($_GET['action']) && $_GET['action'] === 'logout' ) {
+            $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+            if ( strpos($request_uri, 'action=logout') !== false || strpos($request_uri, '/wp-login.php') !== false ) {
                 return;
             }
             wp_redirect(home_url('/dashboard'));
