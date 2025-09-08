@@ -263,6 +263,16 @@ body.dark .btn-ghost:hover, body.dark .btn-refresh:hover { background:var(--prim
   margin-top: 8px;
 }
 
+/* PB STATUS BADGES */
+[data-widget="pb-status"] [data-pb-status] { display:inline-block; padding:2px 10px; border-radius:999px; font-size:.7rem; font-weight:600; letter-spacing:.5px; background:#e2e8f0; color:#1e293b; text-transform:uppercase; }
+body.dark [data-widget="pb-status"] [data-pb-status] { background:#334155; color:#e2e8f0; }
+[data-pb-status].is-active { background:#16a34a; color:#fff; }
+[data-pb-status].is-provisional { background:#d97706; color:#fff; }
+[data-pb-status].is-suspended { background:#dc2626; color:#fff; }
+[data-pb-status].is-lifetime { background:linear-gradient(90deg,#ec4899,#7e22ce); color:#fff; }
+[data-pb-suspense-wrap] { margin-top:6px; font-size:.75rem; }
+body.dark [data-pb-suspense-wrap] { color:#e2e8f0; }
+
 .purchases-list {
   margin: 0;
   padding: 0 0 0 18px;

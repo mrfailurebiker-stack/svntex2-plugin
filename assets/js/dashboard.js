@@ -57,6 +57,9 @@
       if(!res.ok) throw new Error('HTTP '+res.status);
       const data = await res.json();
       statusEl.textContent = data.status || 'inactive';
+  // status badge classes
+  statusEl.className = ''; // reset
+  if(data.status){ statusEl.classList.add('is-'+data.status); }
       const ci = document.querySelector('[data-pb-cycle-index]');
       const cs = document.querySelector('[data-pb-cycle-start]');
       const cr = document.querySelector('[data-pb-cycle-refs]');
