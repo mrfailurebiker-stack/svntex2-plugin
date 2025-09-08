@@ -1,4 +1,4 @@
-<?php if ( ! defined( 'ABSPATH' ) ) exit; wp_enqueue_style('svntex2-style'); ?>
+<?php if ( ! defined( 'ABSPATH' ) ) exit; ?>
 <div class="svntex-brand-bar">
   <a class="brand" href="<?php echo esc_url( home_url('/') ); ?>">SVNTeX</a>
   <div class="svntex-brand-links">

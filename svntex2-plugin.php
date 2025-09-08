@@ -263,7 +263,22 @@ function svntex2_render_auth_pages(){
         $file = SVNTEX2_PLUGIN_DIR.'views/customer-registration.php';
     } else { return; }
     status_header(200); nocache_headers();
+    // Capture template output so we can wrap with full HTML (ensures wp_head/wp_footer fire and styles load)
+    ob_start();
     if ( file_exists( $file ) ) { include $file; } else { echo '<p>Auth view missing.</p>'; }
+    $content = ob_get_clean();
+    ?><!DOCTYPE html>
+    <html <?php language_attributes(); ?>>
+    <head>
+        <meta charset="<?php bloginfo('charset'); ?>" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <?php wp_head(); ?>
+    </head>
+    <body <?php body_class('svntex-app-shell'); ?>>
+        <?php echo $content; ?>
+        <?php wp_footer(); ?>
+    </body>
+    </html><?php
     exit;
 }
 
