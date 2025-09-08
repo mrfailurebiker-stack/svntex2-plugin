@@ -171,6 +171,23 @@ function svntex2_admin_withdrawals(){
 
 function svntex2_admin_distributions(){
     global $wpdb; $table = $wpdb->prefix.'svntex_profit_distributions';
+    $suspense_table = $wpdb->prefix.'svntex_pb_suspense';
+    // Release suspense action
+    if( isset($_POST['svntex2_release_suspense']) && check_admin_referer('svntex2_release_suspense','svntex2_release_suspense_nonce') ){
+        $sid = (int) $_POST['suspense_id'];
+        $row = $wpdb->get_row( $wpdb->prepare("SELECT * FROM $suspense_table WHERE id=%d AND status='held'", $sid) );
+        if($row){
+            // Only release if user now active or lifetime
+            $ustatus = get_user_meta($row->user_id,'_svntex2_pb_status', true );
+            if( in_array($ustatus,['active','lifetime'], true) ){
+                svntex2_wallet_add_transaction( $row->user_id, 'profit_bonus', (float)$row->amount, 'pb_release:'.$row->month_year, [ 'original_month'=>$row->month_year,'released'=>current_time('mysql'),'reason'=>$row->reason ], 'income' );
+                $wpdb->update($suspense_table,[ 'status'=>'released','released_at'=>current_time('mysql') ],['id'=>$row->id]);
+                echo '<div class="updated notice"><p>Suspense payout released.</p></div>';
+            } else {
+                echo '<div class="error notice"><p>User not active/lifetime; cannot release.</p></div>';
+            }
+        }
+    }
     if( isset($_POST['svntex2_new_distribution']) && check_admin_referer('svntex2_new_distribution','svntex2_distribution_nonce') ){
         $month_year = sanitize_text_field($_POST['month_year']);
         $company_profit = (float)$_POST['company_profit'];
@@ -194,6 +211,20 @@ function svntex2_admin_distributions(){
             printf('<tr><td>%d</td><td>%s</td><td>%s</td><td>%d</td><td>%s</td><td>%s</td></tr>', $r->id, esc_html($r->month_year), number_format_i18n($r->company_profit,2), $r->eligible_members, number_format_i18n($r->profit_value,4), esc_html($r->created_at));
         }
     } else { echo '<tr><td colspan="6">No distribution records.</td></tr>'; }
+    echo '</tbody></table>';
+
+    // Suspense queue
+    $srows = $wpdb->get_results("SELECT * FROM $suspense_table WHERE status='held' ORDER BY created_at DESC LIMIT 100");
+    echo '<h3>Suspense (Held PB Payouts)</h3>';
+    echo '<table class="widefat striped svntex2-table"><thead><tr><th>ID</th><th>User</th><th>Month</th><th>Amount</th><th>Status</th><th>Reason</th><th>Created</th><th>Action</th></tr></thead><tbody>';
+    if($srows){
+        foreach($srows as $r){
+            echo '<tr>';
+            printf('<td>%d</td><td>%d</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>', $r->id,$r->user_id, esc_html($r->month_year), number_format_i18n($r->amount,2), esc_html($r->status), esc_html($r->reason), esc_html($r->created_at));
+            echo '<td><form method="post" style="display:inline">'.wp_nonce_field('svntex2_release_suspense','svntex2_release_suspense_nonce',true,false).'<input type="hidden" name="suspense_id" value="'.(int)$r->id.'" /><button class="button button-small" name="svntex2_release_suspense" value="1">Release</button></form></td>';
+            echo '</tr>';
+        }
+    } else { echo '<tr><td colspan="8">No held payouts.</td></tr>'; }
     echo '</tbody></table>';
 }
 

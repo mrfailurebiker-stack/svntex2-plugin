@@ -37,6 +37,62 @@ function svntex2_pb_get_status( $user_id ){
 }
 function svntex2_pb_set_status($user_id,$status){ update_user_meta($user_id,'_svntex2_pb_status',$status); }
 
+/**
+ * Record monthly referral qualification count snapshot for maintenance.
+ * Called when a referral qualifies and by monthly maintenance cron to ensure metric existence.
+ */
+function svntex2_pb_increment_month_referral($user_id){
+    $month = date('Y-m');
+    $key = '_svntex2_pb_ref_m_'.$month;
+    $cur = (int) get_user_meta($user_id,$key, true );
+    update_user_meta($user_id,$key,$cur+1);
+}
+
+add_action('svntex2_referral_qualified', function($referrer_id){ svntex2_pb_increment_month_referral($referrer_id); }, 20, 1);
+
+/** Evaluate lifecycle (rolling 12 months) */
+function svntex2_pb_evaluate_lifecycle($user_id){
+    $status = svntex2_pb_get_status($user_id);
+    $now_month = date('Y-m');
+    $total12 = 0; $months = [];
+    for($i=0;$i<12;$i++){
+        $m = date('Y-m', strtotime("first day of -$i month"));
+        $months[]=$m;
+        $c = (int) get_user_meta($user_id,'_svntex2_pb_ref_m_'.$m, true );
+        $total12 += $c;
+    }
+    // Lifetime if maintained active >= 24 consecutive months (tracked by meta start timestamp)
+    $life_at = (int) get_user_meta($user_id,'_svntex2_pb_active_since', true );
+    if($status==='active' && !$life_at){ update_user_meta($user_id,'_svntex2_pb_active_since', time()); }
+    if($status==='active' && $life_at && ( time() - $life_at ) >= (24*30*DAY_IN_SECONDS ) ){
+        svntex2_pb_set_status($user_id,'lifetime');
+        return 'lifetime';
+    }
+    // Suspension rule: if not lifetime and total12 < 4 after initial activation period (> 6 months since activation)
+    $activated_on = (int) get_user_meta($user_id,'_svntex2_pb_activated_on', true );
+    if($status==='active' && $activated_on && ( time() - $activated_on ) > (6*30*DAY_IN_SECONDS ) ){
+        if( $total12 < 4 ){
+            svntex2_pb_set_status($user_id,'suspended');
+            return 'suspended';
+        }
+    }
+    if($status==='suspended' && $total12 >= 4){ svntex2_pb_set_status($user_id,'active'); return 'active'; }
+    return svntex2_pb_get_status($user_id);
+}
+
+/** Monthly lifecycle maintenance cron (runs prior to distribution) */
+add_action('svntex2_monthly_distribution','svntex2_pb_run_lifecycle_maintenance',5);
+function svntex2_pb_run_lifecycle_maintenance(){
+    // Evaluate all users who ever had provisional/active/lifetime/suspended
+    $query = new WP_User_Query([
+        'meta_query' => [ [ 'key'=>'_svntex2_pb_status','compare'=>'EXISTS' ] ],
+        'fields'=>'ID', 'number'=>5000
+    ]);
+    foreach( $query->get_results() as $uid ){
+        svntex2_pb_evaluate_lifecycle($uid);
+    }
+}
+
 /** Increment qualifying referral count for PB and manage activation / maintenance */
 function svntex2_pb_track_referral($referrer_id){
     $count = (int) get_user_meta($referrer_id,'_svntex2_pb_referral_count_total', true );
@@ -121,8 +177,15 @@ function svntex2_pb_monthly_distribution_run(){
     foreach($eligible as $e){
         $share_ratio = $e['percent'] / $percent_sum; // 0..1
         $payout = round( $company_profit * $share_ratio, 2 );
-        svntex2_wallet_add_transaction( $e['user_id'], 'profit_bonus', $payout, 'pb:'.$month, [ 'month'=>$month,'spend'=>$e['spend'],'slab_percent'=>$e['percent'],'ratio'=>$share_ratio,'company_profit'=>$company_profit ], 'income' );
-        $wpdb->insert($payouts,[ 'user_id'=>$e['user_id'],'month_year'=>$month,'slab_percent'=>$e['percent']*100,'payout_amount'=>$payout,'created_at'=> current_time('mysql', true) ]);
+        // If user status suspended (or not fully active) move to suspense instead of paying immediately
+        $ustatus = svntex2_pb_get_status($e['user_id']);
+        if( in_array($ustatus,['suspended','provisional'], true ) ){
+            $susp = $wpdb->prefix.'svntex_pb_suspense';
+            $wpdb->insert($susp,[ 'user_id'=>$e['user_id'],'month_year'=>$month,'slab_percent'=>$e['percent']*100,'amount'=>$payout,'reason'=>$ustatus,'status'=>'held','created_at'=> current_time('mysql', true) ]);
+        } else {
+            svntex2_wallet_add_transaction( $e['user_id'], 'profit_bonus', $payout, 'pb:'.$month, [ 'month'=>$month,'spend'=>$e['spend'],'slab_percent'=>$e['percent'],'ratio'=>$share_ratio,'company_profit'=>$company_profit ], 'income' );
+            $wpdb->insert($payouts,[ 'user_id'=>$e['user_id'],'month_year'=>$month,'slab_percent'=>$e['percent']*100,'payout_amount'=>$payout,'created_at'=> current_time('mysql', true) ]);
+        }
     }
 
     set_transient($lock,1, 10 * DAY_IN_SECONDS);

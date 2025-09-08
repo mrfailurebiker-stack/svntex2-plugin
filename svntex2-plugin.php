@@ -155,6 +155,21 @@ function svntex2_activate() {
         KEY user_month (user_id, month_year)
     ) $charset";
 
+    // Suspense table for withheld PB payouts (KYC pending / suspended etc.)
+    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_pb_suspense (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT UNSIGNED NOT NULL,
+        month_year CHAR(7) NOT NULL,
+        slab_percent DECIMAL(5,2) NULL,
+        amount DECIMAL(14,2) NOT NULL,
+        reason VARCHAR(40) NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'held',
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        released_at DATETIME NULL,
+        KEY user_month (user_id, month_year),
+        KEY status (status)
+    ) $charset";
+
     foreach ( $sql as $statement ) { dbDelta( $statement ); }
     update_option( 'svntex2_version', SVNTEX2_VERSION );
     flush_rewrite_rules();
@@ -409,6 +424,24 @@ add_action( 'plugins_loaded', function(){
         $wpdb->query( "ALTER TABLE $wd_table ADD COLUMN tds_amount DECIMAL(12,2) NULL AFTER amount" );
         $wpdb->query( "ALTER TABLE $wd_table ADD COLUMN amc_amount DECIMAL(12,2) NULL AFTER tds_amount" );
         $wpdb->query( "ALTER TABLE $wd_table ADD COLUMN net_amount DECIMAL(12,2) NULL AFTER amc_amount" );
+    }
+    // Add suspense table if missing (safety for upgrades)
+    $suspense_table = $pref.'svntex_pb_suspense';
+    if ( $wpdb->get_var( $wpdb->prepare("SHOW TABLES LIKE %s", $suspense_table) ) !== $suspense_table ) {
+        $charset = $wpdb->get_charset_collate();
+        $wpdb->query("CREATE TABLE $suspense_table (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id BIGINT UNSIGNED NOT NULL,
+            month_year CHAR(7) NOT NULL,
+            slab_percent DECIMAL(5,2) NULL,
+            amount DECIMAL(14,2) NOT NULL,
+            reason VARCHAR(40) NOT NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'held',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            released_at DATETIME NULL,
+            KEY user_month (user_id, month_year),
+            KEY status (status)
+        ) $charset");
     }
 } );
 
