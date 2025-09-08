@@ -7,5 +7,66 @@ add_action('rest_api_init', function(){
         'permission_callback' => function(){ return is_user_logged_in(); },
         'callback' => function(){ return ['balance' => svntex2_wallet_get_balance(get_current_user_id())]; }
     ]);
+    // PB Dashboard meta endpoint
+    register_rest_route('svntex2/v1','/pb/meta', [
+        'methods' => 'GET',
+        'permission_callback' => function(){ return is_user_logged_in(); },
+        'callback' => function(){
+            $uid = get_current_user_id();
+            // Force evaluation so status reflects latest cycle transitions
+            if( function_exists('svntex2_pb_evaluate_lifecycle') ) { svntex2_pb_evaluate_lifecycle($uid); }
+            $status = get_user_meta($uid,'_svntex2_pb_status', true ); if(!$status) $status='inactive';
+            $cycle_start = get_user_meta($uid,'_svntex2_pb_cycle_start', true );
+            $cycle_ref_total = (int) get_user_meta($uid,'_svntex2_pb_cycle_ref_total', true );
+            $activation_month = get_user_meta($uid,'_svntex2_pb_cycle_activation_month', true );
+            $inclusion_start = get_user_meta($uid,'_svntex2_pb_inclusion_start_month', true );
+            $month12_prev = get_user_meta($uid,'_svntex2_pb_cycle_prev_month12_refs', true );
+            $lifetime_since = get_user_meta($uid,'_svntex2_pb_active_since', true );
+            $now_month = date('Y-m');
+            // Determine current cycle month index
+            $cycle_month_index = null;
+            if( $cycle_start ){
+                try {
+                    $start_dt = new DateTime($cycle_start.'-01');
+                    $now_dt = new DateTime($now_month.'-01');
+                    $diff = $start_dt->diff($now_dt);
+                    $cycle_month_index = $diff->y * 12 + $diff->m + 1; // 1-based
+                } catch(Exception $e){ $cycle_month_index = null; }
+            }
+            // Monthly spend + slab for current and last month
+            $current_spend = function_exists('svntex2_pb_get_monthly_spend') ? svntex2_pb_get_monthly_spend($uid,$now_month) : 0.0;
+            $last_month = date('Y-m', strtotime('first day of last month'));
+            $last_spend = function_exists('svntex2_pb_get_monthly_spend') ? svntex2_pb_get_monthly_spend($uid,$last_month) : 0.0;
+            $current_slab = function_exists('svntex2_pb_resolve_slab_percent') ? svntex2_pb_resolve_slab_percent($current_spend) : 0.0;
+            // Next slab threshold (simple scan)
+            $next_threshold = null; $slabs = function_exists('svntex2_pb_get_slabs') ? svntex2_pb_get_slabs() : [];
+            foreach( $slabs as $thr=>$pct ){ if( $current_spend < $thr ){ $next_threshold = $thr; break; } }
+            // Suspense summary
+            global $wpdb; $susp_tbl = $wpdb->prefix.'svntex_pb_suspense';
+            $held_total = (float) $wpdb->get_var($wpdb->prepare("SELECT COALESCE(SUM(amount),0) FROM $susp_tbl WHERE user_id=%d AND status='held'", $uid));
+            $held_count = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $susp_tbl WHERE user_id=%d AND status='held'", $uid));
+            return [
+                'status' => $status,
+                'cycle' => [
+                    'start' => $cycle_start,
+                    'month_index' => $cycle_month_index,
+                    'referrals_in_cycle' => $cycle_ref_total,
+                    'activation_month' => $activation_month,
+                    'inclusion_start_month' => $inclusion_start,
+                    'prev_cycle_month12_refs' => $month12_prev,
+                ],
+                'lifetime' => [ 'since_ts' => $lifetime_since ? (int)$lifetime_since : null ],
+                'spend' => [
+                    'current_month' => $current_spend,
+                    'last_month' => $last_spend,
+                    'slab_percent' => $current_slab,
+                    'next_threshold' => $next_threshold,
+                ],
+                'suspense' => [ 'held_total' => $held_total, 'held_count' => $held_count ],
+                'server_time' => current_time('mysql', true),
+                'version' => SVNTEX2_VERSION,
+            ];
+        }
+    ]);
 });
 ?>
