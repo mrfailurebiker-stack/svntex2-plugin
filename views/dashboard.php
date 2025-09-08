@@ -42,12 +42,12 @@ $logout_url = esc_url( wp_logout_url( home_url() ) );
     </aside>
     <!-- Mobile Bottom Navigation -->
     <nav class="mobile-nav" aria-label="Mobile Navigation">
-        <a href="<?php echo esc_url( home_url('/dashboard') ); ?>" class="mobile-nav-link" data-nav="home"><span class="nav-ico">🏠</span><span class="nav-label">Home</span></a>
-        <a href="#wallet" class="mobile-nav-link" data-nav="wallet"><span class="nav-ico">💰</span><span class="nav-label">Wallet</span></a>
-        <a href="#purchases" class="mobile-nav-link" data-nav="purchases"><span class="nav-ico">🛒</span><span class="nav-label">Purchases</span></a>
-        <a href="#referrals" class="mobile-nav-link" data-nav="referrals"><span class="nav-ico">👥</span><span class="nav-label">Referrals</span></a>
-        <a href="#kyc" class="mobile-nav-link" data-nav="kyc"><span class="nav-ico">🛡️</span><span class="nav-label">KYC</span></a>
-        <a href="<?php echo $logout_url; ?>" class="mobile-nav-link"><span class="nav-ico">�</span><span class="nav-label">Logout</span></a>
+    <a href="<?php echo esc_url( home_url('/dashboard') ); ?>" class="mobile-nav-link" data-nav="home"><span class="nav-ico">🏠</span><span class="nav-label">Home</span></a>
+    <a href="#wallet" class="mobile-nav-link" data-nav="wallet"><span class="nav-ico">💰</span><span class="nav-label">Wallet</span></a>
+    <a href="#purchases" class="mobile-nav-link" data-nav="purchases"><span class="nav-ico">🛒</span><span class="nav-label">Purchases</span></a>
+    <a href="#referrals" class="mobile-nav-link" data-nav="referrals"><span class="nav-ico">👥</span><span class="nav-label">Referrals</span></a>
+    <a href="#kyc" class="mobile-nav-link" data-nav="kyc"><span class="nav-ico">🛡️</span><span class="nav-label">KYC</span></a>
+    <a href="<?php echo $logout_url; ?>" class="mobile-nav-link"><span class="nav-ico">🚪</span><span class="nav-label">Logout</span></a>
     </nav>
     <main class="dashboard-content" role="main">
         <header class="content-header">

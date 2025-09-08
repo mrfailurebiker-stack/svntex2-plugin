@@ -370,15 +370,10 @@ add_action('template_redirect', function(){
         // But allow logout to work (detect logout URL more robustly)
         if ( wp_is_mobile() ) {
             $request_uri = $_SERVER['REQUEST_URI'] ?? '';
-            // Never redirect if logging out or accessing login page
-            if (
-                strpos($request_uri, 'action=logout') !== false ||
-                strpos($request_uri, '/wp-login.php') !== false ||
-                strpos($request_uri, '/logout') !== false ||
-                strpos($request_uri, 'loggedout') !== false ||
-                strpos($request_uri, 'customer-login') !== false
-            ) {
-                return;
+            // Never redirect if logging out or accessing login page (case-insensitive, robust)
+            $logout_patterns = ['action=logout','/wp-login.php','/logout','loggedout','customer-login','wp-json','admin-ajax.php'];
+            foreach($logout_patterns as $pat) {
+                if ( stripos($request_uri, $pat) !== false ) return;
             }
             wp_redirect(home_url('/dashboard'));
             exit;
