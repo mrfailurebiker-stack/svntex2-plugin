@@ -1,0 +1,13 @@
+The authoritative DOCX specification was generated from SVNTeX2_PB_Bonus_Logic.md.
+
+File: SVNTeX2_PB_Bonus_Logic.docx
+Location: docs/
+Size: ~9.4 KB (XML package; styling: basic headings, list paragraphs)
+Generation Method: Custom minimal OpenXML packer (no external conversion dependency) on 2025-09-08.
+
+Editing Workflow:
+1. Modify markdown: docs/SVNTeX2_PB_Bonus_Logic.md
+2. Re-run docx generation helper script (embed into build task later).
+3. Distribute DOCX to stakeholders.
+
+Integrity: Existing data tables remain untouched; only documentation files created.
