@@ -50,34 +50,131 @@ function svntex2_pb_increment_month_referral($user_id){
 
 add_action('svntex2_referral_qualified', function($referrer_id){ svntex2_pb_increment_month_referral($referrer_id); }, 20, 1);
 
-/** Evaluate lifecycle (rolling 12 months) */
+/**
+ * Evaluate lifecycle using ANNUAL CYCLE model (2 + 4 maintenance + renewal 2 in month12) while preserving prior meta.
+ * This supersedes the older rolling-12 logic but keeps lifetime elevation behavior.
+ * Metadata introduced (non-destructive):
+ *  - _svntex2_pb_cycle_start : YYYY-MM of current cycle (baseline)
+ *  - _svntex2_pb_cycle_ref_total : integer referrals counted in current cycle
+ *  - _svntex2_pb_inclusion_start_month : YYYY-MM month from which PB inclusion begins (post activation)
+ *  - _svntex2_pb_cycle_last_transition : timestamp (for auditing)
+ *  - _svntex2_pb_cycle_activation_month : YYYY-MM when activation (2nd referral) achieved in this cycle
+ *  - _svntex2_pb_cycle_prev_month12_refs : number of referrals achieved in month12 of prior cycle (snapshot)
+ */
 function svntex2_pb_evaluate_lifecycle($user_id){
     $status = svntex2_pb_get_status($user_id);
     $now_month = date('Y-m');
-    $total12 = 0; $months = [];
-    for($i=0;$i<12;$i++){
-        $m = date('Y-m', strtotime("first day of -$i month"));
-        $months[]=$m;
-        $c = (int) get_user_meta($user_id,'_svntex2_pb_ref_m_'.$m, true );
-        $total12 += $c;
+
+    // 1. Establish / load cycle baseline
+    $cycle_start = get_user_meta($user_id,'_svntex2_pb_cycle_start', true );
+    if( empty($cycle_start) ){
+        // Use first day of registration month if available else current month
+        $u = get_userdata($user_id);
+        $reg_month = $u? date('Y-m', strtotime($u->user_registered)) : $now_month;
+        $cycle_start = $reg_month;
+        update_user_meta($user_id,'_svntex2_pb_cycle_start',$cycle_start);
+        if( get_user_meta($user_id,'_svntex2_pb_cycle_ref_total', true ) === '' ){
+            update_user_meta($user_id,'_svntex2_pb_cycle_ref_total',0);
+        }
     }
-    // Lifetime if maintained active >= 24 consecutive months (tracked by meta start timestamp)
+
+    // 2. Lifetime elevation (unchanged from previous logic)
     $life_at = (int) get_user_meta($user_id,'_svntex2_pb_active_since', true );
     if($status==='active' && !$life_at){ update_user_meta($user_id,'_svntex2_pb_active_since', time()); }
     if($status==='active' && $life_at && ( time() - $life_at ) >= (24*30*DAY_IN_SECONDS ) ){
         svntex2_pb_set_status($user_id,'lifetime');
         return 'lifetime';
     }
-    // Suspension rule: if not lifetime and total12 < 4 after initial activation period (> 6 months since activation)
-    $activated_on = (int) get_user_meta($user_id,'_svntex2_pb_activated_on', true );
-    if($status==='active' && $activated_on && ( time() - $activated_on ) > (6*30*DAY_IN_SECONDS ) ){
-        if( $total12 < 4 ){
+
+    // 3. Compute cycle month index (1..12) relative to cycle_start
+    $start_dt = DateTime::createFromFormat('Y-m-d',$cycle_start.'-01');
+    $now_dt = DateTime::createFromFormat('Y-m-d',$now_month.'-01');
+    if(!$start_dt || !$now_dt){ return $status; }
+    $diff = $start_dt->diff($now_dt);
+    $cycle_month_index = $diff->y * 12 + $diff->m + 1; // month1 = cycle_start month
+
+    // 4. Snapshot month12 referral counts of previous cycle (already stored when cycle rolled)
+    // (No action here unless debugging)
+
+    // 5. Renewal / rollover check: if we have moved into month > 12, finalize previous cycle
+    if( $cycle_month_index > 12 ){
+        // Determine previous cycle's month12 string
+        $prev_month_dt = clone $now_dt; // current month belongs to NEW cycle after rollover
+        // month12 was previous month relative to now_dt when index just exceeded 12
+        $month12_dt = (clone $now_dt)->modify('-1 month');
+        $month12_key = $month12_dt->format('Y-m');
+        $month12_referrals = (int) get_user_meta($user_id,'_svntex2_pb_ref_m_'.$month12_key, true );
+        update_user_meta($user_id,'_svntex2_pb_cycle_prev_month12_refs',$month12_referrals);
+
+        $cycle_total = (int) get_user_meta($user_id,'_svntex2_pb_cycle_ref_total', true );
+
+        $suspend = false;
+        // Maintenance requirement: total >=6
+        if( $cycle_total < 6 ){ $suspend = true; }
+        // Renewal requirement: month12 new referrals >=2
+        if( $month12_referrals < 2 ){ $suspend = true; }
+
+        if( $suspend && $status !== 'lifetime'){
             svntex2_pb_set_status($user_id,'suspended');
-            return 'suspended';
+            $status = 'suspended';
+        } else {
+            // Remain active or provisional depending on renewal seeding
+            if( $status==='active' || $status==='lifetime'){
+                // If month12 had >=2 new, seed new cycle as provisional (treated as activation in new cycle)
+                if( $month12_referrals >=2 ){
+                    svntex2_pb_set_status($user_id,'provisional');
+                    $status='provisional';
+                    update_user_meta($user_id,'_svntex2_pb_activated_on', time());
+                    update_user_meta($user_id,'_svntex2_pb_cycle_activation_month',$now_month); // new cycle activation month
+                    // Inclusion start month = next month
+                    $incl = DateTime::createFromFormat('Y-m-d',$now_month.'-01');
+                    $incl->modify('+1 month');
+                    update_user_meta($user_id,'_svntex2_pb_inclusion_start_month',$incl->format('Y-m'));
+                    update_user_meta($user_id,'_svntex2_pb_cycle_ref_total', 2); // seed first 2
+                } else {
+                    // Could not seed automatically; if not suspended (edge: lifetime) keep status
+                    update_user_meta($user_id,'_svntex2_pb_cycle_ref_total', 0);
+                }
+            }
         }
+        // Start new cycle baseline as current month
+        update_user_meta($user_id,'_svntex2_pb_cycle_start', $now_month);
+        update_user_meta($user_id,'_svntex2_pb_cycle_last_transition', time());
+        // Recalculate index for clarity (now month1)
+        $cycle_month_index = 1;
     }
-    if($status==='suspended' && $total12 >= 4){ svntex2_pb_set_status($user_id,'active'); return 'active'; }
-    return svntex2_pb_get_status($user_id);
+
+    // 6. Enforce activation/inclusion for current cycle if provisional not yet set
+    $cycle_ref_total = (int) get_user_meta($user_id,'_svntex2_pb_cycle_ref_total', true );
+    $activation_month = get_user_meta($user_id,'_svntex2_pb_cycle_activation_month', true );
+
+    // 7. Suspended recovery: needs fresh pattern inside current cycle
+    if( $status==='suspended' ){
+        if( $cycle_ref_total >= 2 && $cycle_ref_total < 6 ){
+            svntex2_pb_set_status($user_id,'provisional');
+            $status='provisional';
+            if( empty($activation_month) ){
+                update_user_meta($user_id,'_svntex2_pb_cycle_activation_month',$now_month);
+                update_user_meta($user_id,'_svntex2_pb_activated_on', time());
+                $incl = DateTime::createFromFormat('Y-m-d',$now_month.'-01');
+                $incl->modify('+1 month');
+                update_user_meta($user_id,'_svntex2_pb_inclusion_start_month',$incl->format('Y-m'));
+            }
+        }
+        if( $cycle_ref_total >= 6 ){
+            svntex2_pb_set_status($user_id,'active');
+            $status='active';
+        }
+        return $status; // suspended path processed
+    }
+
+    // 8. Provisional -> Active within same cycle
+    if( $status==='provisional' && $cycle_ref_total >= 6 ){
+        svntex2_pb_set_status($user_id,'active');
+        $status='active';
+    }
+
+    return $status;
 }
 
 /** Monthly lifecycle maintenance cron (runs prior to distribution) */
@@ -95,21 +192,37 @@ function svntex2_pb_run_lifecycle_maintenance(){
 
 /** Increment qualifying referral count for PB and manage activation / maintenance */
 function svntex2_pb_track_referral($referrer_id){
+    // Legacy cumulative total (do not remove – might be referenced elsewhere)
     $count = (int) get_user_meta($referrer_id,'_svntex2_pb_referral_count_total', true );
     $count++;
     update_user_meta($referrer_id,'_svntex2_pb_referral_count_total',$count);
-    $activated_on = get_user_meta($referrer_id,'_svntex2_pb_activated_on', true );
+
+    // Annual cycle scoped counters
+    $cycle_start = get_user_meta($referrer_id,'_svntex2_pb_cycle_start', true );
+    if( empty($cycle_start) ){
+        $cycle_start = date('Y-m');
+        update_user_meta($referrer_id,'_svntex2_pb_cycle_start',$cycle_start);
+        update_user_meta($referrer_id,'_svntex2_pb_cycle_ref_total',0);
+    }
+    $cycle_ref_total = (int) get_user_meta($referrer_id,'_svntex2_pb_cycle_ref_total', true );
+    $cycle_ref_total++;
+    update_user_meta($referrer_id,'_svntex2_pb_cycle_ref_total',$cycle_ref_total);
+
     $status = svntex2_pb_get_status($referrer_id);
-    if( $status==='inactive' && $count >= 2 ){
-        // initial activation condition requires 2 qualifying referrals
+
+    // Activation threshold (2 in cycle)
+    if( $status==='inactive' && $cycle_ref_total >= 2 ){
         svntex2_pb_set_status($referrer_id,'provisional');
         update_user_meta($referrer_id,'_svntex2_pb_activated_on', time());
+        update_user_meta($referrer_id,'_svntex2_pb_cycle_activation_month', date('Y-m'));
+        $incl = DateTime::createFromFormat('Y-m-d',date('Y-m').'-01');
+        $incl->modify('+1 month');
+        update_user_meta($referrer_id,'_svntex2_pb_inclusion_start_month',$incl->format('Y-m'));
     }
-    // After activation, need total 6 (2+4) within 12 months
-    if( $status!=='lifetime' ){
-        if( $count >= 6 ){
-            svntex2_pb_set_status($referrer_id,'active');
-        }
+
+    // Provisional -> Active when reach 6 refs in cycle
+    if( in_array($status,['provisional','active'], true) && $cycle_ref_total >=6 ){
+        svntex2_pb_set_status($referrer_id,'active');
     }
 }
 add_action('svntex2_referral_qualified', function($referrer_id,$referee_id){ svntex2_pb_track_referral($referrer_id); },10,2);
