@@ -1,5 +1,12 @@
 <?php if ( ! defined( 'ABSPATH' ) ) exit; wp_enqueue_style('svntex2-style'); ?>
-<main class="svntex-auth-shell">
+<div class="svntex-brand-bar">
+  <a class="brand" href="<?php echo esc_url( home_url('/') ); ?>">SVNTeX</a>
+  <div class="svntex-brand-links">
+    <a href="<?php echo esc_url( site_url('/'.SVNTEX2_LOGIN_SLUG.'/') ); ?>">Log In</a>
+    <a class="btn-brand sm" href="<?php echo esc_url( site_url('/'.SVNTEX2_REGISTER_SLUG.'/') ); ?>">Register</a>
+  </div>
+</div>
+<main class="svntex-auth-shell fade-in">
   <section class="svntex-auth-card" role="form" aria-labelledby="svntexRegTitle">
     <h1 id="svntexRegTitle" class="svntex-auth-title">Get Started</h1>
     <p class="svntex-auth-sub">Create your account to access the SVNTeX platform</p>

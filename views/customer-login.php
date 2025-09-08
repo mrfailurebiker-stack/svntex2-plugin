@@ -1,8 +1,15 @@
 <?php if ( ! defined( 'ABSPATH' ) ) exit; wp_enqueue_style('svntex2-style'); ?>
-<main class="svntex-auth-shell">
+<div class="svntex-brand-bar">
+  <a class="brand" href="<?php echo esc_url( home_url('/') ); ?>">SVNTeX</a>
+  <div class="svntex-brand-links">
+    <a href="<?php echo esc_url( site_url('/'.SVNTEX2_REGISTER_SLUG.'/') ); ?>">Sign Up</a>
+    <a class="btn-brand sm" href="<?php echo esc_url( site_url('/'.SVNTEX2_LOGIN_SLUG.'/') ); ?>">Login</a>
+  </div>
+</div>
+<main class="svntex-auth-shell fade-in">
   <section class="svntex-auth-card" role="form" aria-labelledby="svntexLoginTitle">
     <h1 id="svntexLoginTitle" class="svntex-auth-title">Welcome Back</h1>
-    <p class="svntex-auth-sub">Sign in to continue to your dashboard</p>
+  <p class="svntex-auth-sub">Sign in to continue to your dashboard</p>
     <form id="svntex2LoginForm" class="svntex-auth-form" method="post" novalidate autocomplete="on">
       <?php wp_nonce_field('svntex2_login','svntex2_login_nonce'); ?>
       <div class="field">

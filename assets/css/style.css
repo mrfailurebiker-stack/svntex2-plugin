@@ -99,6 +99,41 @@ body:not(.dark) .btn-ghost, body:not(.dark) .btn-refresh { background:rgba(255,2
 @media (max-width:1020px){ .dashboard-widgets { gap:20px; } }
 @media (max-width:760px){ .dash-title { font-size:1.65rem; } .widget { padding:18px; } }
 @media (max-width:560px){ .panel { padding:1.35rem 1rem; border-radius:24px; } }
+
+/* ============================================================= */
+/* GLOBAL BRAND NAV + BUTTON (imported from landing for reuse)   */
+/* ============================================================= */
+.svntex-brand-bar { display:flex; align-items:center; justify-content:space-between; padding: clamp(1rem,2vw,1.6rem) clamp(1.1rem,3vw,2.2rem); position:relative; z-index:15; }
+.svntex-brand-bar .brand { font-size: clamp(1.25rem,2vw,1.85rem); font-weight:700; letter-spacing:.5px; background:linear-gradient(90deg,#db2777,#7e22ce); -webkit-background-clip:text; background-clip:text; color:transparent; text-decoration:none; }
+.svntex-brand-bar .brand:focus-visible { outline:2px solid #db2777; outline-offset:4px; border-radius:8px; }
+.svntex-brand-links { display:flex; gap:1rem; align-items:center; }
+.svntex-brand-links a { position:relative; text-decoration:none; font-weight:600; font-size:.85rem; color:var(--text-light); padding:.45rem .75rem; border-radius:12px; transition:.35s background, .35s color; }
+.svntex-brand-links a:hover { background:rgba(255,255,255,0.08); color:#fff; }
+body:not(.dark) .svntex-brand-links a:hover { background:rgba(0,0,0,0.06); color:#222; }
+.btn-brand, .svntex-brand-links .btn-brand { --btn-bg:#db2777; --btn-bg2:#7e22ce; display:inline-flex; align-items:center; gap:.5rem; background:linear-gradient(92deg,var(--btn-bg),var(--btn-bg2)); color:#fff !important; padding:.8rem 1.25rem .85rem; font-weight:600; font-size:.85rem; letter-spacing:.4px; border-radius:16px; text-decoration:none; border:1px solid rgba(255,255,255,.12); box-shadow:0 8px 22px -6px rgba(219,39,119,.55),0 2px 4px rgba(0,0,0,.45); transition:.45s transform,.45s box-shadow; cursor:pointer; }
+.btn-brand:hover { transform:translateY(-3px); box-shadow:0 10px 28px -6px rgba(219,39,119,.65),0 4px 12px rgba(0,0,0,.5); }
+.btn-brand:active { transform:translateY(0); }
+.btn-brand:focus-visible { outline:none; box-shadow:0 0 0 3px rgba(219,39,119,.55); }
+
+/* Size variants */
+.btn-brand.sm { padding:.55rem .95rem .6rem; font-size:.75rem; border-radius:14px; }
+
+/* Apply brand shell to auth + dashboard if body class present */
+body.svntex-app-shell .svntex-auth-shell { padding-top:0; }
+body.svntex-app-shell .svntex-auth-card { margin-top: clamp(1rem,4vh,3.5rem); }
+
+/* Dashboard top fusion bar (optional) */
+.svntex-dash-top { display:flex; align-items:center; justify-content:space-between; padding: clamp(.85rem,1.4vw,1.25rem) clamp(1rem,2.1vw,2rem); position:sticky; top:0; z-index:20; backdrop-filter:blur(14px); background:rgba(15,23,42,0.55); border-bottom:1px solid rgba(255,255,255,0.06); }
+body:not(.dark) .svntex-dash-top { background:rgba(255,255,255,0.65); }
+.svntex-dash-top .dash-brand { font-size:1.05rem; font-weight:700; letter-spacing:.5px; background:linear-gradient(90deg,#db2777,#7e22ce); -webkit-background-clip:text; background-clip:text; color:transparent; text-decoration:none; }
+.svntex-dash-top .dash-actions { display:flex; gap:.65rem; }
+.svntex-dash-top .dash-actions .mini { background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.15); padding:.55rem .7rem; border-radius:14px; cursor:pointer; color:#fff; font-size:.75rem; font-weight:600; letter-spacing:.3px; transition:.35s background,.35s transform; }
+.svntex-dash-top .dash-actions .mini:hover { background:linear-gradient(90deg,#db2777,#7e22ce); transform:translateY(-2px); }
+body:not(.dark) .svntex-dash-top .dash-actions .mini { color:#1e293b; }
+
+/* Helper for JS fade-in (progressive enhancement) */
+.fade-in { opacity:0; transform:translateY(10px); animation:fadeIn .75s ease forwards; }
+@keyframes fadeIn { to { opacity:1; transform:translateY(0); } }
 /* Main Stylesheet for SVNTeX Dashboard and Forms */
 
 :root {

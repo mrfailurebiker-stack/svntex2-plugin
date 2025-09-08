@@ -20,16 +20,23 @@ if ( function_exists('wc_get_orders') ) {
 
 $logout_url = esc_url( wp_logout_url( home_url() ) );
 ?>
-<div class="svntex-dashboard-wrapper" data-svntex2-dashboard>
+<div class="svntex-dash-top">
+    <a href="<?php echo esc_url( home_url('/') ); ?>" class="dash-brand">SVNTeX</a>
+    <div class="dash-actions">
+        <button class="mini" id="svntex2DarkToggleTop" aria-label="Toggle dark mode">Theme</button>
+        <a class="mini" href="<?php echo esc_url( wp_logout_url( home_url('/') ) ); ?>">Logout</a>
+    </div>
+</div>
+<div class="svntex-dashboard-wrapper fade-in" data-svntex2-dashboard>
     <aside class="dashboard-sidebar" role="navigation" aria-label="Dashboard Navigation">
         <nav>
             <ul class="nav-list">
-                <li><a href="<?php echo esc_url( home_url('/dashboard') ); ?>" class="nav-link active" data-nav="home">Home</a></li>
-                <li><a href="#wallet" class="nav-link" data-nav="wallet">Wallet</a></li>
-                <li><a href="#purchases" class="nav-link" data-nav="purchases">Purchases</a></li>
-                <li><a href="#referrals" class="nav-link" data-nav="referrals">Referrals</a></li>
-                <li><a href="#kyc" class="nav-link" data-nav="kyc">KYC</a></li>
-                <li><a href="<?php echo $logout_url; ?>" class="nav-link">Logout</a></li>
+                <li><a href="<?php echo esc_url( home_url('/dashboard') ); ?>" class="nav-link active" data-nav="home"><span class="nav-ico">🏠</span>Home</a></li>
+                <li><a href="#wallet" class="nav-link" data-nav="wallet"><span class="nav-ico">💰</span>Wallet</a></li>
+                <li><a href="#purchases" class="nav-link" data-nav="purchases"><span class="nav-ico">🛒</span>Purchases</a></li>
+                <li><a href="#referrals" class="nav-link" data-nav="referrals"><span class="nav-ico">👥</span>Referrals</a></li>
+                <li><a href="#kyc" class="nav-link" data-nav="kyc"><span class="nav-ico">🛡️</span>KYC</a></li>
+                <li><a href="<?php echo $logout_url; ?>" class="nav-link"><span class="nav-ico">🚪</span>Logout</a></li>
             </ul>
         </nav>
     </aside>
