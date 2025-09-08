@@ -649,11 +649,7 @@ if ( ! file_exists( SVNTEX2_PLUGIN_DIR . 'assets/js/core.js' ) ) {
 // 12. LOGOUT REDIRECT (ENSURE CONSISTENCY)
 // -----------------------------------------------------------------------------
 add_action( 'wp_logout', function() {
-    if ( ! headers_sent() ) {
-        wp_safe_redirect( home_url('/') );
-        exit;
-    }
-    echo '<script>window.location.href="' . esc_url( home_url('/') ) . '";</script>';
+    wp_safe_redirect( home_url('/') );
     exit;
 });
 
@@ -662,22 +658,9 @@ add_action( 'wp_logout', function() {
 // -----------------------------------------------------------------------------
 add_action( 'template_redirect', function() {
     $request_uri = $_SERVER['REQUEST_URI'] ?? '';
-    // WooCommerce logout endpoint
+    // WooCommerce logout endpoint only
     if ( preg_match('#/my-account/logout/?#i', $request_uri) ) {
-        if ( ! headers_sent() ) {
-            wp_safe_redirect( home_url('/') );
-            exit;
-        }
-        echo '<script>window.location.href="' . esc_url( home_url('/') ) . '";</script>';
-        exit;
-    }
-    // Direct wp-login.php?action=logout access
-    if ( stripos($request_uri, '/wp-login.php') !== false && isset($_GET['action']) && $_GET['action'] === 'logout' ) {
-        if ( ! headers_sent() ) {
-            wp_safe_redirect( home_url('/') );
-            exit;
-        }
-        echo '<script>window.location.href="' . esc_url( home_url('/') ) . '";</script>';
+        wp_safe_redirect( home_url('/') );
         exit;
     }
 });
