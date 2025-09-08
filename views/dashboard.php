@@ -18,13 +18,13 @@ if ( function_exists('wc_get_orders') ) {
     ]);
 }
 
-$logout_url = esc_url( wp_logout_url( home_url() ) );
+$logout_url = esc_url( wp_logout_url( home_url('/') ) );
 ?>
 <div class="svntex-dash-top">
     <a href="<?php echo esc_url( home_url('/') ); ?>" class="dash-brand">SVNTeX</a>
     <div class="dash-actions">
         <button class="mini" id="svntex2DarkToggleTop" aria-label="Toggle dark mode">Theme</button>
-        <a class="mini" href="<?php echo esc_url( wp_logout_url( home_url('/') ) ); ?>">Logout</a>
+    <a class="mini" href="<?php echo $logout_url; ?>">Logout</a>
     </div>
 </div>
 <div class="svntex-dashboard-wrapper fade-in" data-svntex2-dashboard>
