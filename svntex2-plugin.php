@@ -27,6 +27,17 @@ define( 'SVNTEX2_MIN_WC_VERSION', '7.0.0' );
 if ( ! defined( 'SVNTEX2_REFERRAL_RATE' ) ) {
     define( 'SVNTEX2_REFERRAL_RATE', 0.10 ); // 10% referral commission
 }
+// Referral Bonus (RB) rate on referee first qualifying action (first order or first wallet top-up)
+if ( ! defined( 'SVNTEX2_REFERRAL_BONUS_RATE' ) ) {
+    define( 'SVNTEX2_REFERRAL_BONUS_RATE', 0.10 ); // 10% one-time bonus
+}
+// Financial charge rates
+if ( ! defined( 'SVNTEX2_TDS_RATE' ) ) {
+    define( 'SVNTEX2_TDS_RATE', 0.02 ); // 2% TDS
+}
+if ( ! defined( 'SVNTEX2_AMC_RATE' ) ) {
+    define( 'SVNTEX2_AMC_RATE', 0.08 ); // 8% maintenance charge
+}
 
 // Pretty slugs for custom auth pages (can be filtered)
 define( 'SVNTEX2_LOGIN_SLUG', 'customer-login' );
@@ -51,7 +62,7 @@ require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/helpers.php';        // Wa
 require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/shortcodes.php';     // Shortcodes (dashboard + extras)
 require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/rest.php';           // REST endpoints
 // Newly scaffolded domain modules (placeholders / partial implementations)
-foreach ( [ 'referrals', 'kyc', 'withdrawals', 'cron', 'admin', 'cli' ] as $module ) {
+foreach ( [ 'referrals', 'kyc', 'withdrawals', 'pb', 'cron', 'admin', 'cli' ] as $module ) {
     $file = SVNTEX2_PLUGIN_DIR . 'includes/functions/' . $module . '.php';
     if ( file_exists( $file ) ) { require_once $file; }
 }
@@ -318,6 +329,27 @@ function svntex2_ajax_do_login(){
 do_action( 'svntex2_initialized' );
 
 // -----------------------------------------------------------------------------
+// 10.1 RUNTIME SCHEMA SAFETY (add new columns if missing)
+// -----------------------------------------------------------------------------
+add_action( 'plugins_loaded', function(){
+    global $wpdb; $pref = $wpdb->prefix;
+    // Add category column to wallet transactions if missing
+    $wallet_table = $pref.'svntex_wallet_transactions';
+    $col = $wpdb->get_results( $wpdb->prepare("SHOW COLUMNS FROM $wallet_table LIKE %s", 'category') );
+    if ( ! $col ) {
+        $wpdb->query( "ALTER TABLE $wallet_table ADD COLUMN category VARCHAR(20) NOT NULL DEFAULT 'general' AFTER type" );
+    }
+    // Add fee columns to withdrawals if missing
+    $wd_table = $pref.'svntex_withdrawals';
+    $fee_col = $wpdb->get_results( $wpdb->prepare("SHOW COLUMNS FROM $wd_table LIKE %s", 'tds_amount') );
+    if ( ! $fee_col ) {
+        $wpdb->query( "ALTER TABLE $wd_table ADD COLUMN tds_amount DECIMAL(12,2) NULL AFTER amount" );
+        $wpdb->query( "ALTER TABLE $wd_table ADD COLUMN amc_amount DECIMAL(12,2) NULL AFTER tds_amount" );
+        $wpdb->query( "ALTER TABLE $wd_table ADD COLUMN net_amount DECIMAL(12,2) NULL AFTER amc_amount" );
+    }
+} );
+
+// -----------------------------------------------------------------------------
 // 10a. REFERRAL QUALIFICATION & COMMISSION ON ORDER COMPLETE
 // -----------------------------------------------------------------------------
 add_action( 'woocommerce_order_status_completed', function( $order_id ) {
@@ -337,9 +369,14 @@ add_action( 'woocommerce_order_status_completed', function( $order_id ) {
     svntex2_referrals_link( $referrer_id, $user_id );
     // Ensure not processed before
     if ( get_post_meta( $order_id, '_svntex2_referral_processed', true ) ) return;
-    $total = (float) $order->get_total();
-    if ( $total <= 0 ) return;
-    svntex2_referrals_mark_qualified( $referrer_id, $user_id, $total );
+    $order_total = (float) $order->get_total();
+    $shipping_total = (float) $order->get_shipping_total();
+    $net_total = $order_total - $shipping_total; // exclude delivery charges
+    if ( $net_total <= 0 ) return;
+    // Qualification requires net_total >= 2400
+    if ( $net_total >= 2400 ) {
+        svntex2_referrals_mark_qualified( $referrer_id, $user_id, $net_total );
+    }
     // Determine dynamic rate using tiered slabs then allow override via filter
     if ( function_exists('svntex2_referrals_get_commission_rate') ) {
         $base_rate = svntex2_referrals_get_commission_rate( $referrer_id, $order, $user_id );
@@ -350,11 +387,56 @@ add_action( 'woocommerce_order_status_completed', function( $order_id ) {
     if ( $rate > 0 ) {
         $commission = round( $total * $rate, 2 );
         if ( $commission > 0 ) {
-            svntex2_wallet_add_transaction( $referrer_id, 'referral_commission', $commission, 'order:'.$order_id, [ 'referee' => $user_id, 'rate' => $rate ] );
+            svntex2_wallet_add_transaction( $referrer_id, 'referral_commission', $commission, 'order:'.$order_id, [ 'referee' => $user_id, 'rate' => $rate ], 'income' );
+        }
+    }
+    // One-time Referral Bonus (RB) if not yet awarded and first qualifying event is this order
+    if ( ! get_user_meta( $user_id, '_svntex2_rb_awarded', true ) ) {
+        $rb_rate = (float) apply_filters( 'svntex2_referral_bonus_rate', SVNTEX2_REFERRAL_BONUS_RATE, $user_id, $referrer_id, $net_total, 'order' );
+        if ( $rb_rate > 0 ) {
+            $rb_bonus = round( $net_total * $rb_rate, 2 );
+            if ( $rb_bonus > 0 ) {
+                svntex2_wallet_add_transaction( $referrer_id, 'referral_bonus', $rb_bonus, 'rb_order:'.$order_id, [ 'referee' => $user_id, 'base_amount' => $net_total, 'rate' => $rb_rate, 'trigger' => 'order' ], 'income' );
+                update_user_meta( $user_id, '_svntex2_rb_awarded', 1 );
+            }
         }
     }
     update_post_meta( $order_id, '_svntex2_referral_processed', 1 );
 }, 30 );
+
+// -----------------------------------------------------------------------------
+// 10a2. REFERRAL BONUS (RB) ON FIRST WALLET TOP-UP (non-order credit)
+// -----------------------------------------------------------------------------
+/**
+ * If a referee (user who was referred) performs their first wallet top-up (any positive credit
+ * transaction of a defined type) we give the referrer a one-time RB = 10% of that credited amount.
+ * We assume top-ups use transaction type 'wallet_topup' (adjust if different). Filter allows changes.
+ */
+add_action( 'svntex2_wallet_transaction_created', function( $user_id, $type, $amount, $reference_id, $meta, $balance_after ) {
+    if ( $type !== 'wallet_topup' ) return; // Only react to explicit top-up events
+    if ( $amount <= 0 ) return;
+    // Already processed a referral bonus for this user?
+    if ( get_user_meta( $user_id, '_svntex2_rb_awarded', true ) ) return;
+    $ref_source = get_user_meta( $user_id, 'referral_source', true );
+    if ( ! $ref_source ) return;
+    $referrer_user = get_user_by( 'login', $ref_source );
+    if ( ! $referrer_user ) $referrer_user = get_user_by( 'email', $ref_source );
+    if ( ! $referrer_user ) return;
+    $referrer_id = (int) $referrer_user->ID;
+    // Link if not yet
+    svntex2_referrals_link( $referrer_id, $user_id );
+    // If top-up itself meets qualification threshold (>=2400) mark referral qualified
+    if ( $amount >= 2400 ) {
+        svntex2_referrals_mark_qualified( $referrer_id, $user_id, $amount );
+    }
+    // Calculate bonus
+    $rate = (float) apply_filters( 'svntex2_referral_bonus_rate', SVNTEX2_REFERRAL_BONUS_RATE, $user_id, $referrer_id, $amount, $type );
+    if ( $rate <= 0 ) return;
+    $bonus = round( $amount * $rate, 2 );
+    if ( $bonus <= 0 ) return;
+    svntex2_wallet_add_transaction( $referrer_id, 'referral_bonus', $bonus, 'rb:'.$reference_id, [ 'referee' => $user_id, 'base_amount' => $amount, 'rate' => $rate, 'trigger' => 'topup' ], 'income' );
+    update_user_meta( $user_id, '_svntex2_rb_awarded', 1 );
+}, 20, 6 );
 
 // -----------------------------------------------------------------------------
 // 10b. WOO My Account DASHBOARD INJECTION

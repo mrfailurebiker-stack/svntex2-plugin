@@ -26,7 +26,8 @@ function svntex2_admin_root(){
         'referrals' => 'Referrals',
         'kyc' => 'KYC',
         'withdrawals' => 'Withdrawals',
-        'distributions' => 'Profit Distributions'
+        'distributions' => 'Profit Distributions',
+        'reports' => 'Reports'
     ];
 
     // Preload counts for widgets
@@ -57,7 +58,8 @@ function svntex2_admin_root(){
         case 'referrals': svntex2_admin_referrals(); break;
         case 'kyc': svntex2_admin_kyc(); break;
         case 'withdrawals': svntex2_admin_withdrawals(); break;
-        case 'distributions': svntex2_admin_distributions(); break;
+    case 'distributions': svntex2_admin_distributions(); break;
+    case 'reports': svntex2_admin_reports(); break;
         default: svntex2_admin_overview($counts); break;
     }
     echo '</div>';
@@ -192,6 +194,64 @@ function svntex2_admin_distributions(){
             printf('<tr><td>%d</td><td>%s</td><td>%s</td><td>%d</td><td>%s</td><td>%s</td></tr>', $r->id, esc_html($r->month_year), number_format_i18n($r->company_profit,2), $r->eligible_members, number_format_i18n($r->profit_value,4), esc_html($r->created_at));
         }
     } else { echo '<tr><td colspan="6">No distribution records.</td></tr>'; }
+    echo '</tbody></table>';
+}
+
+function svntex2_admin_reports(){
+    global $wpdb; $pref = $wpdb->prefix;
+    $wallet_table = $pref.'svntex_wallet_transactions';
+    $withdraw_table = $pref.'svntex_withdrawals';
+    $from = isset($_GET['from']) ? sanitize_text_field($_GET['from']) : '';
+    $to = isset($_GET['to']) ? sanitize_text_field($_GET['to']) : '';
+    $export = isset($_GET['export']) && $_GET['export']==='csv';
+    $where = '1=1';
+    $params = [];
+    if ( $from && preg_match('/^\d{4}-\d{2}-\d{2}$/',$from) ) { $where .= ' AND t.created_at >= %s'; $params[] = $from.' 00:00:00'; }
+    if ( $to && preg_match('/^\d{4}-\d{2}-\d{2}$/',$to) ) { $where .= ' AND t.created_at <= %s'; $params[] = $to.' 23:59:59'; }
+    $sql = "SELECT t.id,t.user_id,t.type,t.category,t.amount,t.balance_after,t.reference_id,t.meta,t.created_at FROM $wallet_table t WHERE $where ORDER BY t.id DESC LIMIT 500";
+    $rows = $params ? $wpdb->get_results( $wpdb->prepare( $sql, $params ) ) : $wpdb->get_results( $sql );
+    // Fees summary
+    $fee_where = 'status=\'approved\''; $fee_params = [];
+    if ( $from ) { $fee_where .= ' AND processed_at >= %s'; $fee_params[] = $from.' 00:00:00'; }
+    if ( $to ) { $fee_where .= ' AND processed_at <= %s'; $fee_params[] = $to.' 23:59:59'; }
+    $fee_sql = "SELECT SUM(tds_amount) tds, SUM(amc_amount) amc, SUM(net_amount) net, SUM(amount) gross FROM $withdraw_table WHERE $fee_where";
+    $fees = $fee_params ? $wpdb->get_row( $wpdb->prepare($fee_sql,$fee_params) ) : $wpdb->get_row($fee_sql);
+    if ( $export ) {
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename=svntex2-report-'.date('Ymd-His').'.csv');
+        $out = fopen('php://output','w');
+        fputcsv($out,['ID','User','Type','Category','Amount','Balance After','Reference','Meta','Created']);
+        if($rows){
+            foreach($rows as $r){ fputcsv($out, [ $r->id,$r->user_id,$r->type,$r->category,$r->amount,$r->balance_after,$r->reference_id,$r->meta,$r->created_at ] ); }
+        }
+        fputcsv($out,[]);
+        fputcsv($out,['Withdraw Fees Summary']);
+        fputcsv($out,['Gross','TDS','AMC','Net']);
+        fputcsv($out,[ $fees->gross ?: 0, $fees->tds ?: 0, $fees->amc ?: 0, $fees->net ?: 0 ]);
+        fclose($out); exit;
+    }
+    echo '<h2>Reports</h2>';
+    echo '<form method="get" class="svntex2-inline-form" style="margin-top:8px">';
+    echo '<input type="hidden" name="page" value="svntex2-admin" />';
+    echo '<input type="hidden" name="tab" value="reports" />';
+    printf('<input type="date" name="from" value="%s" /> ', esc_attr($from));
+    printf('<input type="date" name="to" value="%s" /> ', esc_attr($to));
+    echo '<button class="button">Filter</button> ';
+    if ( $rows ) {
+        echo '<a class="button" href="'.esc_url( add_query_arg( ['page'=>'svntex2-admin','tab'=>'reports','from'=>$from,'to'=>$to,'export'=>'csv'], admin_url('admin.php') ) ).'">Export CSV</a>';
+    }
+    echo '</form>';
+    echo '<h3>Wallet Transactions (latest 500)</h3>';
+    echo '<table class="widefat striped svntex2-table"><thead><tr><th>ID</th><th>User</th><th>Type</th><th>Category</th><th>Amount</th><th>Balance After</th><th>Reference</th><th>Meta</th><th>Created</th></tr></thead><tbody>';
+    if($rows){
+        foreach($rows as $r){
+            echo '<tr>'; printf('<td>%d</td><td>%d</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><code style="font-size:10px">%s</code></td><td>%s</td>', $r->id,$r->user_id,esc_html($r->type),esc_html($r->category),number_format_i18n($r->amount,2),number_format_i18n($r->balance_after,2),esc_html($r->reference_id ?: '-'), esc_html($r->meta), esc_html($r->created_at) ); echo '</tr>';
+        }
+    } else { echo '<tr><td colspan="9">No transactions.</td></tr>'; }
+    echo '</tbody></table>';
+    echo '<h3>Withdrawal Fees Summary</h3>';
+    echo '<table class="widefat striped svntex2-table"><thead><tr><th>Gross</th><th>TDS (2%)</th><th>AMC (8%)</th><th>Net</th></tr></thead><tbody>';
+    printf('<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>', number_format_i18n($fees->gross ?: 0,2), number_format_i18n($fees->tds ?: 0,2), number_format_i18n($fees->amc ?: 0,2), number_format_i18n($fees->net ?: 0,2));
     echo '</tbody></table>';
 }
 
