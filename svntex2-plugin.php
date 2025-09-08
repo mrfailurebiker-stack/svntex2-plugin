@@ -276,7 +276,8 @@ function svntex2_dashboard_shortcode() {
     wp_enqueue_style( 'svntex2-style' );
     wp_enqueue_script( 'svntex2-dashboard' );
     wp_localize_script( 'svntex2-dashboard', 'SVNTEX2Dash', [
-        'rest_url' => esc_url_raw( rest_url( 'svntex2/v1/wallet/balance' ) ),
+    'rest_url' => esc_url_raw( rest_url( 'svntex2/v1/wallet/balance' ) ),
+    'pb_meta_url' => esc_url_raw( rest_url( 'svntex2/v1/pb/meta' ) ),
         'nonce'    => wp_create_nonce( 'wp_rest' ),
     ] );
     $file = SVNTEX2_PLUGIN_DIR . 'views/dashboard.php';

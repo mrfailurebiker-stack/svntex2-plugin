@@ -46,4 +46,67 @@
   // Auto refresh once on load after slight delay
   setTimeout(fetchBalance, 400);
 
+  // PB META wiring
+  async function fetchPBMeta(){
+    if(!SVNTEX2Dash || !SVNTEX2Dash.pb_meta_url) return;
+    const statusEl = document.querySelector('[data-pb-status]');
+    if(!statusEl) return;
+    try {
+      statusEl.textContent = '…';
+      const res = await fetch(SVNTEX2Dash.pb_meta_url, { headers: { 'X-WP-Nonce': SVNTEX2Dash.nonce } });
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const data = await res.json();
+      statusEl.textContent = data.status || 'inactive';
+      const ci = document.querySelector('[data-pb-cycle-index]');
+      const cs = document.querySelector('[data-pb-cycle-start]');
+      const cr = document.querySelector('[data-pb-cycle-refs]');
+      const act = document.querySelector('[data-pb-activation]');
+      const incl = document.querySelector('[data-pb-inclusion]');
+      const spendEl = document.querySelector('[data-pb-spend]');
+      const slabEl = document.querySelector('[data-pb-slab]');
+      const nextThrEl = document.querySelector('[data-pb-next-threshold]');
+      const suspWrap = document.querySelector('[data-pb-suspense-wrap]');
+      const suspTotal = document.querySelector('[data-pb-suspense-total]');
+      const suspCount = document.querySelector('[data-pb-suspense-count]');
+      const lastSync = document.querySelector('[data-pb-last-sync]');
+      const prog = document.querySelector('[data-pb-progress]');
+      const progHint = document.querySelector('[data-pb-progress-hint]');
+      if(ci) ci.textContent = data.cycle && data.cycle.month_index ? data.cycle.month_index : '—';
+      if(cs) cs.textContent = data.cycle && data.cycle.start ? '('+data.cycle.start+')' : '';
+      if(cr) cr.textContent = data.cycle && typeof data.cycle.referrals_in_cycle!=='undefined' ? data.cycle.referrals_in_cycle : '0';
+      if(act) act.textContent = data.cycle && data.cycle.activation_month ? data.cycle.activation_month : '—';
+      if(incl) incl.textContent = data.cycle && data.cycle.inclusion_start_month ? data.cycle.inclusion_start_month : '—';
+      if(spendEl) spendEl.textContent = (data.spend && typeof data.spend.current_month !== 'undefined') ? Number(data.spend.current_month).toFixed(2) : '0.00';
+      if(slabEl) slabEl.textContent = data.spend && data.spend.slab_percent ? (data.spend.slab_percent*100).toFixed(0)+'%' : '0%';
+      if(nextThrEl){
+        if(data.spend && data.spend.next_threshold){
+          const cur = data.spend.current_month || 0;
+            nextThrEl.textContent = data.spend.next_threshold + ' (+'+(data.spend.next_threshold - cur)+')';
+        } else { nextThrEl.textContent = 'Max'; }
+      }
+      if(data.suspense){
+        if(data.suspense.held_count>0){
+          suspWrap && (suspWrap.hidden = false);
+          suspTotal && (suspTotal.textContent = data.suspense.held_total.toFixed(2));
+          suspCount && (suspCount.textContent = data.suspense.held_count);
+        }
+      }
+      if(lastSync){ lastSync.textContent = 'Updated '+ new Date().toLocaleTimeString(); }
+      // Progress bar: referrals toward 6
+      if(prog && data.cycle){
+        const refs = data.cycle.referrals_in_cycle || 0;
+        const pct = Math.min(100, (refs/6)*100);
+        prog.style.width = pct+'%';
+        if(progHint){
+          if(refs < 2) progHint.textContent = (2-refs)+' more to Activate';
+          else if(refs < 6) progHint.textContent = (6-refs)+' more to become Active';
+          else progHint.textContent = 'Active – maintain & renew';
+        }
+      }
+    }catch(e){ console.warn('PB meta failed', e); }
+  }
+  setTimeout(fetchPBMeta, 600);
+  // Refresh PB meta every 60s
+  setInterval(fetchPBMeta, 60000);
+
 })(jQuery);
