@@ -26,6 +26,8 @@ jobs:
           + assets/***
           + views/***
           + README.md
+          + CHANGELOG.md
+          + TESTING.md
           - *
           EOF
           cat include.txt
