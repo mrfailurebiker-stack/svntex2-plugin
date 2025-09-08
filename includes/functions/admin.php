@@ -27,7 +27,8 @@ function svntex2_admin_root(){
         'kyc' => 'KYC',
         'withdrawals' => 'Withdrawals',
         'distributions' => 'Profit Distributions',
-        'reports' => 'Reports'
+        'reports' => 'Reports',
+        'settings' => 'Settings'
     ];
 
     // Preload counts for widgets
@@ -60,6 +61,7 @@ function svntex2_admin_root(){
         case 'withdrawals': svntex2_admin_withdrawals(); break;
     case 'distributions': svntex2_admin_distributions(); break;
     case 'reports': svntex2_admin_reports(); break;
+    case 'settings': svntex2_admin_settings(); break;
         default: svntex2_admin_overview($counts); break;
     }
     echo '</div>';
@@ -172,6 +174,30 @@ function svntex2_admin_withdrawals(){
 function svntex2_admin_distributions(){
     global $wpdb; $table = $wpdb->prefix.'svntex_profit_distributions';
     $suspense_table = $wpdb->prefix.'svntex_pb_suspense';
+    $inputs_table = $wpdb->prefix.'svntex_profit_inputs';
+    $mode = get_option('svntex2_pb_distribution_mode','normalized');
+    $auto_release = (int) get_option('svntex2_pb_auto_release',0);
+    // Handle save of profit inputs
+    if( isset($_POST['svntex2_save_profit_inputs']) && check_admin_referer('svntex2_save_profit_inputs','svntex2_profit_inputs_nonce') ){
+        $month_year = sanitize_text_field($_POST['month_year']);
+        if( preg_match('/^\d{4}-\d{2}$/',$month_year) ){
+            $data = [
+                'revenue' => (float)$_POST['revenue'],
+                'remaining_wallet' => (float)$_POST['remaining_wallet'],
+                'cogs' => (float)$_POST['cogs'],
+                'maintenance_percent' => (float)$_POST['maintenance_percent'],
+                'notes' => sanitize_textarea_field($_POST['notes'] ?? '')
+            ];
+            $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM $inputs_table WHERE month_year=%s", $month_year));
+            if($exists){
+                $data['updated_at'] = current_time('mysql');
+                $wpdb->update($inputs_table,$data,['month_year'=>$month_year]);
+                echo '<div class="updated notice"><p>Profit inputs updated.</p></div>';
+            } else {
+                $data['month_year'] = $month_year; $wpdb->insert($inputs_table,$data); echo '<div class="updated notice"><p>Profit inputs saved.</p></div>';
+            }
+        }
+    }
     // Release suspense action
     if( isset($_POST['svntex2_release_suspense']) && check_admin_referer('svntex2_release_suspense','svntex2_release_suspense_nonce') ){
         $sid = (int) $_POST['suspense_id'];
@@ -204,6 +230,7 @@ function svntex2_admin_distributions(){
     }
     $rows = $wpdb->get_results("SELECT * FROM $table ORDER BY id DESC LIMIT 60");
     echo '<h2>Profit Distributions</h2>';
+    echo '<p><strong>Current Mode:</strong> '.esc_html( ucfirst(str_replace('_',' ', $mode)) ).' | <strong>Auto-Release:</strong> '.($auto_release? 'Enabled':'Disabled').'</p>';
     echo '<form method="post" class="svntex2-inline-form">'.wp_nonce_field('svntex2_new_distribution','svntex2_distribution_nonce', true, false).'<input type="text" name="month_year" placeholder="YYYY-MM" pattern="^[0-9]{4}-[0-9]{2}$" required /> <input type="number" step="0.01" name="company_profit" placeholder="Company Profit" required /> <button class="button button-primary" name="svntex2_new_distribution" value="1">Add</button></form>';
     echo '<table class="widefat striped svntex2-table"><thead><tr><th>ID</th><th>Month</th><th>Company Profit</th><th>Eligible Members</th><th>Profit Value</th><th>Created</th></tr></thead><tbody>';
     if($rows){
@@ -211,6 +238,31 @@ function svntex2_admin_distributions(){
             printf('<tr><td>%d</td><td>%s</td><td>%s</td><td>%d</td><td>%s</td><td>%s</td></tr>', $r->id, esc_html($r->month_year), number_format_i18n($r->company_profit,2), $r->eligible_members, number_format_i18n($r->profit_value,4), esc_html($r->created_at));
         }
     } else { echo '<tr><td colspan="6">No distribution records.</td></tr>'; }
+    echo '</tbody></table>';
+
+    // Profit Inputs Management
+    echo '<h3>Monthly Profit Inputs</h3>';
+    $edit_month = isset($_GET['edit_inputs']) ? sanitize_text_field($_GET['edit_inputs']) : date('Y-m');
+    $current_inputs = null;
+    if( preg_match('/^\d{4}-\d{2}$/',$edit_month) ){
+        $current_inputs = $wpdb->get_row( $wpdb->prepare("SELECT * FROM $inputs_table WHERE month_year=%s", $edit_month) );
+    }
+    echo '<form method="post" class="svntex2-inline-form" style="flex-wrap:wrap;gap:10px">'.wp_nonce_field('svntex2_save_profit_inputs','svntex2_profit_inputs_nonce',true,false);
+    echo '<input type="text" name="month_year" value="'.esc_attr($edit_month).'" placeholder="YYYY-MM" pattern="^[0-9]{4}-[0-9]{2}$" required />';
+    printf('<input type="number" step="0.01" name="revenue" value="%s" placeholder="Revenue" />', esc_attr($current_inputs->revenue ?? '')); 
+    printf('<input type="number" step="0.01" name="remaining_wallet" value="%s" placeholder="Remaining Wallet" />', esc_attr($current_inputs->remaining_wallet ?? ''));
+    printf('<input type="number" step="0.01" name="cogs" value="%s" placeholder="COGS" />', esc_attr($current_inputs->cogs ?? ''));
+    printf('<input type="number" step="0.0001" name="maintenance_percent" value="%s" placeholder="Maint % (0-1)" />', esc_attr($current_inputs->maintenance_percent ?? ''));
+    echo '<textarea name="notes" placeholder="Notes" style="min-width:200px" rows="1">'.esc_textarea($current_inputs->notes ?? '').'</textarea>';
+    echo '<button class="button button-primary" name="svntex2_save_profit_inputs" value="1">Save Inputs</button>';
+    echo '</form>';
+    $recent_inputs = $wpdb->get_results("SELECT * FROM $inputs_table ORDER BY month_year DESC LIMIT 24");
+    echo '<table class="widefat striped svntex2-table"><thead><tr><th>Month</th><th>Revenue</th><th>Remaining Wallet</th><th>COGS</th><th>Maint %</th><th>Notes</th><th>Updated</th></tr></thead><tbody>';
+    if($recent_inputs){
+        foreach($recent_inputs as $ri){
+            printf('<tr><td><a href="%s">%s</a></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>', esc_url( add_query_arg(['page'=>'svntex2-admin','tab'=>'distributions','edit_inputs'=>$ri->month_year], admin_url('admin.php')) ), esc_html($ri->month_year), number_format_i18n($ri->revenue,2), number_format_i18n($ri->remaining_wallet,2), number_format_i18n($ri->cogs,2), esc_html($ri->maintenance_percent), esc_html(wp_trim_words($ri->notes,8,'…')), esc_html($ri->updated_at ?: $ri->created_at));
+        }
+    } else { echo '<tr><td colspan="7">No profit inputs yet.</td></tr>'; }
     echo '</tbody></table>';
 
     // Suspense queue
@@ -284,6 +336,35 @@ function svntex2_admin_reports(){
     echo '<table class="widefat striped svntex2-table"><thead><tr><th>Gross</th><th>TDS (2%)</th><th>AMC (8%)</th><th>Net</th></tr></thead><tbody>';
     printf('<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>', number_format_i18n($fees->gross ?: 0,2), number_format_i18n($fees->tds ?: 0,2), number_format_i18n($fees->amc ?: 0,2), number_format_i18n($fees->net ?: 0,2));
     echo '</tbody></table>';
+}
+
+/** Settings tab */
+function svntex2_admin_settings(){
+    if( isset($_POST['svntex2_save_settings']) && check_admin_referer('svntex2_save_settings','svntex2_settings_nonce') ){
+        $mode = sanitize_key($_POST['pb_distribution_mode'] ?? 'normalized');
+        if( ! in_array($mode,['normalized','direct_formula'], true) ) $mode='normalized';
+        update_option('svntex2_pb_distribution_mode',$mode);
+        $auto = isset($_POST['pb_auto_release']) ? 1 : 0; update_option('svntex2_pb_auto_release',$auto);
+        $manual_profit = isset($_POST['manual_profit_value']) ? floatval($_POST['manual_profit_value']) : 0.0; update_option('svntex2_manual_profit_value',$manual_profit);
+        echo '<div class="updated notice"><p>Settings saved.</p></div>';
+    }
+    $mode = get_option('svntex2_pb_distribution_mode','normalized');
+    $auto = (int)get_option('svntex2_pb_auto_release',0);
+    $manual_profit = (float) get_option('svntex2_manual_profit_value',0);
+    echo '<h2>Settings</h2>';
+    echo '<form method="post" class="svntex2-inline-form" style="flex-direction:column;align-items:flex-start;gap:14px;max-width:520px">';
+    wp_nonce_field('svntex2_save_settings','svntex2_settings_nonce');
+    echo '<label><strong>PB Distribution Mode</strong><br/>';
+    echo '<select name="pb_distribution_mode">';
+    foreach(['normalized'=>'Normalized Share (Σ slab %)','direct_formula'=>'Direct Formula (profit_value * slab %)'] as $k=>$label){
+        printf('<option value="%s" %s>%s</option>', esc_attr($k), selected($mode,$k,false), esc_html($label));
+    }
+    echo '</select></label>';
+    echo '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="pb_auto_release" value="1" '.checked($auto,1,false).'/> Auto-release suspense when user becomes Active</label>';
+    echo '<label><strong>Manual Profit Override (current month)</strong><br/><input type="number" step="0.01" name="manual_profit_value" value="'.esc_attr($manual_profit).'" placeholder="0.00"/> <small>0 = disabled (use computed profit)</small></label>';
+    echo '<button class="button button-primary" name="svntex2_save_settings" value="1">Save Settings</button>';
+    echo '</form>';
+    echo '<h3>Info</h3><p>Normalized mode divides company profit proportionally by total slab % values. Direct Formula mode uses average profit value times each user slab %.</p>';
 }
 
 /** Inline styles (kept minimal & scoped) */

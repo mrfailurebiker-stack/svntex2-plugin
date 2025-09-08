@@ -239,14 +239,22 @@ function svntex2_pb_get_monthly_spend($user_id, $month){
 
 /** Determine company profit components (placeholders) */
 function svntex2_pb_compute_company_profit($month){
-    // Placeholder: integrate real revenue figures externally via filter
-    $base_revenue = (float) apply_filters('svntex2_pb_month_revenue', 0.0, $month );
-    $remaining_wallet = (float) apply_filters('svntex2_pb_remaining_wallet_total', 0.0, $month );
-    $product_cost = (float) apply_filters('svntex2_pb_cogs', 0.0, $month );
-    $maintenance_percent = (float) apply_filters('svntex2_pb_maintenance_percent', 0.0, $month );
+    global $wpdb; $inputs_table = $wpdb->prefix.'svntex_profit_inputs';
+    $row = $wpdb->get_row( $wpdb->prepare("SELECT * FROM $inputs_table WHERE month_year=%s", $month) );
+    $base_revenue = $row? (float)$row->revenue : 0.0;
+    $remaining_wallet = $row? (float)$row->remaining_wallet : 0.0;
+    $product_cost = $row? (float)$row->cogs : 0.0;
+    $maintenance_percent = $row? (float)$row->maintenance_percent : 0.0;
     $maintenance_amount = round( $base_revenue * $maintenance_percent, 2 );
     $profit = $base_revenue - $remaining_wallet - $product_cost - $maintenance_amount;
     if ( $profit < 0 ) $profit = 0.0;
+    // Allow override via option for current month manual profit
+    if( $month === date('Y-m') ){
+        $override = (float) get_option('svntex2_manual_profit_value',0);
+        if( $override > 0 ) $profit = $override;
+    }
+    // Filters still allow external modification
+    $profit = (float) apply_filters('svntex2_pb_company_profit', $profit, $month, $row );
     return [ 'company_profit'=>$profit, 'revenue'=>$base_revenue, 'remaining_wallet'=>$remaining_wallet, 'cogs'=>$product_cost, 'maintenance'=>$maintenance_amount ];
 }
 
@@ -280,24 +288,50 @@ function svntex2_pb_monthly_distribution_run(){
     $company_profit = $profit_data['company_profit'];
     if ( $company_profit <= 0 ) { set_transient($lock,1,DAY_IN_SECONDS); return; }
 
-    // Normalize by total percent sum so total paid == company_profit
-    $percent_sum = 0.0; foreach($eligible as $e){ $percent_sum += $e['percent']; }
-    if ( $percent_sum <= 0 ) { set_transient($lock,1,DAY_IN_SECONDS); return; }
+    $mode = get_option('svntex2_pb_distribution_mode','normalized');
+    $susp = $wpdb->prefix.'svntex_pb_suspense';
+    if( $mode === 'direct_formula' ){
+        // Store profit_value as average for info only
+        $wpdb->insert($dist,[ 'month_year'=>$month,'company_profit'=>$company_profit,'eligible_members'=>count($eligible),'profit_value'=> round($company_profit / count($eligible),4),'created_at'=> current_time('mysql', true) ]);
+        foreach($eligible as $e){
+            $payout = round( $company_profit * $e['percent'], 2 ); // direct formula
+            $ustatus = svntex2_pb_get_status($e['user_id']);
+            if( in_array($ustatus,['suspended','provisional'], true ) ){
+                $wpdb->insert($susp,[ 'user_id'=>$e['user_id'],'month_year'=>$month,'slab_percent'=>$e['percent']*100,'amount'=>$payout,'reason'=>$ustatus,'status'=>'held','created_at'=> current_time('mysql', true) ]);
+            } else {
+                svntex2_wallet_add_transaction( $e['user_id'], 'profit_bonus', $payout, 'pb:'.$month, [ 'month'=>$month,'spend'=>$e['spend'],'slab_percent'=>$e['percent'],'mode'=>'direct','company_profit'=>$company_profit ], 'income' );
+                $wpdb->insert($payouts,[ 'user_id'=>$e['user_id'],'month_year'=>$month,'slab_percent'=>$e['percent']*100,'payout_amount'=>$payout,'created_at'=> current_time('mysql', true) ]);
+            }
+        }
+    } else {
+        // Normalized
+        $percent_sum = 0.0; foreach($eligible as $e){ $percent_sum += $e['percent']; }
+        if ( $percent_sum <= 0 ) { set_transient($lock,1,DAY_IN_SECONDS); return; }
+        $wpdb->insert($dist,[ 'month_year'=>$month,'company_profit'=>$company_profit,'eligible_members'=>count($eligible),'profit_value'=> round($company_profit / count($eligible),4),'created_at'=> current_time('mysql', true) ]);
+        foreach($eligible as $e){
+            $share_ratio = $e['percent'] / $percent_sum; // 0..1
+            $payout = round( $company_profit * $share_ratio, 2 );
+            $ustatus = svntex2_pb_get_status($e['user_id']);
+            if( in_array($ustatus,['suspended','provisional'], true ) ){
+                $wpdb->insert($susp,[ 'user_id'=>$e['user_id'],'month_year'=>$month,'slab_percent'=>$e['percent']*100,'amount'=>$payout,'reason'=>$ustatus,'status'=>'held','created_at'=> current_time('mysql', true) ]);
+            } else {
+                svntex2_wallet_add_transaction( $e['user_id'], 'profit_bonus', $payout, 'pb:'.$month, [ 'month'=>$month,'spend'=>$e['spend'],'slab_percent'=>$e['percent'],'ratio'=>$share_ratio,'mode'=>'normalized','company_profit'=>$company_profit ], 'income' );
+                $wpdb->insert($payouts,[ 'user_id'=>$e['user_id'],'month_year'=>$month,'slab_percent'=>$e['percent']*100,'payout_amount'=>$payout,'created_at'=> current_time('mysql', true) ]);
+            }
+        }
+    }
 
-    // Insert distribution header (profit_value = company_profit / count)
-    $wpdb->insert($dist,[ 'month_year'=>$month,'company_profit'=>$company_profit,'eligible_members'=>count($eligible),'profit_value'=> round($company_profit / count($eligible),4),'created_at'=> current_time('mysql', true) ]);
-
-    foreach($eligible as $e){
-        $share_ratio = $e['percent'] / $percent_sum; // 0..1
-        $payout = round( $company_profit * $share_ratio, 2 );
-        // If user status suspended (or not fully active) move to suspense instead of paying immediately
-        $ustatus = svntex2_pb_get_status($e['user_id']);
-        if( in_array($ustatus,['suspended','provisional'], true ) ){
-            $susp = $wpdb->prefix.'svntex_pb_suspense';
-            $wpdb->insert($susp,[ 'user_id'=>$e['user_id'],'month_year'=>$month,'slab_percent'=>$e['percent']*100,'amount'=>$payout,'reason'=>$ustatus,'status'=>'held','created_at'=> current_time('mysql', true) ]);
-        } else {
-            svntex2_wallet_add_transaction( $e['user_id'], 'profit_bonus', $payout, 'pb:'.$month, [ 'month'=>$month,'spend'=>$e['spend'],'slab_percent'=>$e['percent'],'ratio'=>$share_ratio,'company_profit'=>$company_profit ], 'income' );
-            $wpdb->insert($payouts,[ 'user_id'=>$e['user_id'],'month_year'=>$month,'slab_percent'=>$e['percent']*100,'payout_amount'=>$payout,'created_at'=> current_time('mysql', true) ]);
+    // Auto-release suspense for users now Active if option enabled
+    if( get_option('svntex2_pb_auto_release',0) ){
+        $held = $wpdb->get_results( "SELECT * FROM $susp WHERE status='held'" );
+        if($held){
+            foreach($held as $hr){
+                $ustatus = svntex2_pb_get_status($hr->user_id);
+                if( in_array($ustatus,['active','lifetime'], true) ){
+                    svntex2_wallet_add_transaction( $hr->user_id, 'profit_bonus', (float)$hr->amount, 'pb_release:'.$hr->month_year, [ 'original_month'=>$hr->month_year,'released'=>current_time('mysql'),'reason'=>$hr->reason,'auto'=>1 ], 'income' );
+                    $wpdb->update($susp,[ 'status'=>'released','released_at'=>current_time('mysql') ],['id'=>$hr->id]);
+                }
+            }
         }
     }
 

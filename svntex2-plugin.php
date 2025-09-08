@@ -145,6 +145,19 @@ function svntex2_activate() {
         UNIQUE KEY month_year (month_year)
     ) $charset";
 
+    // Admin-entered monthly profit input components (revenue, wallet remaining, cogs, maintenance %)
+    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_profit_inputs (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        month_year CHAR(7) NOT NULL UNIQUE,
+        revenue DECIMAL(14,2) NOT NULL DEFAULT 0,
+        remaining_wallet DECIMAL(14,2) NOT NULL DEFAULT 0,
+        cogs DECIMAL(14,2) NOT NULL DEFAULT 0,
+        maintenance_percent DECIMAL(5,4) NOT NULL DEFAULT 0,
+        notes TEXT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NULL
+    ) $charset";
+
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_pb_payouts (
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         user_id BIGINT UNSIGNED NOT NULL,
@@ -442,6 +455,22 @@ add_action( 'plugins_loaded', function(){
             released_at DATETIME NULL,
             KEY user_month (user_id, month_year),
             KEY status (status)
+        ) $charset");
+    }
+    // Profit inputs table safety
+    $profit_inputs_table = $pref.'svntex_profit_inputs';
+    if ( $wpdb->get_var( $wpdb->prepare("SHOW TABLES LIKE %s", $profit_inputs_table) ) !== $profit_inputs_table ) {
+        $charset = $wpdb->get_charset_collate();
+        $wpdb->query("CREATE TABLE $profit_inputs_table (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            month_year CHAR(7) NOT NULL UNIQUE,
+            revenue DECIMAL(14,2) NOT NULL DEFAULT 0,
+            remaining_wallet DECIMAL(14,2) NOT NULL DEFAULT 0,
+            cogs DECIMAL(14,2) NOT NULL DEFAULT 0,
+            maintenance_percent DECIMAL(5,4) NOT NULL DEFAULT 0,
+            notes TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NULL
         ) $charset");
     }
 } );

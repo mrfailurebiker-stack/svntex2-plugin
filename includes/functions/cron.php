@@ -14,7 +14,36 @@ add_filter('cron_schedules', function($schedules){
     if (!isset($schedules['monthly'])) {
         $schedules['monthly'] = [ 'interval' => 30 * DAY_IN_SECONDS, 'display' => __('Once Monthly','svntex2') ];
     }
+    if(!isset($schedules['svntex2_five_minutes'])){
+        $schedules['svntex2_five_minutes'] = [ 'interval' => 300, 'display' => __('Every 5 Minutes','svntex2') ];
+    }
     return $schedules;
+});
+
+// Auto schedule suspense release cron
+add_action('init', function(){
+    if( get_option('svntex2_pb_auto_release') ){
+        if( ! wp_next_scheduled('svntex2_auto_release_suspense') ){
+            wp_schedule_event(time()+120,'svntex2_five_minutes','svntex2_auto_release_suspense');
+        }
+    } else {
+        $ts = wp_next_scheduled('svntex2_auto_release_suspense');
+        if($ts){ wp_unschedule_event($ts,'svntex2_auto_release_suspense'); }
+    }
+});
+
+add_action('svntex2_auto_release_suspense', function(){
+    if( ! get_option('svntex2_pb_auto_release') ) return;
+    global $wpdb; $susp = $wpdb->prefix.'svntex_pb_suspense';
+    $rows = $wpdb->get_results("SELECT * FROM $susp WHERE status='held' ORDER BY id ASC LIMIT 50");
+    if(!$rows) return;
+    foreach($rows as $r){
+        $ustatus = get_user_meta($r->user_id,'_svntex2_pb_status', true );
+        if( in_array($ustatus,['active','lifetime'], true) ){
+            svntex2_wallet_add_transaction( $r->user_id, 'profit_bonus', (float)$r->amount, 'pb_release:'.$r->month_year, [ 'auto_release'=>1,'original_month'=>$r->month_year ], 'income' );
+            $wpdb->update($susp,[ 'status'=>'released','released_at'=>current_time('mysql', true) ],['id'=>$r->id]);
+        }
+    }
 });
 
 add_action('svntex2_monthly_distribution','svntex2_run_monthly_distribution');
