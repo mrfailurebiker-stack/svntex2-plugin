@@ -20,13 +20,26 @@ if ( function_exists('wc_get_orders') ) {
 
 $logout_url = esc_url( wp_logout_url( home_url() ) );
 ?>
+<!DOCTYPE html>
+<html <?php language_attributes(); ?>>
+<head>
+    <meta charset="<?php bloginfo('charset'); ?>" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title><?php bloginfo('name'); ?> – Dashboard</title>
+    <?php wp_head(); ?>
+    <link rel="stylesheet" href="<?php echo esc_url( SVNTEX2_PLUGIN_URL.'assets/css/style.css?ver='.SVNTEX2_VERSION ); ?>" />
+    <link rel="stylesheet" href="<?php echo esc_url( SVNTEX2_PLUGIN_URL.'assets/css/landing.css?ver='.SVNTEX2_VERSION ); ?>" />
+</head>
+<body <?php body_class('svntex-app-shell'); ?>>
 <div class="svntex-dash-top">
     <a href="<?php echo esc_url( home_url('/') ); ?>" class="dash-brand">SVNTeX</a>
     <div class="dash-actions">
         <button class="mini" id="svntex2DarkToggleTop" aria-label="Toggle dark mode">Theme</button>
         <a class="mini" href="<?php echo esc_url( wp_logout_url( home_url('/') ) ); ?>">Logout</a>
     </div>
-</div>
+<?php wp_footer(); ?>
+</body>
+</html>
 <div class="svntex-dashboard-wrapper fade-in" data-svntex2-dashboard>
     <aside class="dashboard-sidebar" role="navigation" aria-label="Dashboard Navigation">
         <nav>

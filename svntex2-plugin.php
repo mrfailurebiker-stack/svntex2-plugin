@@ -8,6 +8,9 @@
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * License: GPLv2 or later
+ *
+ * Roadmap / Pending feature logic: see docs/MISSING_FEATURES.md (updated regularly).
+ * High-level architecture diagram included in above document for quick onboarding.
  */
 
 // -----------------------------------------------------------------------------

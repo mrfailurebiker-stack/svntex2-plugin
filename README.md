@@ -23,6 +23,8 @@ Foundation plugin for the SVNTeX 2.0 customer / member platform.
 * Automated test suite (PHPUnit) for slabs, fees, distribution normalization.
 * Security hardening (encryption of sensitive KYC data, audit logging, permissions review).
 
+For a detailed, continuously updated breakdown of each pending module (status, gaps, proposed logic) see `docs/MISSING_FEATURES.md`.
+
 ## Development Quick Start
 1. Clone repo into `wp-content/plugins/svntex2-plugin`.
 2. Activate plugin in WP admin.
