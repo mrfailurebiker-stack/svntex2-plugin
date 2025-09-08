@@ -658,8 +658,13 @@ add_action( 'wp_logout', function() {
 // -----------------------------------------------------------------------------
 add_action( 'template_redirect', function() {
     $request_uri = $_SERVER['REQUEST_URI'] ?? '';
-    // WooCommerce logout endpoint only
+    // WooCommerce logout endpoint
     if ( preg_match('#/my-account/logout/?#i', $request_uri) ) {
+        wp_safe_redirect( home_url('/') );
+        exit;
+    }
+    // WordPress core logout URL
+    if ( stripos($request_uri, '/wp-login.php') !== false && isset($_GET['action']) && $_GET['action'] === 'logout' ) {
         wp_safe_redirect( home_url('/') );
         exit;
     }
