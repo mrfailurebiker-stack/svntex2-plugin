@@ -144,6 +144,49 @@ body:not(.dark) .svntex-dash-top .dash-actions .mini { color:#1e293b; }
   --primary-blue: #2563eb;
   --primary-blue-rgb: 37,99,235;
   --bg: #ffffff;
+  .mobile-nav {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+    background: var(--sidebar-bg, #162132);
+    border-top: 1px solid #e3e8ef;
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+    justify-content: space-around;
+    align-items: center;
+    padding: 0.25rem 0;
+  }
+  .mobile-nav-link {
+    flex: 1;
+    text-align: center;
+    padding: 8px 0 4px 0;
+    color: var(--text-light, #64748b);
+    text-decoration: none;
+    font-size: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: background 0.2s, color 0.2s;
+    border: none;
+    background: none;
+  }
+  .mobile-nav-link.active,
+  .mobile-nav-link:active,
+  .mobile-nav-link:hover {
+    color: var(--primary-blue, #2563eb);
+    background: #e3e8ef;
+  }
+  .mobile-nav-link .nav-ico {
+    font-size: 1.3rem;
+    margin-bottom: 2px;
+  }
+  .mobile-nav-link .nav-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: .2px;
+  }
   --bg-alt: #f4f6fb;
   --border: #e2e8f0;
   --text: #1e293b;

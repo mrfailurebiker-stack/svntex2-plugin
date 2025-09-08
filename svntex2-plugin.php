@@ -368,7 +368,11 @@ add_action('template_redirect', function(){
     if ( ! is_user_logged_in() ) return; // let login redirect logic handle guests
     // Allow site owners to disable override via filter
     if ( ! apply_filters('svntex2_override_my_account', true) ) return;
-    // Render ONLY SVNTeX dashboard (no WooCommerce navigation / endpoints)
+        // Mobile redirect: always show dashboard, never WooCommerce My Account
+        if ( wp_is_mobile() ) {
+            wp_redirect(home_url('/dashboard'));
+            exit;
+        }
     wp_enqueue_style( 'svntex2-style' );
     wp_enqueue_script( 'svntex2-dashboard' );
     wp_localize_script( 'svntex2-dashboard', 'SVNTEX2Dash', [
