@@ -385,9 +385,10 @@ add_action( 'woocommerce_order_status_completed', function( $order_id ) {
     }
     $rate = (float) apply_filters( 'svntex2_referral_commission_rate', $base_rate, $order, $referrer_id, $user_id );
     if ( $rate > 0 ) {
-        $commission = round( $total * $rate, 2 );
+        // Commission base uses net_total (order total minus shipping) to align with qualification logic
+        $commission = round( $net_total * $rate, 2 );
         if ( $commission > 0 ) {
-            svntex2_wallet_add_transaction( $referrer_id, 'referral_commission', $commission, 'order:'.$order_id, [ 'referee' => $user_id, 'rate' => $rate ], 'income' );
+            svntex2_wallet_add_transaction( $referrer_id, 'referral_commission', $commission, 'order:'.$order_id, [ 'referee' => $user_id, 'rate' => $rate, 'base' => $net_total ], 'income' );
         }
     }
     // One-time Referral Bonus (RB) if not yet awarded and first qualifying event is this order
