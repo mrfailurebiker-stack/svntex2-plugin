@@ -267,6 +267,18 @@ function svntex2_render_auth_pages(){
     exit;
 }
 
+// Front page landing override (simple) – render modern landing if is home/front
+add_action('template_redirect', function(){
+    if ( ! is_user_logged_in() && ( is_front_page() || is_home() ) ) {
+        // Avoid conflict if a static front page with content is set; allow override via filter
+        $enabled = apply_filters('svntex2_enable_landing', true);
+        if ( ! $enabled ) return;        
+        $file = SVNTEX2_PLUGIN_DIR.'views/landing.php';
+        if ( file_exists( $file ) ) {
+            status_header(200); nocache_headers(); include $file; exit; }
+    }
+});
+
 // Redirect wp-login.php to custom page (except special cases)
 add_action( 'login_init', function(){
     if ( isset( $_GET['action'] ) && in_array( $_GET['action'], ['lostpassword','rp','resetpass'], true ) ) return; // allow core flows
