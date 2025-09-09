@@ -64,6 +64,44 @@ $logout_url = esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
 
 /* Ensure our widget area is readable on dark themes */
 .widget { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.06)); padding: 16px; border-radius: 8px; margin-bottom: 14px; }
+
+/* Compact 3-line tab styles */
+.compact-tab { display:flex; align-items:center; gap:8px; background:transparent; border:0; color:inherit; cursor:pointer; padding:6px 8px; border-radius:8px; }
+.compact-lines { display:inline-block; width:22px; }
+.compact-line { display:block; height:2px; background:#dfe9ff; margin:3px 0; border-radius:2px; }
+.compact-label { font-size:12px; opacity:0.9; }
+
+/* Hidden by default on desktop; visible on small screens and tablet */
+@media (max-width: 900px) {
+    .compact-tab { display:flex; }
+}
+
+/* When menu is open, show the nav as overlay on small screens */
+.menu-open #svntex-compact-menu { display:block !important; position: fixed; left: 12px; top: 80px; width: calc(100% - 24px); max-width: 420px; z-index: 10000; box-shadow: 0 8px 30px rgba(0,0,0,0.6); }
+
+</style>
+<script>
+// Small behavior to toggle compact menu on mobile/tablet
+(function(){
+    function qs(sel, ctx){ return (ctx||document).querySelector(sel); }
+    var compact = qs('.compact-tab');
+    var menu = qs('#svntex-compact-menu');
+    if (!compact || !menu) return;
+    compact.addEventListener('click', function(e){
+        var opened = document.documentElement.classList.toggle('menu-open');
+        compact.setAttribute('aria-expanded', opened ? 'true' : 'false');
+    });
+    // close when clicking outside
+    document.addEventListener('click', function(e){
+        if (!document.documentElement.classList.contains('menu-open')) return;
+        if (compact.contains(e.target) || menu.contains(e.target)) return;
+        document.documentElement.classList.remove('menu-open');
+        compact.setAttribute('aria-expanded','false');
+    });
+    // close on escape
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape') { document.documentElement.classList.remove('menu-open'); compact.setAttribute('aria-expanded','false'); } });
+})();
+</script>
 </style>
 <div class="svntex-dash-top">
     <a href="<?php echo esc_url( home_url('/') ); ?>" class="dash-brand">SVNTeX</a>
@@ -74,7 +112,16 @@ $logout_url = esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
 </div>
 <div class="svntex-dashboard-wrapper fade-in" data-svntex2-dashboard>
     <aside class="dashboard-sidebar" role="navigation" aria-label="Dashboard Navigation">
-        <nav>
+        <!-- Compact 3-line tab: clicking toggles full menu visibility -->
+        <button class="compact-tab" aria-expanded="false" aria-controls="svntex-compact-menu" title="Open menu">
+            <span class="compact-lines">
+                <em class="compact-line"></em>
+                <em class="compact-line"></em>
+                <em class="compact-line"></em>
+            </span>
+            <span class="compact-label">Menu</span>
+        </button>
+        <nav id="svntex-compact-menu">
             <ul class="nav-list">
                 <li><a href="<?php echo esc_url( home_url('/dashboard') ); ?>" class="nav-link active" data-nav="home"><span class="nav-ico">🏠</span>Home</a></li>
                 <li><a href="#wallet" class="nav-link" data-nav="wallet"><span class="nav-ico">💰</span>Wallet</a></li>
