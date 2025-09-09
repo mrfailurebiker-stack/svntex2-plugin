@@ -84,13 +84,24 @@ $logout_url = esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
 .dashboard-sidebar.open .nav-list { display:block !important; position: absolute; left: 8px; top: 56px; width: 220px; max-width: 80vw; z-index: 1000; box-shadow: 0 8px 30px rgba(0,0,0,0.6); background: linear-gradient(180deg, rgba(18,18,30,0.98), rgba(10,10,20,0.95)); padding:12px; border-radius:8px; }
 </style>
 <style>
-/* Hide compact menu by default on mobile; shown when .menu-open is toggled */
+/* Mobile drawer: when menu opens, show a white full-height panel similar to site nav */
 #svntex-compact-menu { display: none; }
-#svntex-compact-menu .nav-list { margin:0; padding:0; }
-#svntex-compact-menu .nav-link { display:block; padding:.8rem 1rem; color:#e6eefb; background:transparent; border-radius:6px; }
-#svntex-compact-menu .nav-link:hover { background: rgba(255,255,255,0.03); }
-#svntex-compact-menu { background: linear-gradient(180deg, rgba(18,18,30,0.98), rgba(10,10,20,0.95)); padding:12px; border-radius:10px; color:#e6eefb; box-shadow: 0 8px 30px rgba(0,0,0,0.6); z-index:10001; }
-.menu-open #svntex-compact-menu { display:block !important; position: fixed; left: 12px; top: 80px; width: calc(100% - 24px); max-width: 420px; }
+#svntex-compact-menu .nav-list { list-style:none; margin:0; padding:0; }
+#svntex-compact-menu .nav-item { border-bottom:1px solid rgba(0,0,0,0.06); }
+#svntex-compact-menu .nav-link { display:block; padding:16px 18px; color:#222; text-decoration:none; background:transparent; }
+#svntex-compact-menu .nav-link .nav-ico { margin-right:10px; }
+#svntex-compact-menu .nav-link:hover { background: rgba(0,0,0,0.03); }
+#svntex-compact-menu .nav-head { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid rgba(0,0,0,0.06); }
+#svntex-compact-menu .nav-head .brand { font-weight:700; color:#1b1b1b; }
+#svntex-compact-menu .close-btn { background:transparent;border:0;font-size:20px;cursor:pointer;color:#111 }
+
+/* Drawer visible state when body gets .menu-open */
+body.menu-open #svntex-compact-menu { display:block !important; position:fixed; left:0; top:0; bottom:0; width:100%; max-width:420px; background:#fff; z-index:10050; overflow:auto; box-shadow: 0 8px 30px rgba(0,0,0,0.25); }
+
+/* For larger screens keep previous compact behaviour hidden */
+@media (min-width: 901px) {
+    #svntex-compact-menu { display:none !important; }
+}
 </style>
 <style>
 /* Hide theme header and footer when our brand UI / My Account override is active */
@@ -112,27 +123,35 @@ body.svntex-app-shell .site { padding-top: 0 !important; }
 body.svntex-app-shell .site-main, body.svntex-myaccount-override .site-main { margin-top: 0 !important; }
 </style>
 <script>
-// Small behavior to toggle compact menu on mobile/tablet — initialize after DOM ready
+// Mobile drawer behavior: toggle body.menu-open and manage focus
 document.addEventListener('DOMContentLoaded', function(){
-    function qs(sel, ctx){ return (ctx||document).querySelector(sel); }
-    var compact = qs('.compact-tab');
-    var menu = qs('#svntex-compact-menu');
-    if (!compact || !menu) return;
-    compact.style.display = 'flex';
-    compact.addEventListener('click', function(e){
-        var opened = compact.parentElement.classList.toggle('open');
-        compact.setAttribute('aria-expanded', opened ? 'true' : 'false');
-        if (opened) compact.parentElement.querySelector('.nav-link')?.focus();
+    var hamburger = document.querySelector('.compact-tab');
+    var menu = document.getElementById('svntex-compact-menu');
+    var closeBtn = document.getElementById('svntex-menu-close');
+    if (!hamburger || !menu) return;
+    // ensure hamburger visible on small screens
+    hamburger.style.display = 'flex';
+    hamburger.addEventListener('click', function(e){
+        document.body.classList.add('menu-open');
+        menu.setAttribute('aria-hidden','false');
+        hamburger.setAttribute('aria-expanded','true');
+        closeBtn && closeBtn.focus();
     });
-    // close when clicking outside
+    function closeMenu(){
+        document.body.classList.remove('menu-open');
+        menu.setAttribute('aria-hidden','true');
+        hamburger.setAttribute('aria-expanded','false');
+        hamburger.focus();
+    }
+    closeBtn && closeBtn.addEventListener('click', closeMenu);
+    // click outside closes menu
     document.addEventListener('click', function(e){
-        if (!compact.parentElement.classList.contains('open')) return;
-        if (compact.contains(e.target) || menu.contains(e.target)) return;
-        compact.parentElement.classList.remove('open');
-        compact.setAttribute('aria-expanded','false');
+        if (!document.body.classList.contains('menu-open')) return;
+        if (menu.contains(e.target) || hamburger.contains(e.target)) return;
+        closeMenu();
     });
-    // close on escape
-    document.addEventListener('keydown', function(e){ if (e.key === 'Escape') { document.documentElement.classList.remove('menu-open'); compact.setAttribute('aria-expanded','false'); } });
+    // escape
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && document.body.classList.contains('menu-open')) closeMenu(); });
 });
 </script>
  
@@ -145,6 +164,23 @@ document.addEventListener('DOMContentLoaded', function(){
 </div>
 <!-- Debug: show build info so we can confirm deployment on live site -->
 <div style="position:fixed;left:12px;bottom:12px;z-index:99999;background:rgba(0,0,0,0.6);color:#fff;padding:6px 8px;border-radius:6px;font-size:11px;opacity:0.9">build: a19d719 — 2025-09-09</div>
+
+<!-- Collapsible server-side debug panel (toggle to inspect runtime values) -->
+<div id="svntex-debug-panel" style="position:fixed;left:12px;bottom:52px;z-index:99999;background:rgba(0,0,0,0.8);color:#fff;padding:8px;border-radius:6px;font-size:12px;max-width:340px;">
+    <button id="svntex-debug-toggle" style="background:#222;border:0;color:#fff;padding:6px 8px;border-radius:6px;cursor:pointer;">Debug ▾</button>
+    <div id="svntex-debug-body" style="display:none;margin-top:8px;line-height:1.4;">
+        <div><strong>User ID:</strong> <?php echo intval($current_user->ID); ?></div>
+        <div><strong>Display name:</strong> <?php echo esc_html($current_user->display_name); ?></div>
+        <div><strong>KYC status:</strong> <?php echo esc_html(get_user_meta($current_user->ID,'kyc_status', true) ?: 'None'); ?></div>
+        <div><strong>Wallet raw:</strong> <?php echo esc_html($wallet_balance); ?></div>
+        <div><strong>Referral count:</strong> <?php echo esc_html($referral_count); ?></div>
+        <div><strong>WooCommerce orders fn:</strong> <?php echo function_exists('wc_get_orders') ? 'available' : 'missing'; ?></div>
+        <div><strong>WooCommerce price fn:</strong> <?php echo function_exists('wc_price') ? 'available' : 'missing'; ?></div>
+        <div style="margin-top:6px;font-size:11px;opacity:0.9;color:#d0d7ff">Note: this is a temporary debug panel; it will not change user data.</div>
+    </div>
+</div>
+<script>document.addEventListener('DOMContentLoaded',function(){var t=document.getElementById('svntex-debug-toggle'),b=document.getElementById('svntex-debug-body');if(!t||!b)return;t.addEventListener('click',function(){if(b.style.display==='none'){b.style.display='block';t.textContent='Debug ▴';}else{b.style.display='none';t.textContent='Debug ▾';}});});</script>
+
 <div class="svntex-dashboard-wrapper fade-in" data-svntex2-dashboard>
     <aside class="dashboard-sidebar" role="navigation" aria-label="Dashboard Navigation">
         <!-- Compact 3-line tab: clicking toggles full menu visibility -->
