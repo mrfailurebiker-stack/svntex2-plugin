@@ -12,6 +12,12 @@ html,body { margin:0; padding:0; font-family: system-ui,-apple-system,Segoe UI,H
 body.svntex-landing { overflow-x:hidden; }
 .svn-landing-shell { position:relative; min-height:100vh; display:flex; flex-direction:column; }
 .svn-landing-nav { display:flex; align-items:center; justify-content:space-between; padding: clamp(1rem,2vw,2rem) clamp(1.2rem,4vw,3rem); z-index:10; }
+.svn-landing-nav .nav-products{display:flex;gap:.6rem;align-items:center}
+.svn-landing-nav .nav-products .nav-link{color:#fff;text-decoration:none;font-weight:600;background:rgba(255,255,255,.1);padding:.45rem .7rem;border-radius:8px;border:1px solid rgba(255,255,255,.08)}
+.svn-landing-nav .nav-products select{padding:.45rem .6rem;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(15,23,42,.6);color:#fff}
+.svn-landing-nav .nav-products .product-search{display:flex;gap:.4rem;align-items:center}
+.svn-landing-nav .nav-products .product-search input[type="search"]{padding:.45rem .6rem;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:#fff;color:#0f172a;min-width:220px}
+.svn-landing-nav .nav-products .product-search button{padding:.48rem .7rem;border-radius:8px;border:0;background:linear-gradient(92deg,var(--svn-accent),var(--svn-accent-alt));color:#fff;font-weight:600;cursor:pointer}
 .svn-landing-nav .brand { font-size: clamp(1.3rem,2.2vw,2rem); font-weight:700; letter-spacing:.5px; background:linear-gradient(90deg,var(--svn-accent),var(--svn-accent-alt)); -webkit-background-clip:text; background-clip:text; color:transparent; }
 .svn-landing-nav .nav-actions a { text-decoration:none; font-weight:600; color:var(--svn-text); font-size:.9rem; margin-left:1.25rem; position:relative; }
 .svn-landing-nav .nav-actions a:after { content:""; position:absolute; left:0; bottom:-4px; width:0; height:2px; background:linear-gradient(90deg,var(--svn-accent),var(--svn-accent-alt)); transition:.35s width; }

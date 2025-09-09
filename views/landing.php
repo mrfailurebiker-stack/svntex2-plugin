@@ -15,6 +15,30 @@
   <div class="shape s3"></div>
   <header class="svn-landing-nav" role="banner">
     <div class="brand">SVNTeX</div>
+    <nav class="nav-products" aria-label="Products">
+      <a class="nav-link" href="<?php echo esc_url( get_post_type_archive_link('svntex_product') ); ?>">Products</a>
+      <?php
+        $terms = get_terms([
+          'taxonomy' => 'svntex_category',
+          'parent' => 0,
+          'hide_empty' => false,
+        ]);
+        if ( ! is_wp_error($terms) && ! empty($terms) ) :
+      ?>
+        <select class="product-category-select" aria-label="Choose category" onchange="if(this.value){window.location.href=this.value;}">
+          <option value="">All Categories</option>
+          <?php foreach($terms as $t): $link = get_term_link($t); if (is_wp_error($link)) continue; ?>
+            <option value="<?php echo esc_url($link); ?>"><?php echo esc_html($t->name); ?></option>
+          <?php endforeach; ?>
+        </select>
+      <?php endif; ?>
+      <form class="product-search" role="search" method="get" action="<?php echo esc_url( home_url('/') ); ?>">
+        <label class="screen-reader-text" for="svntex-search">Search products</label>
+        <input id="svntex-search" type="search" name="s" placeholder="Search products..." value="" />
+        <input type="hidden" name="post_type" value="svntex_product" />
+        <button type="submit">Search</button>
+      </form>
+    </nav>
     <nav class="nav-actions" aria-label="Primary">
       <a href="<?php echo esc_url( site_url('/'.SVNTEX2_LOGIN_SLUG.'/') ); ?>">Log In</a>
       <a href="<?php echo esc_url( site_url('/'.SVNTEX2_REGISTER_SLUG.'/') ); ?>">Sign Up</a>
