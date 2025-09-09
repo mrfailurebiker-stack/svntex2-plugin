@@ -1,0 +1,6 @@
+This is a test file to confirm GitHub deployment to Hostinger.
+
+If you see this file on your server, your deployment is working correctly.
+
+- SVNTeX2 Test
+- Date: 2025-09-09
