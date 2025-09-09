@@ -674,6 +674,24 @@ if ( ! file_exists( SVNTEX2_PLUGIN_DIR . 'assets/js/core.js' ) ) {
 // 12. LOGOUT REDIRECT (ENSURE CONSISTENCY)
 // -----------------------------------------------------------------------------
 add_action( 'wp_logout', function() {
+    error_log('SVNTEX2 LOGOUT: wp_logout hook fired, clearing session and redirecting.');
+    // Force clear cookies and session
+    if ( isset( $_COOKIE[LOGGED_IN_COOKIE] ) ) {
+        setcookie( LOGGED_IN_COOKIE, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+    }
+    if ( isset( $_COOKIE[AUTH_COOKIE] ) ) {
+        setcookie( AUTH_COOKIE, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+    }
+    if ( isset( $_COOKIE[SECURE_AUTH_COOKIE] ) ) {
+        setcookie( SECURE_AUTH_COOKIE, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+    }
+    if ( isset( $_COOKIE[USER_COOKIE] ) ) {
+        setcookie( USER_COOKIE, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+    }
+    // Destroy PHP session
+    if ( session_status() === PHP_SESSION_ACTIVE ) {
+        session_destroy();
+    }
     wp_safe_redirect( home_url('/customer-login/') );
     exit;
 });
@@ -686,13 +704,45 @@ add_action( 'template_redirect', function() {
     $login_url = home_url('/customer-login/');
     // WooCommerce logout endpoint
     if ( preg_match('#/my-account/logout/?#i', $request_uri) ) {
-        error_log('SVNTEX2 REDIRECT: Woo logout endpoint detected, redirecting to: ' . $login_url);
+        error_log('SVNTEX2 REDIRECT: Woo logout endpoint detected, clearing session and redirecting to: ' . $login_url);
+        // Force clear cookies and session
+        if ( isset( $_COOKIE[LOGGED_IN_COOKIE] ) ) {
+            setcookie( LOGGED_IN_COOKIE, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+        }
+        if ( isset( $_COOKIE[AUTH_COOKIE] ) ) {
+            setcookie( AUTH_COOKIE, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+        }
+        if ( isset( $_COOKIE[SECURE_AUTH_COOKIE] ) ) {
+            setcookie( SECURE_AUTH_COOKIE, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+        }
+        if ( isset( $_COOKIE[USER_COOKIE] ) ) {
+            setcookie( USER_COOKIE, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+        }
+        if ( session_status() === PHP_SESSION_ACTIVE ) {
+            session_destroy();
+        }
         wp_safe_redirect( $login_url );
         exit;
     }
     // WordPress core logout URL
     if ( stripos($request_uri, '/wp-login.php') !== false && isset($_GET['action']) && $_GET['action'] === 'logout' ) {
-        error_log('SVNTEX2 REDIRECT: WP core logout detected, redirecting to: ' . $login_url);
+        error_log('SVNTEX2 REDIRECT: WP core logout detected, clearing session and redirecting to: ' . $login_url);
+        // Force clear cookies and session
+        if ( isset( $_COOKIE[LOGGED_IN_COOKIE] ) ) {
+            setcookie( LOGGED_IN_COOKIE, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+        }
+        if ( isset( $_COOKIE[AUTH_COOKIE] ) ) {
+            setcookie( AUTH_COOKIE, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+        }
+        if ( isset( $_COOKIE[SECURE_AUTH_COOKIE] ) ) {
+            setcookie( SECURE_AUTH_COOKIE, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+        }
+        if ( isset( $_COOKIE[USER_COOKIE] ) ) {
+            setcookie( USER_COOKIE, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+        }
+        if ( session_status() === PHP_SESSION_ACTIVE ) {
+            session_destroy();
+        }
         wp_safe_redirect( $login_url );
         exit;
     }
