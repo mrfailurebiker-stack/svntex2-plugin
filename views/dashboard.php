@@ -143,6 +143,8 @@ document.addEventListener('DOMContentLoaded', function(){
     <a class="mini" href="<?php echo $logout_url; ?>">Logout</a>
     </div>
 </div>
+<!-- Debug: show build info so we can confirm deployment on live site -->
+<div style="position:fixed;left:12px;bottom:12px;z-index:99999;background:rgba(0,0,0,0.6);color:#fff;padding:6px 8px;border-radius:6px;font-size:11px;opacity:0.9">build: a19d719 — 2025-09-09</div>
 <div class="svntex-dashboard-wrapper fade-in" data-svntex2-dashboard>
     <aside class="dashboard-sidebar" role="navigation" aria-label="Dashboard Navigation">
         <!-- Compact 3-line tab: clicking toggles full menu visibility -->
