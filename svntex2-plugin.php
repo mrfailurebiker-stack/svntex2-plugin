@@ -481,6 +481,15 @@ function svntex2_ajax_do_login(){
                 if ( $q ) { $user = $q[0]; break; }
             }
         }
+        // Finally try mobile meta if input looks like a phone
+        if ( ! $user ) {
+            $maybe_mobile = preg_replace('/\D/','', $login_id);
+            if ( strlen($maybe_mobile) >= 10 ) {
+                $q = get_users( [ 'meta_key' => 'mobile', 'meta_value' => $maybe_mobile, 'number' => 1, 'fields' => 'all' ] );
+                error_log('SVNTEX2 AJAX LOGIN: Try mobile meta=' . $maybe_mobile . ', found=' . print_r($q, true));
+                if ( $q ) { $user = $q[0]; }
+            }
+        }
     }
     if ( ! $user ) {
         error_log('SVNTEX2 AJAX LOGIN: Account not found for login_id=' . $login_id);

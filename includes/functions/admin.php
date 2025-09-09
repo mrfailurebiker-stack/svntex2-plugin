@@ -23,6 +23,7 @@ function svntex2_admin_root(){
     $active = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'overview';
     $tabs = [
         'overview' => 'Overview',
+    'users' => 'Users',
         'referrals' => 'Referrals',
         'kyc' => 'KYC',
         'withdrawals' => 'Withdrawals',
@@ -62,6 +63,7 @@ function svntex2_admin_root(){
     case 'distributions': svntex2_admin_distributions(); break;
     case 'reports': svntex2_admin_reports(); break;
     case 'settings': svntex2_admin_settings(); break;
+    case 'users': svntex2_admin_users(); break;
         default: svntex2_admin_overview($counts); break;
     }
     echo '</div>';
@@ -86,6 +88,135 @@ function svntex2_admin_overview($counts){
     }
     echo '</div>';
     echo '<p>Use the tabs above to manage each module.</p>';
+}
+
+function svntex2_admin_users(){
+    if ( ! current_user_can('manage_options') ) return;
+    $action = isset($_GET['action']) ? sanitize_key($_GET['action']) : '';
+    if ( $action === 'edit' ) {
+        $uid = isset($_GET['user_id']) ? (int) $_GET['user_id'] : 0;
+        svntex2_admin_user_edit($uid);
+        return;
+    }
+    // Filters
+    $name   = isset($_GET['name']) ? sanitize_text_field($_GET['name']) : '';
+    $cid    = isset($_GET['customer_id']) ? sanitize_text_field($_GET['customer_id']) : '';
+    $email  = isset($_GET['email']) ? sanitize_email($_GET['email']) : '';
+    $mobile = isset($_GET['mobile']) ? preg_replace('/\D/','', $_GET['mobile']) : '';
+    $from   = isset($_GET['from']) ? sanitize_text_field($_GET['from']) : '';
+    $to     = isset($_GET['to']) ? sanitize_text_field($_GET['to']) : '';
+
+    // Build user query
+    $args = [ 'number' => 50, 'paged' => max(1, (int)($_GET['paged'] ?? 1)), 'orderby'=>'registered', 'order'=>'DESC' ];
+    $meta_query = [];
+    if ( $cid ) { $meta_query[] = [ 'key'=>'customer_id', 'value'=>$cid, 'compare'=>'=' ]; }
+    if ( $mobile ) { $meta_query[] = [ 'key'=>'mobile', 'value'=>$mobile, 'compare'=>'=' ]; }
+    if ( $from || $to ) {
+        // We'll post-filter by date as WP_User_Query's date_query is for posts; registered is a user field we can filter via pre_get_users, simpler to filter array.
+        $args['fields'] = 'all';
+    }
+    if ( $meta_query ) $args['meta_query'] = $meta_query;
+    if ( $email ) $args['search'] = $email; // email exact optional
+    if ( $name ) { $args['search'] = '*'.esc_attr($name).'*'; $args['search_columns'] = ['user_nicename','display_name','user_login','user_email']; }
+    $q = new WP_User_Query( $args );
+    $users = $q->get_results();
+    // Date range filter
+    if ( ($from && preg_match('/^\d{4}-\d{2}-\d{2}$/',$from)) || ($to && preg_match('/^\d{4}-\d{2}-\d{2}$/',$to)) ) {
+        $from_ts = $from ? strtotime($from.' 00:00:00') : 0;
+        $to_ts   = $to ? strtotime($to.' 23:59:59') : PHP_INT_MAX;
+        $users = array_values(array_filter($users, function($u) use($from_ts,$to_ts){
+            $reg = strtotime($u->user_registered);
+            return $reg >= $from_ts && $reg <= $to_ts;
+        }));
+    }
+
+    echo '<h2>Users</h2>';
+    echo '<form method="get" class="svntex2-inline-form">';
+    echo '<input type="hidden" name="page" value="svntex2-admin" />';
+    echo '<input type="hidden" name="tab" value="users" />';
+    printf('<input type="text" name="name" placeholder="Full name" value="%s" /> ', esc_attr($name));
+    printf('<input type="text" name="customer_id" placeholder="User ID" value="%s" /> ', esc_attr($cid));
+    printf('<input type="email" name="email" placeholder="Email" value="%s" /> ', esc_attr($email));
+    printf('<input type="text" name="mobile" placeholder="Phone" value="%s" /> ', esc_attr($mobile));
+    printf('<input type="date" name="from" value="%s" /> ', esc_attr($from));
+    printf('<input type="date" name="to" value="%s" /> ', esc_attr($to));
+    echo '<button class="button">Search</button>';
+    echo '</form>';
+
+    echo '<table class="widefat striped svntex2-table"><thead><tr><th>User ID</th><th>Name</th><th>Email</th><th>Mobile</th><th>Joined</th><th>Action</th></tr></thead><tbody>';
+    if ($users) {
+        foreach($users as $u){
+            $cid = get_user_meta($u->ID,'customer_id',true);
+            $mob = get_user_meta($u->ID,'mobile',true);
+            printf('<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><a class="button button-small" href="%s">Edit</a></td></tr>',
+                esc_html($cid ?: $u->user_login),
+                esc_html($u->first_name . ' ' . $u->last_name ?: $u->display_name),
+                esc_html($u->user_email ?: '-'),
+                esc_html($mob ?: '-'),
+                esc_html(mysql2date('Y-m-d', $u->user_registered)),
+                esc_url( add_query_arg(['page'=>'svntex2-admin','tab'=>'users','action'=>'edit','user_id'=>$u->ID], admin_url('admin.php')) )
+            );
+        }
+    } else {
+        echo '<tr><td colspan="6">No users found.</td></tr>';
+    }
+    echo '</tbody></table>';
+}
+
+function svntex2_admin_user_edit( $user_id ){
+    if ( ! current_user_can('manage_options') ) return;
+    $u = get_user_by('id', $user_id);
+    if ( ! $u ) { echo '<div class="error notice"><p>User not found.</p></div>'; return; }
+    if ( isset($_POST['svntex2_save_user']) && check_admin_referer('svntex2_save_user','svntex2_user_nonce') ) {
+        $first = sanitize_text_field($_POST['first_name'] ?? '');
+        $last  = sanitize_text_field($_POST['last_name'] ?? '');
+        $email = sanitize_email($_POST['email'] ?? '');
+        $mobile= preg_replace('/\D/','', $_POST['mobile'] ?? '');
+        $age   = (int) ($_POST['age'] ?? 0);
+        $gender= sanitize_text_field($_POST['gender'] ?? '');
+        $pass  = (string) ($_POST['password'] ?? '');
+        $errors = [];
+        if ( $email && email_exists($email) && $email !== $u->user_email ) $errors[] = 'Email already in use';
+        $dupe = get_users([ 'meta_key'=>'mobile', 'meta_value'=>$mobile, 'exclude'=>[$u->ID], 'number'=>1, 'fields'=>'ids' ]);
+        if ( $mobile && $dupe ) $errors[] = 'Mobile already in use';
+        if ( $errors ) { echo '<div class="error notice"><p>'.esc_html(implode(' | ', $errors)).'</p></div>'; }
+        else {
+            wp_update_user([ 'ID'=>$u->ID, 'first_name'=>$first, 'last_name'=>$last, 'user_email'=>$email, 'display_name'=>$first ?: $u->display_name ]);
+            if ($mobile) update_user_meta($u->ID,'mobile',$mobile);
+            update_user_meta($u->ID,'age',$age);
+            update_user_meta($u->ID,'gender',$gender);
+            if ( isset($_POST['referral_source']) ) update_user_meta($u->ID,'referral_source', sanitize_text_field($_POST['referral_source']) );
+            if ( isset($_POST['employee_id']) ) update_user_meta($u->ID,'employee_id', sanitize_text_field($_POST['employee_id']) );
+            if ( $pass ) wp_set_password($pass, $u->ID);
+            echo '<div class="updated notice"><p>User updated.</p></div>';
+            $u = get_user_by('id',$user_id); // refresh
+        }
+    }
+    $cid = get_user_meta($u->ID,'customer_id',true);
+    $mob = get_user_meta($u->ID,'mobile',true);
+    $age = get_user_meta($u->ID,'age',true);
+    $gen = get_user_meta($u->ID,'gender',true);
+    $ref = get_user_meta($u->ID,'referral_source',true);
+    $emp = get_user_meta($u->ID,'employee_id',true);
+    echo '<h2>Edit User</h2>';
+    echo '<form method="post" class="form-wrap" style="max-width:680px">'.wp_nonce_field('svntex2_save_user','svntex2_user_nonce',true,false);
+    printf('<p><strong>User ID (immutable):</strong> %s</p>', esc_html($cid ?: $u->user_login));
+    printf('<label>First name<br/><input type="text" name="first_name" value="%s" class="regular-text" /></label>', esc_attr($u->first_name));
+    printf('<br/><label>Last name<br/><input type="text" name="last_name" value="%s" class="regular-text" /></label>', esc_attr($u->last_name));
+    printf('<br/><label>Email<br/><input type="email" name="email" value="%s" class="regular-text" /></label>', esc_attr($u->user_email));
+    printf('<br/><label>Mobile<br/><input type="text" name="mobile" value="%s" class="regular-text" /></label>', esc_attr($mob));
+    printf('<br/><label>Age<br/><input type="number" name="age" value="%s" class="small-text" /></label>', esc_attr($age));
+    echo '<br/><label>Gender<br/>';
+    echo '<select name="gender">';
+    $gopts = [ ''=>'— Select —','male'=>'Male','female'=>'Female','other'=>'Other','prefer_not_to_say'=>'Prefer not to say' ];
+    foreach($gopts as $k=>$v){ printf('<option value="%s" %s>%s</option>', esc_attr($k), selected($gen,$k,false), esc_html($v)); }
+    echo '</select></label>';
+    printf('<br/><label>Referral ID<br/><input type="text" name="referral_source" value="%s" class="regular-text" /></label>', esc_attr($ref));
+    printf('<br/><label>Employee ID<br/><input type="text" name="employee_id" value="%s" class="regular-text" /></label>', esc_attr($emp));
+    echo '<br/><label>Set New Password (optional)<br/><input type="password" name="password" class="regular-text" /></label>';
+    echo '<p><button class="button button-primary" name="svntex2_save_user" value="1">Save</button> ';
+    echo '<a class="button" href="'.esc_url( admin_url('admin.php?page=svntex2-admin&tab=users') ).'">Back</a></p>';
+    echo '</form>';
 }
 
 function svntex2_admin_referrals(){

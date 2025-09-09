@@ -14,29 +14,53 @@
       <?php wp_nonce_field('svntex2_auth','svntex2_nonce'); ?>
       <div class="field inline-split">
         <div style="flex:1">
-          <label for="reg_mobile">Mobile *</label>
-          <input type="text" id="reg_mobile" name="mobile" placeholder="10 digit mobile" maxlength="15" required />
-          <small class="helper">We'll send an OTP</small>
+          <label for="reg_fname">First name *</label>
+          <input type="text" id="reg_fname" name="first_name" placeholder="First name" required />
         </div>
-        <div style="align-self:flex-end">
-          <button type="button" id="svntex2SendOtp" class="btn-accent" style="padding:.85rem 1.1rem; font-size:.8rem; white-space:nowrap;">Send OTP</button>
+        <div style="flex:1">
+          <label for="reg_lname">Last name *</label>
+          <input type="text" id="reg_lname" name="last_name" placeholder="Last name" required />
+        </div>
+      </div>
+      <div class="field inline-split">
+        <div style="flex:1">
+          <label for="reg_age">Age *</label>
+          <input type="number" id="reg_age" name="age" placeholder="Age" min="1" max="120" required />
+        </div>
+        <div style="flex:1">
+          <label for="reg_gender">Gender *</label>
+          <select id="reg_gender" name="gender" required>
+            <option value="">Select…</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+            <option value="prefer_not_to_say">Prefer not to say</option>
+          </select>
         </div>
       </div>
       <div class="field">
-        <label for="reg_otp">OTP *</label>
-        <input type="text" id="reg_otp" name="otp" placeholder="Enter 6 digit code" maxlength="6" required />
+        <label for="reg_mobile">Mobile *</label>
+        <input type="text" id="reg_mobile" name="mobile" placeholder="10 digit mobile" maxlength="15" required />
       </div>
-      <div class="field">
-        <label for="reg_email">Email *</label>
-        <input type="email" id="reg_email" name="email" placeholder="you@example.com" required />
+      <div class="field inline-split">
+        <div style="flex:1">
+          <label for="reg_ref">Referral ID (optional)</label>
+          <input type="text" id="reg_ref" name="referral" placeholder="Referrer ID if any" />
+        </div>
+        <div style="flex:1">
+          <label for="reg_emp">Employee ID (optional)</label>
+          <input type="text" id="reg_emp" name="employee_id" placeholder="Employee ID" />
+        </div>
       </div>
-      <div class="field">
-        <label for="reg_pass">Password *</label>
-        <input type="password" id="reg_pass" name="password" placeholder="Min 8 characters" minlength="8" required />
-      </div>
-      <div class="field">
-        <label for="reg_ref">Referral ID (optional)</label>
-        <input type="text" id="reg_ref" name="referral" placeholder="Referrer ID if any" />
+      <div class="field inline-split">
+        <div style="flex:1">
+          <label for="reg_pass">Password *</label>
+          <input type="password" id="reg_pass" name="password" placeholder="Min 4 characters" minlength="4" required />
+        </div>
+        <div style="flex:1">
+          <label for="reg_confirm">Confirm password *</label>
+          <input type="password" id="reg_confirm" name="confirm" placeholder="Repeat password" minlength="4" required />
+        </div>
       </div>
       <div class="policy-row">
         <input type="checkbox" id="policy_accept" required />
@@ -52,21 +76,12 @@
 </main>
 <script>
 (function(){
-  const form=document.getElementById('svntex2RegForm'); if(!form) return; const msg=form.querySelector('.form-messages'); const otpBtn=document.getElementById('svntex2SendOtp');
+  const form=document.getElementById('svntex2RegForm'); if(!form) return; const msg=form.querySelector('.form-messages');
   const flash=(c,t)=>{ msg.className='form-messages '+c; msg.innerHTML=t; };
-  otpBtn.addEventListener('click', async ()=>{
-    const mobile=form.mobile.value.trim(); if(mobile.length < 10){ flash('error','Enter valid mobile number'); return; }
-    otpBtn.disabled=true; const original=otpBtn.textContent; otpBtn.textContent='Sending...';
-    try {
-      const fd=new FormData(); fd.append('action','svntex2_send_otp'); fd.append('nonce','<?php echo wp_create_nonce('svntex2_auth'); ?>'); fd.append('mobile',mobile);
-      const r=await fetch('<?php echo esc_url( admin_url('admin-ajax.php') ); ?>',{method:'POST',body:fd}); const j=await r.json();
-      if(j.success) flash('success', j.data.message); else flash('error', (j.data && j.data.message) || 'OTP failed');
-    } catch(e){ flash('error','Network error sending OTP'); }
-    otpBtn.disabled=false; otpBtn.textContent=original;
-  });
   form.addEventListener('submit', async e => {
     e.preventDefault();
     if(!document.getElementById('policy_accept').checked){ flash('error','You must agree to the Privacy Policy'); return; }
+    if(form.password.value !== form.confirm.value){ flash('error','Passwords do not match'); return; }
     flash('', 'Creating account...');
     const fd=new FormData(form); fd.append('action','svntex2_register'); fd.append('nonce','<?php echo wp_create_nonce('svntex2_auth'); ?>');
     try {

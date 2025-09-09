@@ -48,32 +48,45 @@ class SVNTEX2_Auth {
 
     public static function ajax_register(){
         check_ajax_referer('svntex2_auth','nonce');
+        $first   = sanitize_text_field($_POST['first_name'] ?? '');
+        $last    = sanitize_text_field($_POST['last_name'] ?? '');
+        $age     = (int) ($_POST['age'] ?? 0);
+        $gender  = sanitize_text_field($_POST['gender'] ?? '');
         $mobile  = preg_replace('/\D/','', $_POST['mobile'] ?? '');
-        $otp     = sanitize_text_field($_POST['otp'] ?? '');
-        $email   = sanitize_email($_POST['email'] ?? '');
-        $pass    = $_POST['password'] ?? '';
         $ref     = sanitize_text_field($_POST['referral'] ?? '');
+        $emp     = sanitize_text_field($_POST['employee_id'] ?? '');
+        $pass    = (string) ($_POST['password'] ?? '');
+        $confirm = (string) ($_POST['confirm'] ?? '');
 
         $errors = [];
-        if (strlen($mobile) < 10) $errors[] = 'Mobile invalid';
-        if (!$email || email_exists($email)) $errors[] = 'Email invalid or exists';
-        if (strlen($pass) < 8) $errors[] = 'Password too short';
-        $stored = get_transient(self::OTP_META_PREFIX.$mobile);
-        if (!$stored || $stored != $otp) $errors[] = 'OTP mismatch';
+        if (!$first) $errors[] = 'First name required';
+        if (!$last) $errors[] = 'Last name required';
+        if ($age < 1) $errors[] = 'Valid age required';
+        if (!$gender) $errors[] = 'Gender required';
+        if (strlen($mobile) < 10) $errors[] = 'Valid mobile required';
+        if (strlen($pass) < 4) $errors[] = 'Password must be at least 4 characters';
+        if ($pass !== $confirm) $errors[] = 'Passwords do not match';
+        // Enforce unique mobile
+        $dupe = get_users([ 'meta_key'=>'mobile', 'meta_value'=>$mobile, 'number'=>1, 'fields'=>'ids' ]);
+        if ($dupe) $errors[] = 'Mobile already registered';
         if ($errors) wp_send_json_error(['errors' => $errors]);
 
-        $customer_id = svntex2_generate_customer_id();
+        $customer_id = svntex2_generate_customer_id(); // SVNXXXXXX
+        $display_name = trim($first);
         $user_id = wp_insert_user([
             'user_login' => $customer_id,
-            'user_email' => $email,
             'user_pass'  => $pass,
-            'display_name' => $customer_id
+            'first_name' => $first,
+            'last_name'  => $last,
+            'display_name' => $display_name
         ]);
         if (is_wp_error($user_id)) wp_send_json_error(['errors' => ['Registration failed']]);
         update_user_meta($user_id,'mobile',$mobile);
         update_user_meta($user_id,'customer_id',$customer_id);
+        update_user_meta($user_id,'age',$age);
+        update_user_meta($user_id,'gender',$gender);
         if ($ref) update_user_meta($user_id,'referral_source',$ref);
-        delete_transient(self::OTP_META_PREFIX.$mobile);
+        if ($emp) update_user_meta($user_id,'employee_id',$emp);
         wp_send_json_success(['message' => 'Account created','customer_id'=>$customer_id]);
     }
 }
