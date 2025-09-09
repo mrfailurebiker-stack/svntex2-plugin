@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SVNTeX 2.0 Customer System
  * Description: Foundation for SVNTeX 2.0 – registration, wallet ledger, referrals, KYC, withdrawals, PB/RB scaffolding with WooCommerce integration.
- * Version: 0.2.8
+ * Version: 0.2.9
  * Author: SVNTeX
  * Text Domain: svntex2
  * Requires at least: 6.0
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
-define( 'SVNTEX2_VERSION',        '0.2.8' );
+define( 'SVNTEX2_VERSION',        '0.2.9' );
 define( 'SVNTEX2_PLUGIN_FILE',    __FILE__ );
 define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
@@ -314,6 +314,9 @@ add_action( 'init', 'svntex2_register_auth_rewrites' );
 function svntex2_register_auth_rewrites(){
     add_rewrite_rule( '^'.SVNTEX2_LOGIN_SLUG.'/?$', 'index.php?svntex2_page=login', 'top' );
     add_rewrite_rule( '^'.SVNTEX2_REGISTER_SLUG.'/?$', 'index.php?svntex2_page=register', 'top' );
+    // Extra compatibility for environments that include index.php in pretty permalinks
+    add_rewrite_rule( '^index\.php/'.SVNTEX2_LOGIN_SLUG+'/?$', 'index.php?svntex2_page=login', 'top' );
+    add_rewrite_rule( '^index\.php/'.SVNTEX2_REGISTER_SLUG+'/?$', 'index.php?svntex2_page=register', 'top' );
     add_rewrite_tag( '%svntex2_page%', '([^&]+)' );
 }
 
@@ -334,8 +337,21 @@ function svntex2_render_auth_pages(){
     // Fallback: detect by REQUEST_URI when rewrites are not active yet
     if ( ! $page ) {
         $req = trim( parse_url( $_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH ), '/' );
-        if ( $req === trim(SVNTEX2_LOGIN_SLUG,'/') ) $page = 'login';
-        if ( $req === trim(SVNTEX2_REGISTER_SLUG,'/') ) $page = 'register';
+        $login_slug = trim(SVNTEX2_LOGIN_SLUG,'/');
+        $register_slug = trim(SVNTEX2_REGISTER_SLUG,'/');
+        // Match slug at segment boundaries, with or without leading index.php, case-insensitive
+        if ( preg_match('#(^|/)(index\.php/)?'.preg_quote($login_slug,'#').'(/|$)#i', $req) ) {
+            $page = 'login';
+        } elseif ( preg_match('#(^|/)(index\.php/)?'.preg_quote($register_slug,'#').'(/|$)#i', $req) ) {
+            $page = 'register';
+        }
+        if ( $page ) {
+            // Set query var so downstream checks (brand UI context, body_class) behave consistently
+            set_query_var('svntex2_page', $page);
+            if ( isset( $GLOBALS['wp_query'] ) && method_exists( $GLOBALS['wp_query'], 'set' ) ) {
+                $GLOBALS['wp_query']->set('svntex2_page', $page);
+            }
+        }
     }
     if ( ! $page ) return;
     if ( $page === 'login' ) {
@@ -344,14 +360,16 @@ function svntex2_render_auth_pages(){
             wp_safe_redirect( wc_get_page_permalink( 'myaccount' ) );
             exit;
         }
-        wp_enqueue_style( 'svntex2-style' );
+    wp_enqueue_style( 'svntex2-style' );
+    wp_enqueue_style( 'svntex2-landing' );
         $file = SVNTEX2_PLUGIN_DIR.'views/customer-login.php';
     } elseif ( $page === 'register' ) {
         if ( is_user_logged_in() ) {
             wp_safe_redirect( wc_get_page_permalink( 'myaccount' ) );
             exit;
         }
-        wp_enqueue_style( 'svntex2-style' );
+    wp_enqueue_style( 'svntex2-style' );
+    wp_enqueue_style( 'svntex2-landing' );
         $file = SVNTEX2_PLUGIN_DIR.'views/customer-registration.php';
     } else { return; }
     status_header(200); nocache_headers();
