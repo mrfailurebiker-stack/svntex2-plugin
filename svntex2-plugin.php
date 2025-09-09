@@ -678,6 +678,24 @@ function svntex2_hook_wc_account_dashboard() {
     }
 }
 
+// -----------------------------------------------------------------------------
+// Ensure My Account page outputs our dashboard markup regardless of theme.
+// This is defensive: some themes render headings/content before 'template_redirect'
+// replacement. We replace the main query content for the WC My Account page with
+// our shortcode so desktop/tablet/mobile always show SVNTeX dashboard.
+// -----------------------------------------------------------------------------
+add_filter( 'the_content', 'svntex2_replace_myaccount_with_dashboard', 20 );
+function svntex2_replace_myaccount_with_dashboard( $content ) {
+    if ( is_admin() ) return $content;
+    // Only act on main query to avoid affecting nested loops
+    if ( ! is_main_query() ) return $content;
+    if ( function_exists( 'is_account_page' ) && is_account_page() && is_user_logged_in() ) {
+        // Return our dashboard markup (shortcode ensures assets and scripts load)
+        return do_shortcode( '[svntex_dashboard]' );
+    }
+    return $content;
+}
+
 function svntex2_wc_account_inject() {
     if ( ! is_user_logged_in() ) { return; }
     global $svntex2_wc_dash_done; // prevent duplicate rendering if shortcode placed manually as well
