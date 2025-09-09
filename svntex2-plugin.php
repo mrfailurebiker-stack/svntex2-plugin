@@ -687,6 +687,17 @@ function svntex2_wc_account_inject() {
 }
 
 // -----------------------------------------------------------------------------
+// Remove default WooCommerce My Account menu items so our custom dashboard is the
+// only visible navigation option. Returning an empty array hides the default
+// links regardless of theme/template output (defensive server-side approach).
+// -----------------------------------------------------------------------------
+add_filter( 'woocommerce_account_menu_items', 'svntex2_override_wc_account_menu_items', 100 );
+function svntex2_override_wc_account_menu_items( $items ) {
+    // Keep this filter minimal: return empty to prevent theme-rendered menu items.
+    return array();
+}
+
+// -----------------------------------------------------------------------------
 // 11. FALLBACK: CREATE CORE JS IF MISSING (DEV SAFETY)
 // -----------------------------------------------------------------------------
 if ( ! file_exists( SVNTEX2_PLUGIN_DIR . 'assets/js/core.js' ) ) {
