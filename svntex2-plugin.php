@@ -490,6 +490,30 @@ function svntex2_ajax_do_login(){
 }
 
 // -----------------------------------------------------------------------------
+// 11.1 SERVER-SIDE LOGOUT ENDPOINT
+// Provide a simple, hard server endpoint that performs a canonical logout and
+// redirects users to the plugin login page. Using admin-post avoids client-side
+// interception and makes testing the logout behaviour easier.
+// -----------------------------------------------------------------------------
+add_action( 'admin_post_nopriv_svntex2_logout', 'svntex2_handle_logout' );
+add_action( 'admin_post_svntex2_logout', 'svntex2_handle_logout' );
+function svntex2_handle_logout() {
+    // Perform core logout flow
+    if ( function_exists( 'wp_logout' ) ) {
+        wp_logout();
+    }
+    // Also attempt to clear PHP session if present (defensive)
+    if ( function_exists( 'session_status' ) && session_status() === PHP_SESSION_ACTIVE ) {
+        // Clear session array and destroy
+        $_SESSION = [];
+        @session_destroy();
+    }
+    // Redirect to plugin login slug
+    wp_safe_redirect( home_url( '/'. SVNTEX2_LOGIN_SLUG . '/' ) );
+    exit;
+}
+
+// -----------------------------------------------------------------------------
 // 10. EXTENSION HOOKS (for future add-ons)
 // -----------------------------------------------------------------------------
 do_action( 'svntex2_initialized' );

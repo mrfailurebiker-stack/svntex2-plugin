@@ -22,7 +22,7 @@ if ( function_exists('wc_get_orders') ) {
     ]);
 }
 
-$logout_url = esc_url( wp_logout_url( home_url( '/'. SVNTEX2_LOGIN_SLUG . '/' ) ) );
+$logout_url = esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
 ?>
 <div class="svntex-dash-top">
     <a href="<?php echo esc_url( home_url('/') ); ?>" class="dash-brand">SVNTeX</a>
