@@ -78,8 +78,10 @@ $logout_url = esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
     .compact-tab { display:flex; }
 }
 
-/* When menu is open, show the nav as overlay on small screens */
-.menu-open #svntex-compact-menu { display:block !important; position: fixed; left: 12px; top: 80px; width: calc(100% - 24px); max-width: 420px; z-index: 10000; box-shadow: 0 8px 30px rgba(0,0,0,0.6); }
+</* When menu is open, previously used full-screen overlay. We'll show in-sidebar panel instead */
+/* sidebar open state */
+.dashboard-sidebar.open { position: relative; }
+.dashboard-sidebar.open .nav-list { display:block !important; position: absolute; left: 8px; top: 56px; width: 220px; max-width: 80vw; z-index: 1000; box-shadow: 0 8px 30px rgba(0,0,0,0.6); background: linear-gradient(180deg, rgba(18,18,30,0.98), rgba(10,10,20,0.95)); padding:12px; border-radius:8px; }
 </style>
 <style>
 /* Hide compact menu by default on mobile; shown when .menu-open is toggled */
@@ -118,15 +120,15 @@ document.addEventListener('DOMContentLoaded', function(){
     if (!compact || !menu) return;
     compact.style.display = 'flex';
     compact.addEventListener('click', function(e){
-        var opened = document.documentElement.classList.toggle('menu-open');
+        var opened = compact.parentElement.classList.toggle('open');
         compact.setAttribute('aria-expanded', opened ? 'true' : 'false');
-        if (opened) menu.querySelector('.nav-link')?.focus();
+        if (opened) compact.parentElement.querySelector('.nav-link')?.focus();
     });
     // close when clicking outside
     document.addEventListener('click', function(e){
-        if (!document.documentElement.classList.contains('menu-open')) return;
+        if (!compact.parentElement.classList.contains('open')) return;
         if (compact.contains(e.target) || menu.contains(e.target)) return;
-        document.documentElement.classList.remove('menu-open');
+        compact.parentElement.classList.remove('open');
         compact.setAttribute('aria-expanded','false');
     });
     // close on escape
