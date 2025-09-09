@@ -8,6 +8,8 @@ if (!is_user_logged_in()) {
 }
 
 $current_user   = wp_get_current_user();
+$customer_id    = get_user_meta($current_user->ID, 'customer_id', true);
+$customer_id    = $customer_id ? $customer_id : ($current_user->user_login ?: '');
 $referral_count = get_user_meta($current_user->ID,'referral_count', true);
 $referral_count = ($referral_count === '') ? 0 : intval($referral_count);
 $wallet_balance = svntex2_wallet_get_balance($current_user->ID); // live ledger helper
@@ -50,7 +52,7 @@ $logout_url = esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
     <main class="dashboard-content" role="main">
         <header class="content-header">
             <div class="header-row">
-                <h1 class="dash-title">Welcome, <?php echo esc_html($current_user->display_name); ?></h1>
+                <h1 class="dash-title">Welcome, <?php echo esc_html($current_user->display_name); ?><?php if($customer_id){ echo ' (' . esc_html($customer_id) . ')'; } ?></h1>
             </div>
         </header>
         <div class="dashboard-widgets" id="wallet" aria-label="Quick Stats">

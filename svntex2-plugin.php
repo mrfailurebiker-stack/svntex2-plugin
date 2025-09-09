@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SVNTeX 2.0 Customer System
  * Description: Foundation for SVNTeX 2.0 – registration, wallet ledger, referrals, KYC, withdrawals, PB/RB scaffolding with WooCommerce integration.
- * Version: 0.2.6
+ * Version: 0.2.7
  * Author: SVNTeX
  * Text Domain: svntex2
  * Requires at least: 6.0
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
-define( 'SVNTEX2_VERSION',        '0.2.6' );
+define( 'SVNTEX2_VERSION',        '0.2.7' );
 define( 'SVNTEX2_PLUGIN_FILE',    __FILE__ );
 define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
@@ -209,10 +209,11 @@ function svntex2_check_dependencies() {
 /** Generate unique customer id. */
 function svntex2_generate_customer_id() : string {
     for ( $i = 0; $i < 5; $i++ ) {
-        $candidate = 'SVN-' . str_pad( (string) wp_rand( 0, 999999 ), 6, '0', STR_PAD_LEFT );
+        // New format: SVNXXXXXX (no hyphen)
+        $candidate = 'SVN' . str_pad( (string) wp_rand( 0, 999999 ), 6, '0', STR_PAD_LEFT );
         if ( ! username_exists( $candidate ) ) { return $candidate; }
     }
-    return 'SVN-' . wp_rand( 100000, 999999 );
+    return 'SVN' . wp_rand( 100000, 999999 );
 }
 
 /** Get referral count meta (int). */
@@ -458,12 +459,27 @@ function svntex2_ajax_do_login(){
         $user = get_user_by( 'email', $login_id );
         error_log('SVNTEX2 AJAX LOGIN: Try email, found user=' . print_r($user, true));
     } else {
-        $user = get_user_by( 'login', $login_id );
-        error_log('SVNTEX2 AJAX LOGIN: Try login, found user=' . print_r($user, true));
+        // Support both legacy "SVN-XXXXXX" and new "SVNXXXXXX" formats
+        $variants = [ $login_id ];
+        if ( preg_match('/^SVN-(\d{6})$/i', $login_id, $m) ) {
+            $variants[] = 'SVN' . $m[1];
+        } elseif ( preg_match('/^SVN(\d{6})$/i', $login_id, $m) ) {
+            $variants[] = 'SVN-' . $m[1];
+        }
+
+        // Try username (user_login) first for each variant
+        foreach ( array_unique($variants) as $try ) {
+            $user = get_user_by( 'login', $try );
+            error_log('SVNTEX2 AJAX LOGIN: Try login variant=' . $try . ', found user=' . print_r($user, true));
+            if ( $user ) break;
+        }
+        // Then try meta customer_id for each variant
         if ( ! $user ) {
-            $q = get_users( [ 'meta_key' => 'customer_id', 'meta_value' => $login_id, 'number' => 1, 'fields' => 'all' ] );
-            error_log('SVNTEX2 AJAX LOGIN: Try meta customer_id, found=' . print_r($q, true));
-            if ( $q ) $user = $q[0];
+            foreach ( array_unique($variants) as $try ) {
+                $q = get_users( [ 'meta_key' => 'customer_id', 'meta_value' => $try, 'number' => 1, 'fields' => 'all' ] );
+                error_log('SVNTEX2 AJAX LOGIN: Try meta customer_id variant=' . $try . ', found=' . print_r($q, true));
+                if ( $q ) { $user = $q[0]; break; }
+            }
         }
     }
     if ( ! $user ) {
@@ -663,8 +679,18 @@ add_action( 'woocommerce_order_status_completed', function( $order_id ) {
     if ( ! $user_id ) return;
     $ref_source = get_user_meta( $user_id, 'referral_source', true );
     if ( ! $ref_source ) return;
-    // Find referrer by login (customer id) or email fallback
-    $referrer_user = get_user_by( 'login', $ref_source );
+    // Find referrer by login (customer id) with legacy/new variants, or email fallback
+    $referrer_user = null;
+    $variants = [ $ref_source ];
+    if ( preg_match('/^SVN-(\d{6})$/i', $ref_source, $m) ) {
+        $variants[] = 'SVN' . $m[1];
+    } elseif ( preg_match('/^SVN(\d{6})$/i', $ref_source, $m) ) {
+        $variants[] = 'SVN-' . $m[1];
+    }
+    foreach ( array_unique($variants) as $try ) {
+        $referrer_user = get_user_by( 'login', $try );
+        if ( $referrer_user ) break;
+    }
     if ( ! $referrer_user ) $referrer_user = get_user_by( 'email', $ref_source );
     if ( ! $referrer_user ) return;
     $referrer_id = (int) $referrer_user->ID;
@@ -723,7 +749,17 @@ add_action( 'svntex2_wallet_transaction_created', function( $user_id, $type, $am
     if ( get_user_meta( $user_id, '_svntex2_rb_awarded', true ) ) return;
     $ref_source = get_user_meta( $user_id, 'referral_source', true );
     if ( ! $ref_source ) return;
-    $referrer_user = get_user_by( 'login', $ref_source );
+    $referrer_user = null;
+    $variants = [ $ref_source ];
+    if ( preg_match('/^SVN-(\d{6})$/i', $ref_source, $m) ) {
+        $variants[] = 'SVN' . $m[1];
+    } elseif ( preg_match('/^SVN(\d{6})$/i', $ref_source, $m) ) {
+        $variants[] = 'SVN-' . $m[1];
+    }
+    foreach ( array_unique($variants) as $try ) {
+        $referrer_user = get_user_by( 'login', $try );
+        if ( $referrer_user ) break;
+    }
     if ( ! $referrer_user ) $referrer_user = get_user_by( 'email', $ref_source );
     if ( ! $referrer_user ) return;
     $referrer_id = (int) $referrer_user->ID;

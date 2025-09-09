@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 	// Generate unique Customer ID
 	do {
-		$customer_id = 'SVN-' . str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+		$customer_id = 'SVN' . str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 		$stmt = $pdo->prepare('SELECT id FROM svntex_customers WHERE customer_id = ?');
 		$stmt->execute([$customer_id]);
 	} while ($stmt->fetch());
