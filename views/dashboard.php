@@ -84,7 +84,11 @@ $logout_url = esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
 <style>
 /* Hide compact menu by default on mobile; shown when .menu-open is toggled */
 #svntex-compact-menu { display: none; }
-</style>
+#svntex-compact-menu .nav-list { margin:0; padding:0; }
+#svntex-compact-menu .nav-link { display:block; padding:.8rem 1rem; color:#e6eefb; background:transparent; border-radius:6px; }
+#svntex-compact-menu .nav-link:hover { background: rgba(255,255,255,0.03); }
+#svntex-compact-menu { background: linear-gradient(180deg, rgba(18,18,30,0.98), rgba(10,10,20,0.95)); padding:12px; border-radius:10px; color:#e6eefb; box-shadow: 0 8px 30px rgba(0,0,0,0.6); z-index:10001; }
+.menu-open #svntex-compact-menu { display:block !important; position: fixed; left: 12px; top: 80px; width: calc(100% - 24px); max-width: 420px; }
 </style>
 <style>
 /* Hide theme header and footer when our brand UI / My Account override is active */
@@ -106,15 +110,17 @@ body.svntex-app-shell .site { padding-top: 0 !important; }
 body.svntex-app-shell .site-main, body.svntex-myaccount-override .site-main { margin-top: 0 !important; }
 </style>
 <script>
-// Small behavior to toggle compact menu on mobile/tablet
-(function(){
+// Small behavior to toggle compact menu on mobile/tablet — initialize after DOM ready
+document.addEventListener('DOMContentLoaded', function(){
     function qs(sel, ctx){ return (ctx||document).querySelector(sel); }
     var compact = qs('.compact-tab');
     var menu = qs('#svntex-compact-menu');
     if (!compact || !menu) return;
+    compact.style.display = 'flex';
     compact.addEventListener('click', function(e){
         var opened = document.documentElement.classList.toggle('menu-open');
         compact.setAttribute('aria-expanded', opened ? 'true' : 'false');
+        if (opened) menu.querySelector('.nav-link')?.focus();
     });
     // close when clicking outside
     document.addEventListener('click', function(e){
@@ -125,9 +131,9 @@ body.svntex-app-shell .site-main, body.svntex-myaccount-override .site-main { ma
     });
     // close on escape
     document.addEventListener('keydown', function(e){ if (e.key === 'Escape') { document.documentElement.classList.remove('menu-open'); compact.setAttribute('aria-expanded','false'); } });
-})();
+});
 </script>
-</style>
+ 
 <div class="svntex-dash-top">
     <a href="<?php echo esc_url( home_url('/') ); ?>" class="dash-brand">SVNTeX</a>
     <div class="dash-actions">
