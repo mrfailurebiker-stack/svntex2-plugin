@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SVNTeX 2.0 Customer System
  * Description: Foundation for SVNTeX 2.0 – registration, wallet ledger, referrals, KYC, withdrawals, PB/RB scaffolding with WooCommerce integration.
- * Version: 0.2.10
+ * Version: 0.2.11
  * Author: SVNTeX
  * Text Domain: svntex2
  * Requires at least: 6.0
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
-define( 'SVNTEX2_VERSION',        '0.2.10' );
+define( 'SVNTEX2_VERSION',        '0.2.11' );
 define( 'SVNTEX2_PLUGIN_FILE',    __FILE__ );
 define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
@@ -68,6 +68,12 @@ require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/rest.php';           // RE
 foreach ( [ 'referrals', 'kyc', 'withdrawals', 'pb', 'cron', 'admin', 'cli' ] as $module ) {
     $file = SVNTEX2_PLUGIN_DIR . 'includes/functions/' . $module . '.php';
     if ( file_exists( $file ) ) { require_once $file; }
+}
+// Products module (CPT + REST + inventory + delivery rules)
+$__pfiles = [ 'products.php', 'rest-products.php' ];
+foreach ( $__pfiles as $__pf ) {
+    $f = SVNTEX2_PLUGIN_DIR . 'includes/functions/' . $__pf;
+    if ( file_exists( $f ) ) require_once $f;
 }
 
 // -----------------------------------------------------------------------------
@@ -181,6 +187,67 @@ function svntex2_activate() {
         released_at DATETIME NULL,
         KEY user_month (user_id, month_year),
         KEY status (status)
+    ) $charset";
+
+    // Product/Inventory tables
+    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_product_variants (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        product_id BIGINT UNSIGNED NOT NULL,
+        sku VARCHAR(80) NOT NULL UNIQUE,
+        attributes LONGTEXT NULL,
+        price DECIMAL(14,2) NULL,
+        tax_class VARCHAR(20) NULL,
+        unit VARCHAR(12) NULL,
+        active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        KEY product_id (product_id), KEY active (active), KEY tax_class (tax_class)
+    ) $charset";
+
+    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_inventory_locations (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        code VARCHAR(20) NOT NULL UNIQUE,
+        name VARCHAR(120) NOT NULL,
+        address TEXT NULL,
+        active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) $charset";
+
+    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_inventory_stocks (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        variant_id BIGINT UNSIGNED NOT NULL,
+        location_id BIGINT UNSIGNED NOT NULL,
+        qty INT NOT NULL DEFAULT 0,
+        min_qty INT NOT NULL DEFAULT 0,
+        max_qty INT NULL,
+        reorder_threshold INT NULL,
+        backorder_enabled TINYINT(1) NOT NULL DEFAULT 0,
+        UNIQUE KEY var_loc (variant_id, location_id),
+        KEY qty (qty), KEY backorder_enabled (backorder_enabled)
+    ) $charset";
+
+    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_delivery_rules (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        scope ENUM('global','product','variant') NOT NULL,
+        scope_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+        mode ENUM('fixed','percent') NOT NULL,
+        amount DECIMAL(14,4) NOT NULL DEFAULT 0,
+        free_threshold DECIMAL(14,2) NULL,
+        override_global TINYINT(1) NOT NULL DEFAULT 0,
+        active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        KEY scope_idx (scope, scope_id), KEY active (active)
+    ) $charset";
+
+    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_media_links (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        product_id BIGINT UNSIGNED NOT NULL,
+        variant_id BIGINT UNSIGNED NULL,
+        attachment_id BIGINT UNSIGNED NULL,
+        media_type VARCHAR(20) NOT NULL,
+        embed_url VARCHAR(255) NULL,
+        sort_order INT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        KEY product_id (product_id), KEY variant_id (variant_id), KEY media_type (media_type)
     ) $charset";
 
     foreach ( $sql as $statement ) { dbDelta( $statement ); }
@@ -707,6 +774,79 @@ add_action( 'plugins_loaded', function(){
             notes TEXT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NULL
+        ) $charset");
+    }
+
+    // Product/Inventory tables safety for upgrades
+    $charset = $wpdb->get_charset_collate();
+    $tbl_variants = $pref.'svntex_product_variants';
+    if ( $wpdb->get_var( $wpdb->prepare("SHOW TABLES LIKE %s", $tbl_variants) ) !== $tbl_variants ) {
+        $wpdb->query("CREATE TABLE $tbl_variants (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            product_id BIGINT UNSIGNED NOT NULL,
+            sku VARCHAR(80) NOT NULL UNIQUE,
+            attributes LONGTEXT NULL,
+            price DECIMAL(14,2) NULL,
+            tax_class VARCHAR(20) NULL,
+            unit VARCHAR(12) NULL,
+            active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY product_id (product_id), KEY active (active), KEY tax_class (tax_class)
+        ) $charset");
+    }
+    $tbl_locations = $pref.'svntex_inventory_locations';
+    if ( $wpdb->get_var( $wpdb->prepare("SHOW TABLES LIKE %s", $tbl_locations) ) !== $tbl_locations ) {
+        $wpdb->query("CREATE TABLE $tbl_locations (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            code VARCHAR(20) NOT NULL UNIQUE,
+            name VARCHAR(120) NOT NULL,
+            address TEXT NULL,
+            active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) $charset");
+    }
+    $tbl_stocks = $pref.'svntex_inventory_stocks';
+    if ( $wpdb->get_var( $wpdb->prepare("SHOW TABLES LIKE %s", $tbl_stocks) ) !== $tbl_stocks ) {
+        $wpdb->query("CREATE TABLE $tbl_stocks (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            variant_id BIGINT UNSIGNED NOT NULL,
+            location_id BIGINT UNSIGNED NOT NULL,
+            qty INT NOT NULL DEFAULT 0,
+            min_qty INT NOT NULL DEFAULT 0,
+            max_qty INT NULL,
+            reorder_threshold INT NULL,
+            backorder_enabled TINYINT(1) NOT NULL DEFAULT 0,
+            UNIQUE KEY var_loc (variant_id, location_id),
+            KEY qty (qty), KEY backorder_enabled (backorder_enabled)
+        ) $charset");
+    }
+    $tbl_rules = $pref.'svntex_delivery_rules';
+    if ( $wpdb->get_var( $wpdb->prepare("SHOW TABLES LIKE %s", $tbl_rules) ) !== $tbl_rules ) {
+        $wpdb->query("CREATE TABLE $tbl_rules (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            scope ENUM('global','product','variant') NOT NULL,
+            scope_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            mode ENUM('fixed','percent') NOT NULL,
+            amount DECIMAL(14,4) NOT NULL DEFAULT 0,
+            free_threshold DECIMAL(14,2) NULL,
+            override_global TINYINT(1) NOT NULL DEFAULT 0,
+            active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY scope_idx (scope, scope_id), KEY active (active)
+        ) $charset");
+    }
+    $tbl_media = $pref.'svntex_media_links';
+    if ( $wpdb->get_var( $wpdb->prepare("SHOW TABLES LIKE %s", $tbl_media) ) !== $tbl_media ) {
+        $wpdb->query("CREATE TABLE $tbl_media (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            product_id BIGINT UNSIGNED NOT NULL,
+            variant_id BIGINT UNSIGNED NULL,
+            attachment_id BIGINT UNSIGNED NULL,
+            media_type VARCHAR(20) NOT NULL,
+            embed_url VARCHAR(255) NULL,
+            sort_order INT NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY product_id (product_id), KEY variant_id (variant_id), KEY media_type (media_type)
         ) $charset");
     }
 } );
