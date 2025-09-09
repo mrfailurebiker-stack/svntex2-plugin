@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SVNTeX 2.0 Customer System
  * Description: Foundation for SVNTeX 2.0 – registration, wallet ledger, referrals, KYC, withdrawals, PB/RB scaffolding with WooCommerce integration.
- * Version: 0.2.9
+ * Version: 0.2.10
  * Author: SVNTeX
  * Text Domain: svntex2
  * Requires at least: 6.0
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
-define( 'SVNTEX2_VERSION',        '0.2.9' );
+define( 'SVNTEX2_VERSION',        '0.2.10' );
 define( 'SVNTEX2_PLUGIN_FILE',    __FILE__ );
 define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
@@ -315,8 +315,8 @@ function svntex2_register_auth_rewrites(){
     add_rewrite_rule( '^'.SVNTEX2_LOGIN_SLUG.'/?$', 'index.php?svntex2_page=login', 'top' );
     add_rewrite_rule( '^'.SVNTEX2_REGISTER_SLUG.'/?$', 'index.php?svntex2_page=register', 'top' );
     // Extra compatibility for environments that include index.php in pretty permalinks
-    add_rewrite_rule( '^index\.php/'.SVNTEX2_LOGIN_SLUG+'/?$', 'index.php?svntex2_page=login', 'top' );
-    add_rewrite_rule( '^index\.php/'.SVNTEX2_REGISTER_SLUG+'/?$', 'index.php?svntex2_page=register', 'top' );
+    add_rewrite_rule( '^index\.php/'.SVNTEX2_LOGIN_SLUG.'/?$', 'index.php?svntex2_page=login', 'top' );
+    add_rewrite_rule( '^index\.php/'.SVNTEX2_REGISTER_SLUG.'/?$', 'index.php?svntex2_page=register', 'top' );
     add_rewrite_tag( '%svntex2_page%', '([^&]+)' );
 }
 
