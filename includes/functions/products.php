@@ -4,18 +4,36 @@ if (!defined('ABSPATH')) exit;
 // 1) CPT + taxonomies
 add_action('init', function(){
     register_post_type('svntex_product', [
-        'label' => 'Products',
+        'labels' => [
+            'name' => 'SVNTeX Products',
+            'singular_name' => 'SVNTeX Product',
+            'menu_name' => 'SVNTeX Products',
+        ],
         'public' => true,
         'has_archive' => true,
         'show_in_rest' => true,
         'rewrite' => [ 'slug' => 'products' ],
         'show_ui' => true,
         'menu_icon' => 'dashicons-products',
-        'supports' => ['title','editor','thumbnail','excerpt'],
+        'menu_position' => 56,
+    'supports' => ['title','editor','thumbnail','excerpt'],
+    'capability_type' => 'post',
+    'show_in_admin_bar' => true,
     ]);
-    register_taxonomy('svntex_category','svntex_product',[ 'label'=>'Product Categories','hierarchical'=>true,'show_ui'=>true ]);
-    register_taxonomy('svntex_collection','svntex_product',[ 'label'=>'Collections','hierarchical'=>false,'show_ui'=>true ]);
-    register_taxonomy('svntex_tag','svntex_product',[ 'label'=>'Tags','hierarchical'=>false,'show_ui'=>true ]);
+    register_taxonomy('svntex_category','svntex_product',[ 'label'=>'Product Categories','hierarchical'=>true,'show_ui'=>true,'show_in_rest'=>true ]);
+    register_taxonomy('svntex_collection','svntex_product',[ 'label'=>'Collections','hierarchical'=>false,'show_ui'=>true,'show_in_rest'=>true ]);
+    register_taxonomy('svntex_tag','svntex_product',[ 'label'=>'Tags','hierarchical'=>false,'show_ui'=>true,'show_in_rest'=>true ]);
+});
+
+// One-time admin notice to surface where the new menu is
+add_action('admin_init', function(){ if(!get_option('svntex2_products_notice_dismissed')) update_option('svntex2_products_notice_dismissed', time()); });
+add_action('admin_notices', function(){
+    if ( ! current_user_can('manage_options') ) return;
+    $ts = (int) get_option('svntex2_products_notice_dismissed', 0);
+    // Show only within 2 hours of first load after update
+    if ( $ts && ( time() - $ts ) < 7200 ) {
+        echo '<div class="notice notice-success is-dismissible"><p><strong>SVNTeX Products</strong> module is active. Find it under <em>SVNTeX Products</em> in the left admin menu. REST API at <code>/wp-json/svntex2/v1</code>.</p></div>';
+    }
 });
 
 // 2) Product ID generator SVN0001 etc.
