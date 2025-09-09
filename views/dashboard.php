@@ -45,7 +45,9 @@ $logout_url = esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
 
 /* Responsive: mobile and small tablets collapse sidebar and use bottom nav */
 @media (max-width: 900px) {
-    .dashboard-sidebar { display: none !important; }
+    /* Keep sidebar container visible on mobile so compact tab can show; hide full nav list */
+    .dashboard-sidebar { display: block !important; }
+    .dashboard-sidebar .nav-list { display: none !important; }
     .dashboard-content { margin-left: 0 !important; padding-bottom: 76px; }
     .svntex-dash-top { padding-right: 12px; }
     .mobile-nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-around; background: rgba(10,10,20,0.95); padding: .5rem 0; z-index: 9999; }
@@ -78,7 +80,11 @@ $logout_url = esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
 
 /* When menu is open, show the nav as overlay on small screens */
 .menu-open #svntex-compact-menu { display:block !important; position: fixed; left: 12px; top: 80px; width: calc(100% - 24px); max-width: 420px; z-index: 10000; box-shadow: 0 8px 30px rgba(0,0,0,0.6); }
-
+</style>
+<style>
+/* Hide compact menu by default on mobile; shown when .menu-open is toggled */
+#svntex-compact-menu { display: none; }
+</style>
 </style>
 <style>
 /* Hide theme header and footer when our brand UI / My Account override is active */
