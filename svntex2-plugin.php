@@ -462,7 +462,9 @@ function svntex2_render_auth_pages(){
 // Front page landing override (simple) – render modern landing if is home/front
 add_action('template_redirect', function(){
     // Force landing page for ALL users on homepage, regardless of theme/static page or login status
-    if ( is_front_page() || is_home() || $_SERVER['REQUEST_URI'] === '/' ) {
+    $req = $_SERVER['REQUEST_URI'] ?? '';
+    $is_home_uri = ($req === '/' || preg_match('#^/index\.php/?$#i', $req));
+    if ( is_front_page() || is_home() || $is_home_uri ) {
         $file = SVNTEX2_PLUGIN_DIR.'views/landing.php';
         if ( file_exists( $file ) ) {
             status_header(200); nocache_headers(); include $file; exit; }

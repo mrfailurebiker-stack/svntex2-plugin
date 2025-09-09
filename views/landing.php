@@ -5,8 +5,14 @@
 <meta charset="<?php bloginfo('charset'); ?>" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title><?php bloginfo('name'); ?> – Welcome</title>
-<?php wp_head(); ?>
-<link rel="stylesheet" href="<?php echo esc_url( plugin_dir_url(SVNTEX2_PLUGIN_FILE).'assets/css/landing.css?v='.SVNTEX2_VERSION ); ?>" />
+<?php
+  // Ensure landing CSS is loaded through WP so caching/versioning works
+  if ( function_exists('wp_enqueue_style') ) {
+    wp_enqueue_style('svntex2-style');
+    wp_enqueue_style('svntex2-landing');
+  }
+  wp_head();
+?>
 </head>
 <body <?php body_class('svntex-landing'); ?>>
 <div class="svn-landing-shell">
@@ -39,7 +45,7 @@
         <button type="submit">Search</button>
       </form>
     </nav>
-    <nav class="nav-actions" aria-label="Primary">
+  <nav class="nav-actions" aria-label="Primary">
       <a href="<?php echo esc_url( site_url('/'.SVNTEX2_LOGIN_SLUG.'/') ); ?>">Log In</a>
       <a href="<?php echo esc_url( site_url('/'.SVNTEX2_REGISTER_SLUG.'/') ); ?>">Sign Up</a>
     </nav>
