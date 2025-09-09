@@ -371,6 +371,9 @@ add_action('template_redirect', function(){
     if ( ! function_exists('is_account_page') ) return;
     if ( ! is_account_page() ) return;
     if ( ! is_user_logged_in() ) return; // let login redirect logic handle guests
+        // Prevent redirect loop: if already on My Account page, do not redirect
+        if ( untrailingslashit(home_url($_SERVER['REQUEST_URI'])) === untrailingslashit(wc_get_page_permalink('myaccount')) ) return;
+   
     // Allow site owners to disable override via filter
     if ( ! apply_filters('svntex2_override_my_account', true) ) return;
         // Mobile redirect: always show dashboard, never WooCommerce My Account
@@ -382,6 +385,7 @@ add_action('template_redirect', function(){
             foreach($logout_patterns as $pat) {
                 if ( stripos($request_uri, $pat) !== false ) return;
             }
+               error_log('SVNTEX2 REDIRECT: Mobile detected, redirecting to My Account: ' . wc_get_page_permalink('myaccount'));
                 wp_redirect(wc_get_page_permalink('myaccount'));
             exit;
         }
@@ -682,11 +686,13 @@ add_action( 'template_redirect', function() {
     $login_url = home_url('/customer-login/');
     // WooCommerce logout endpoint
     if ( preg_match('#/my-account/logout/?#i', $request_uri) ) {
+        error_log('SVNTEX2 REDIRECT: Woo logout endpoint detected, redirecting to: ' . $login_url);
         wp_safe_redirect( $login_url );
         exit;
     }
     // WordPress core logout URL
     if ( stripos($request_uri, '/wp-login.php') !== false && isset($_GET['action']) && $_GET['action'] === 'logout' ) {
+        error_log('SVNTEX2 REDIRECT: WP core logout detected, redirecting to: ' . $login_url);
         wp_safe_redirect( $login_url );
         exit;
     }
