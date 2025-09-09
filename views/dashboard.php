@@ -25,58 +25,24 @@ if ( function_exists('wc_get_orders') ) {
 $logout_url = esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
 ?>
 <style>
-/* Keep dashboard content width flexible. Let the theme (Astra) manage header/navigation. */
+/* Keep dashboard content width flexible. Theme (Astra) manages site chrome. */
 .svntex-dashboard-wrapper { max-width: 1100px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
-.svntex-dash-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
+.svntex-dash-top { display:flex; justify-content:flex-end; align-items:center; margin-bottom:18px; gap:8px; }
 .widget { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.06)); padding: 16px; border-radius: 8px; margin-bottom: 14px; }
+.dash-actions { display:flex; gap:8px; align-items:center; }
+.dash-actions .mini { padding:6px 10px; background:#f5f5f7; border-radius:8px; text-decoration:none; color:inherit; line-height:1; display:inline-flex; align-items:center; }
+.dash-actions .mini:hover { background:#ececef; }
+.dash-actions .mini-badge { margin-left:6px; font-weight:600; font-size:12px; opacity:.9; }
 </style>
-<!-- Theme handles mobile drawer and header; plugin does not render a separate mobile menu -->
-<style>
-/* Hide theme header and footer when our brand UI / My Account override is active */
-body.svntex-app-shell header,
-body.svntex-app-shell .site-header,
-body.svntex-app-shell .site-navigation,
-body.svntex-app-shell .top-navigation,
-body.svntex-app-shell .site-footer,
-body.svntex-app-shell footer,
-body.svntex-myaccount-override header,
-body.svntex-myaccount-override .site-header,
-body.svntex-myaccount-override .site-navigation,
-body.svntex-myaccount-override .top-navigation,
-body.svntex-myaccount-override .site-footer,
-body.svntex-myaccount-override footer { display: none !important; }
-
-/* Ensure page content uses full viewport when header/footer hidden */
-body.svntex-app-shell .site { padding-top: 0 !important; }
-body.svntex-app-shell .site-main, body.svntex-myaccount-override .site-main { margin-top: 0 !important; }
-</style>
-<!-- Plugin defers mobile menu behavior to the active theme (Astra) -->
  
 <div class="svntex-dash-top">
-    <a href="<?php echo esc_url( home_url('/') ); ?>" class="dash-brand">SVNTeX</a>
-    <div class="dash-actions">
-        <button class="mini" id="svntex2DarkToggleTop" aria-label="Toggle dark mode">Theme</button>
-    <a class="mini" href="<?php echo $logout_url; ?>">Logout</a>
-    </div>
-</div>
-<!-- Debug: show build info so we can confirm deployment on live site -->
-<div style="position:fixed;left:12px;bottom:12px;z-index:99999;background:rgba(0,0,0,0.6);color:#fff;padding:6px 8px;border-radius:6px;font-size:11px;opacity:0.9">build: a19d719 — 2025-09-09</div>
-
-<!-- Collapsible server-side debug panel (toggle to inspect runtime values) -->
-<div id="svntex-debug-panel" style="position:fixed;left:12px;bottom:52px;z-index:99999;background:rgba(0,0,0,0.8);color:#fff;padding:8px;border-radius:6px;font-size:12px;max-width:340px;">
-    <button id="svntex-debug-toggle" style="background:#222;border:0;color:#fff;padding:6px 8px;border-radius:6px;cursor:pointer;">Debug ▾</button>
-    <div id="svntex-debug-body" style="display:none;margin-top:8px;line-height:1.4;">
-        <div><strong>User ID:</strong> <?php echo intval($current_user->ID); ?></div>
-        <div><strong>Display name:</strong> <?php echo esc_html($current_user->display_name); ?></div>
-        <div><strong>KYC status:</strong> <?php echo esc_html(get_user_meta($current_user->ID,'kyc_status', true) ?: 'None'); ?></div>
-        <div><strong>Wallet raw:</strong> <?php echo esc_html($wallet_balance); ?></div>
-        <div><strong>Referral count:</strong> <?php echo esc_html($referral_count); ?></div>
-        <div><strong>WooCommerce orders fn:</strong> <?php echo function_exists('wc_get_orders') ? 'available' : 'missing'; ?></div>
-        <div><strong>WooCommerce price fn:</strong> <?php echo function_exists('wc_price') ? 'available' : 'missing'; ?></div>
-        <div style="margin-top:6px;font-size:11px;opacity:0.9;color:#d0d7ff">Note: this is a temporary debug panel; it will not change user data.</div>
-    </div>
-</div>
-<script>document.addEventListener('DOMContentLoaded',function(){var t=document.getElementById('svntex-debug-toggle'),b=document.getElementById('svntex-debug-body');if(!t||!b)return;t.addEventListener('click',function(){if(b.style.display==='none'){b.style.display='block';t.textContent='Debug ▴';}else{b.style.display='none';t.textContent='Debug ▾';}});});</script>
+    <nav class="dash-actions" aria-label="Quick actions">
+        <a class="mini" href="#kyc">KYC</a>
+        <a class="mini" href="<?php echo esc_url( function_exists('wc_get_cart_url') ? wc_get_cart_url() : home_url('/cart/') ); ?>">Cart</a>
+        <a class="mini" href="#wallet">Wallet <span class="mini-badge"><?php echo function_exists('wc_price') ? wp_strip_all_tags( wc_price($wallet_balance) ) : esc_html(number_format($wallet_balance,2)); ?></span></a>
+        <a class="mini" href="<?php echo $logout_url; ?>">Logout</a>
+    </nav>
+ </div>
 
 <div class="svntex-dashboard-wrapper fade-in" data-svntex2-dashboard>
     <!-- Navigation is provided by the active theme (Astra). Remove sidebar/menu duplication. -->
@@ -85,10 +51,6 @@ body.svntex-app-shell .site-main, body.svntex-myaccount-override .site-main { ma
         <header class="content-header">
             <div class="header-row">
                 <h1 class="dash-title">Welcome, <?php echo esc_html($current_user->display_name); ?></h1>
-                <div class="header-actions">
-                    <button type="button" class="btn-ghost" id="svntex2DarkToggle" aria-pressed="false" aria-label="Toggle dark mode">🌙</button>
-                    <button type="button" class="btn-refresh" id="svntex2WalletRefresh" aria-label="Refresh wallet balance">↻</button>
-                </div>
             </div>
         </header>
         <div class="dashboard-widgets" id="wallet" aria-label="Quick Stats">
