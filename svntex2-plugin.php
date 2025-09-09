@@ -319,11 +319,18 @@ function svntex2_render_auth_pages(){
     $page = get_query_var('svntex2_page');
     if ( ! $page ) return;
     if ( $page === 'login' ) {
-        if ( is_user_logged_in() ) { wp_safe_redirect( wc_get_page_permalink( 'myaccount' ) ); exit; }
+        // Only redirect logged-in users away from login page
+        if ( is_user_logged_in() ) {
+            wp_safe_redirect( wc_get_page_permalink( 'myaccount' ) );
+            exit;
+        }
         wp_enqueue_style( 'svntex2-style' );
         $file = SVNTEX2_PLUGIN_DIR.'views/customer-login.php';
     } elseif ( $page === 'register' ) {
-        if ( is_user_logged_in() ) { wp_safe_redirect( wc_get_page_permalink( 'myaccount' ) ); exit; }
+        if ( is_user_logged_in() ) {
+            wp_safe_redirect( wc_get_page_permalink( 'myaccount' ) );
+            exit;
+        }
         wp_enqueue_style( 'svntex2-style' );
         $file = SVNTEX2_PLUGIN_DIR.'views/customer-registration.php';
     } else { return; }
