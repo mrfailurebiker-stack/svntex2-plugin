@@ -18,7 +18,7 @@ if ( function_exists('wc_get_orders') ) {
     ]);
 }
 
-$logout_url = esc_url( wp_logout_url( home_url('/') ) );
+$logout_url = esc_url( wp_logout_url( home_url('/') ) . '&_wpnonce=' . wp_create_nonce('log-out') );
 ?>
 <div class="svntex-dash-top">
     <a href="<?php echo esc_url( home_url('/') ); ?>" class="dash-brand">SVNTeX</a>
