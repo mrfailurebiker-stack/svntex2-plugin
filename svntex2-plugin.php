@@ -670,30 +670,5 @@ if ( ! file_exists( SVNTEX2_PLUGIN_DIR . 'assets/js/core.js' ) ) {
     @file_put_contents( SVNTEX2_PLUGIN_DIR . 'assets/js/core.js', "console.log('SVNTeX core loaded');" );
 }
 
-// -----------------------------------------------------------------------------
-// 12. LOGOUT REDIRECT (ENSURE CONSISTENCY)
-// -----------------------------------------------------------------------------
-add_action( 'wp_logout', function() {
-    error_log('SVNTEX2 LOGOUT: wp_logout hook fired.');
-    // Use WordPress logout function to clear everything
-    if ( is_user_logged_in() ) {
-        wp_logout();
-        error_log('SVNTEX2 LOGOUT: Called wp_logout().');
-    }
-    // Force clear cookies
-    foreach ([LOGGED_IN_COOKIE, AUTH_COOKIE, SECURE_AUTH_COOKIE, USER_COOKIE] as $cookie) {
-        if ( isset($_COOKIE[$cookie]) ) {
-            setcookie($cookie, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN);
-            error_log('SVNTEX2 LOGOUT: Cleared cookie ' . $cookie);
-        }
-    }
-    // Destroy PHP session
-    if ( session_status() === PHP_SESSION_ACTIVE ) {
-        session_destroy();
-        error_log('SVNTEX2 LOGOUT: Session destroyed.');
-    }
-    wp_safe_redirect( home_url('/customer-login/') );
-    exit;
-});
 
 // -----------------------------------------------------------------------------
