@@ -24,6 +24,47 @@ if ( function_exists('wc_get_orders') ) {
 
 $logout_url = esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
 ?>
+<style>
+/* Hide WooCommerce My Account navigation and content so only our custom dashboard shows */
+.woocommerce-MyAccount-navigation,
+.woocommerce-MyAccount-content,
+.woocommerce nav.woocommerce-MyAccount-navigation,
+.woocommerce-account .woocommerce-MyAccount-navigation,
+.woocommerce-account .woocommerce-MyAccount-content { display: none !important; }
+
+/* Remove theme greeting block that can show "Hello ... Log out" when inside My Account */
+.woocommerce-MyAccount .woocommerce-MyAccount-content p { display: none !important; }
+
+/* Dashboard layout: sidebar + content for desktop/tablet, mobile uses bottom nav */
+.svntex-dashboard-wrapper { max-width: 1100px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
+.dashboard-sidebar { width: 260px; float: left; margin-right: 24px; }
+.dashboard-content { margin-left: 284px; }
+
+/* Make sure our top bar actions align */
+.svntex-dash-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
+
+/* Responsive: mobile and small tablets collapse sidebar and use bottom nav */
+@media (max-width: 900px) {
+    .dashboard-sidebar { display: none !important; }
+    .dashboard-content { margin-left: 0 !important; padding-bottom: 76px; }
+    .svntex-dash-top { padding-right: 12px; }
+    .mobile-nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-around; background: rgba(10,10,20,0.95); padding: .5rem 0; z-index: 9999; }
+}
+
+/* Tablet layout tweaks */
+@media (min-width: 901px) and (max-width: 1199px) {
+    .dashboard-sidebar { width: 220px; margin-right: 16px; }
+    .dashboard-content { margin-left: 236px; }
+}
+
+/* Nav list visual polish */
+.nav-list { list-style:none; margin:0; padding:0; }
+.nav-list .nav-link { display:block; padding:.8rem 1rem; color: #e6eefb; text-decoration:none; border-left:4px solid transparent; }
+.nav-list .nav-link.active, .nav-list .nav-link:hover { background: rgba(255,255,255,0.03); color: #fff; border-left-color: #7c5cff; }
+
+/* Ensure our widget area is readable on dark themes */
+.widget { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.06)); padding: 16px; border-radius: 8px; margin-bottom: 14px; }
+</style>
 <div class="svntex-dash-top">
     <a href="<?php echo esc_url( home_url('/') ); ?>" class="dash-brand">SVNTeX</a>
     <div class="dash-actions">
