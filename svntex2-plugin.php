@@ -382,7 +382,7 @@ add_action('template_redirect', function(){
             foreach($logout_patterns as $pat) {
                 if ( stripos($request_uri, $pat) !== false ) return;
             }
-            wp_redirect(home_url('/dashboard'));
+                wp_redirect(wc_get_page_permalink('myaccount'));
             exit;
         }
     wp_enqueue_style( 'svntex2-style' );
@@ -432,42 +432,56 @@ add_action( 'register_init', function(){
 // AJAX login handler
 add_action( 'wp_ajax_nopriv_svntex2_do_login', 'svntex2_ajax_do_login' );
 function svntex2_ajax_do_login(){
+    // Debug: log all POST data and steps
+    error_log('SVNTEX2 AJAX LOGIN: POST=' . print_r($_POST, true));
     check_ajax_referer( 'svntex2_login', 'svntex2_login_nonce' );
-    // Simple rate limit: allow up to 20 attempts per IP per 10 minutes
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     $rl_key = 'svntex2_login_rl_' . md5( $ip );
     $attempts = (int) get_transient( $rl_key );
     $login_id = sanitize_text_field( $_POST['login_id'] ?? '' );
     $password = $_POST['password'] ?? '';
-    if ( ! $login_id || ! $password ) wp_send_json_error( ['message' => 'Missing credentials'] );
+    if ( ! $login_id || ! $password ) {
+        error_log('SVNTEX2 AJAX LOGIN: Missing credentials');
+        wp_send_json_error( ['message' => 'Missing credentials'] );
+    }
 
     $user = null;
     if ( is_email( $login_id ) ) {
         $user = get_user_by( 'email', $login_id );
+        error_log('SVNTEX2 AJAX LOGIN: Try email, found user=' . print_r($user, true));
     } else {
-        // Try username then meta (customer_id stored as username style)
         $user = get_user_by( 'login', $login_id );
+        error_log('SVNTEX2 AJAX LOGIN: Try login, found user=' . print_r($user, true));
         if ( ! $user ) {
             $q = get_users( [ 'meta_key' => 'customer_id', 'meta_value' => $login_id, 'number' => 1, 'fields' => 'all' ] );
+            error_log('SVNTEX2 AJAX LOGIN: Try meta customer_id, found=' . print_r($q, true));
             if ( $q ) $user = $q[0];
         }
     }
-    if ( ! $user ) wp_send_json_error( ['message' => 'Account not found'] );
+    if ( ! $user ) {
+        error_log('SVNTEX2 AJAX LOGIN: Account not found for login_id=' . $login_id);
+        wp_send_json_error( ['message' => 'Account not found'] );
+    }
     $check = wp_check_password( $password, $user->user_pass, $user->ID );
+    error_log('SVNTEX2 AJAX LOGIN: Password check=' . ($check ? 'PASS' : 'FAIL'));
     if ( ! $check ) {
         $attempts++;
         set_transient( $rl_key, $attempts, 10 * MINUTE_IN_SECONDS );
+        error_log('SVNTEX2 AJAX LOGIN: Invalid password, attempts=' . $attempts);
         if ( $attempts > 20 ) {
+            error_log('SVNTEX2 AJAX LOGIN: Too many attempts');
             wp_send_json_error( ['message' => 'Too many attempts. Try later.'] );
         }
         wp_send_json_error( ['message' => 'Invalid password'] );
     }
     delete_transient( $rl_key );
     $remember = ! empty( $_POST['remember'] );
+    error_log('SVNTEX2 AJAX LOGIN: Setting auth cookie for user_id=' . $user->ID);
     wp_set_current_user( $user->ID );
     wp_set_auth_cookie( $user->ID, $remember );
     do_action( 'wp_login', $user->user_login, $user );
     $redirect = wc_get_page_permalink( 'myaccount' );
+    error_log('SVNTEX2 AJAX LOGIN: Success, redirect=' . $redirect);
     wp_send_json_success( [ 'redirect' => $redirect ] );
 }
 
