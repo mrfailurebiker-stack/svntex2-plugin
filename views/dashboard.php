@@ -1,7 +1,11 @@
+
 <?php
 // Modernized SVNTeX Dashboard (Phase 1 UI polishing)
 if (!defined('ABSPATH')) exit;
-if (!is_user_logged_in()) { echo '<p>Please login.</p>'; return; }
+if (!is_user_logged_in()) {
+    wp_safe_redirect( home_url('/customer-login/') );
+    exit;
+}
 
 $current_user   = wp_get_current_user();
 $referral_count = get_user_meta($current_user->ID,'referral_count', true);
