@@ -22,6 +22,10 @@ jobs:
           cat > include.txt <<'EOF'
           + svntex2-plugin.php
           + hostinger-pipeline-test.php
+          + hostinger-deploy-test.php
+          + deploy-copilot-test2.php
+          + deploy-test-copilot.php
+          + test-github-deploy.txt
           + includes/***
           + assets/***
           + views/***
