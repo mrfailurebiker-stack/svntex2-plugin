@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SVNTeX 2.0 Customer System
  * Description: Foundation for SVNTeX 2.0 – registration, wallet ledger, referrals, KYC, withdrawals, PB/RB scaffolding with WooCommerce integration.
- * Version: 0.2.7
+ * Version: 0.2.8
  * Author: SVNTeX
  * Text Domain: svntex2
  * Requires at least: 6.0
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
-define( 'SVNTEX2_VERSION',        '0.2.7' );
+define( 'SVNTEX2_VERSION',        '0.2.8' );
 define( 'SVNTEX2_PLUGIN_FILE',    __FILE__ );
 define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
@@ -331,6 +331,12 @@ add_action( 'init', function(){
 add_action( 'template_redirect', 'svntex2_render_auth_pages' );
 function svntex2_render_auth_pages(){
     $page = get_query_var('svntex2_page');
+    // Fallback: detect by REQUEST_URI when rewrites are not active yet
+    if ( ! $page ) {
+        $req = trim( parse_url( $_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH ), '/' );
+        if ( $req === trim(SVNTEX2_LOGIN_SLUG,'/') ) $page = 'login';
+        if ( $req === trim(SVNTEX2_REGISTER_SLUG,'/') ) $page = 'register';
+    }
     if ( ! $page ) return;
     if ( $page === 'login' ) {
         // Only redirect logged-in users away from login page
