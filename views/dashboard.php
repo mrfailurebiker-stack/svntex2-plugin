@@ -80,6 +80,25 @@ $logout_url = esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
 .menu-open #svntex-compact-menu { display:block !important; position: fixed; left: 12px; top: 80px; width: calc(100% - 24px); max-width: 420px; z-index: 10000; box-shadow: 0 8px 30px rgba(0,0,0,0.6); }
 
 </style>
+<style>
+/* Hide theme header and footer when our brand UI / My Account override is active */
+body.svntex-app-shell header,
+body.svntex-app-shell .site-header,
+body.svntex-app-shell .site-navigation,
+body.svntex-app-shell .top-navigation,
+body.svntex-app-shell .site-footer,
+body.svntex-app-shell footer,
+body.svntex-myaccount-override header,
+body.svntex-myaccount-override .site-header,
+body.svntex-myaccount-override .site-navigation,
+body.svntex-myaccount-override .top-navigation,
+body.svntex-myaccount-override .site-footer,
+body.svntex-myaccount-override footer { display: none !important; }
+
+/* Ensure page content uses full viewport when header/footer hidden */
+body.svntex-app-shell .site { padding-top: 0 !important; }
+body.svntex-app-shell .site-main, body.svntex-myaccount-override .site-main { margin-top: 0 !important; }
+</style>
 <script>
 // Small behavior to toggle compact menu on mobile/tablet
 (function(){
