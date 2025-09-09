@@ -674,23 +674,23 @@ if ( ! file_exists( SVNTEX2_PLUGIN_DIR . 'assets/js/core.js' ) ) {
 // 12. LOGOUT REDIRECT (ENSURE CONSISTENCY)
 // -----------------------------------------------------------------------------
 add_action( 'wp_logout', function() {
-    error_log('SVNTEX2 LOGOUT: wp_logout hook fired, clearing session and redirecting.');
-    // Force clear cookies and session
-    if ( isset( $_COOKIE[LOGGED_IN_COOKIE] ) ) {
-        setcookie( LOGGED_IN_COOKIE, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+    error_log('SVNTEX2 LOGOUT: wp_logout hook fired.');
+    // Use WordPress logout function to clear everything
+    if ( is_user_logged_in() ) {
+        wp_logout();
+        error_log('SVNTEX2 LOGOUT: Called wp_logout().');
     }
-    if ( isset( $_COOKIE[AUTH_COOKIE] ) ) {
-        setcookie( AUTH_COOKIE, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
-    }
-    if ( isset( $_COOKIE[SECURE_AUTH_COOKIE] ) ) {
-        setcookie( SECURE_AUTH_COOKIE, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
-    }
-    if ( isset( $_COOKIE[USER_COOKIE] ) ) {
-        setcookie( USER_COOKIE, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+    // Force clear cookies
+    foreach ([LOGGED_IN_COOKIE, AUTH_COOKIE, SECURE_AUTH_COOKIE, USER_COOKIE] as $cookie) {
+        if ( isset($_COOKIE[$cookie]) ) {
+            setcookie($cookie, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN);
+            error_log('SVNTEX2 LOGOUT: Cleared cookie ' . $cookie);
+        }
     }
     // Destroy PHP session
     if ( session_status() === PHP_SESSION_ACTIVE ) {
         session_destroy();
+        error_log('SVNTEX2 LOGOUT: Session destroyed.');
     }
     wp_safe_redirect( home_url('/customer-login/') );
     exit;
