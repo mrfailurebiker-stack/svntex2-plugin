@@ -26,6 +26,7 @@ jobs:
           + deploy-copilot-test2.php
           + deploy-test-copilot.php
           + test-github-deploy.txt
+          + deploy-debug.php
           + includes/***
           + assets/***
           + views/***
