@@ -317,6 +317,16 @@ function svntex2_register_auth_rewrites(){
     add_rewrite_tag( '%svntex2_page%', '([^&]+)' );
 }
 
+// Ensure rewrites are flushed automatically after plugin version changes,
+// so custom auth slugs start working immediately after deploy.
+add_action( 'init', function(){
+    $stored = get_option( 'svntex2_version' );
+    if ( $stored !== SVNTEX2_VERSION ) {
+        flush_rewrite_rules( false );
+        update_option( 'svntex2_version', SVNTEX2_VERSION );
+    }
+}, 99 );
+
 // Template loader for custom pages
 add_action( 'template_redirect', 'svntex2_render_auth_pages' );
 function svntex2_render_auth_pages(){
