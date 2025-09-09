@@ -22,10 +22,14 @@
           <input type="text" id="reg_lname" name="last_name" placeholder="Last name" required />
         </div>
       </div>
+      <div class="field">
+        <label for="reg_email">Email *</label>
+        <input type="email" id="reg_email" name="email" placeholder="you@example.com" required />
+      </div>
       <div class="field inline-split">
         <div style="flex:1">
-          <label for="reg_age">Age *</label>
-          <input type="number" id="reg_age" name="age" placeholder="Age" min="1" max="120" required />
+          <label for="reg_dob">Date of birth *</label>
+          <input type="date" id="reg_dob" name="dob" required />
         </div>
         <div style="flex:1">
           <label for="reg_gender">Gender *</label>
@@ -82,6 +86,13 @@
     e.preventDefault();
     if(!document.getElementById('policy_accept').checked){ flash('error','You must agree to the Privacy Policy'); return; }
     if(form.password.value !== form.confirm.value){ flash('error','Passwords do not match'); return; }
+    // 18+ client-side check
+    const dobInput=document.getElementById('reg_dob');
+    if(dobInput && dobInput.value){
+      const dob=new Date(dobInput.value+'T00:00:00'); const now=new Date();
+      const age=Math.floor((now - dob) / (365.2425*24*60*60*1000));
+      if(isFinite(age) && age < 18){ flash('error','You must be at least 18 years old'); return; }
+    }
     flash('', 'Creating account...');
     const fd=new FormData(form); fd.append('action','svntex2_register'); fd.append('nonce','<?php echo wp_create_nonce('svntex2_auth'); ?>');
     try {

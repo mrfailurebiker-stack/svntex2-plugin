@@ -50,7 +50,8 @@ class SVNTEX2_Auth {
         check_ajax_referer('svntex2_auth','nonce');
         $first   = sanitize_text_field($_POST['first_name'] ?? '');
         $last    = sanitize_text_field($_POST['last_name'] ?? '');
-        $age     = (int) ($_POST['age'] ?? 0);
+        $email   = sanitize_email($_POST['email'] ?? '');
+        $dob     = sanitize_text_field($_POST['dob'] ?? ''); // YYYY-MM-DD
         $gender  = sanitize_text_field($_POST['gender'] ?? '');
         $mobile  = preg_replace('/\D/','', $_POST['mobile'] ?? '');
         $ref     = sanitize_text_field($_POST['referral'] ?? '');
@@ -61,7 +62,21 @@ class SVNTEX2_Auth {
         $errors = [];
         if (!$first) $errors[] = 'First name required';
         if (!$last) $errors[] = 'Last name required';
-        if ($age < 1) $errors[] = 'Valid age required';
+        if (!$email || !is_email($email)) $errors[] = 'Valid email required';
+        // Validate DOB and 18+
+        $computed_age = 0;
+        if ($dob && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dob)) {
+            $dob_ts = strtotime($dob . ' 00:00:00');
+            if ($dob_ts === false) {
+                $errors[] = 'Valid date of birth required';
+            } else {
+                $now = current_time('timestamp');
+                $computed_age = (int) floor( ($now - $dob_ts) / (365.2425 * DAY_IN_SECONDS) );
+                if ($computed_age < 18) $errors[] = 'You must be at least 18 years old';
+            }
+        } else {
+            $errors[] = 'Valid date of birth required';
+        }
         if (!$gender) $errors[] = 'Gender required';
         if (strlen($mobile) < 10) $errors[] = 'Valid mobile required';
         if (strlen($pass) < 4) $errors[] = 'Password must be at least 4 characters';
@@ -69,6 +84,7 @@ class SVNTEX2_Auth {
         // Enforce unique mobile
         $dupe = get_users([ 'meta_key'=>'mobile', 'meta_value'=>$mobile, 'number'=>1, 'fields'=>'ids' ]);
         if ($dupe) $errors[] = 'Mobile already registered';
+        if ($email && email_exists($email)) $errors[] = 'Email already registered';
         if ($errors) wp_send_json_error(['errors' => $errors]);
 
         $customer_id = svntex2_generate_customer_id(); // SVNXXXXXX
@@ -76,6 +92,7 @@ class SVNTEX2_Auth {
         $user_id = wp_insert_user([
             'user_login' => $customer_id,
             'user_pass'  => $pass,
+            'user_email' => $email,
             'first_name' => $first,
             'last_name'  => $last,
             'display_name' => $display_name
@@ -83,7 +100,9 @@ class SVNTEX2_Auth {
         if (is_wp_error($user_id)) wp_send_json_error(['errors' => ['Registration failed']]);
         update_user_meta($user_id,'mobile',$mobile);
         update_user_meta($user_id,'customer_id',$customer_id);
-        update_user_meta($user_id,'age',$age);
+        // Store DOB and also maintain computed age for backward compatibility
+        update_user_meta($user_id,'dob',$dob);
+        update_user_meta($user_id,'age',$computed_age);
         update_user_meta($user_id,'gender',$gender);
         if ($ref) update_user_meta($user_id,'referral_source',$ref);
         if ($emp) update_user_meta($user_id,'employee_id',$emp);
