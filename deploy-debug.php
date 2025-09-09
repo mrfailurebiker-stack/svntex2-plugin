@@ -17,8 +17,24 @@ $current_user = wp_get_current_user();
 $wallet = function_exists('svntex2_wallet_get_balance') ? svntex2_wallet_get_balance($current_user->ID) : '(no wallet fn)';
 $kyc = get_user_meta($current_user->ID,'kyc_status', true) ?: 'None';
 $ref = get_user_meta($current_user->ID,'referral_count', true) ?: 0;
+// Attempt to show plugin version details
+$const_ver = defined('SVNTEX2_VERSION') ? SVNTEX2_VERSION : '(const undefined)';
+$header_ver = '(unknown)';
+if ( defined('SVNTEX2_PLUGIN_FILE') ) {
+    if ( ! function_exists('get_plugin_data') ) {
+        require_once ABSPATH . 'wp-admin/includes/plugin.php';
+    }
+    if ( function_exists('get_plugin_data') ) {
+        $pd = get_plugin_data( SVNTEX2_PLUGIN_FILE, false, false );
+        if ( ! empty( $pd['Version'] ) ) {
+            $header_ver = $pd['Version'];
+        }
+    }
+}
 echo "Commit: d23567c\n";
 echo "Commit time: 2025-09-09 14:34:01 +0530\n";
+echo "SVNTEX2_VERSION const: " . $const_ver . "\n";
+echo "Plugin header Version: " . $header_ver . "\n";
 echo "User ID: " . intval($current_user->ID) . "\n";
 echo "Display name: " . esc_html($current_user->display_name) . "\n";
 echo "KYC status: " . esc_html($kyc) . "\n";

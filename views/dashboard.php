@@ -25,84 +25,12 @@ if ( function_exists('wc_get_orders') ) {
 $logout_url = esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
 ?>
 <style>
-/* Hide WooCommerce My Account navigation and content so only our custom dashboard shows */
-.woocommerce-MyAccount-navigation,
-.woocommerce-MyAccount-content,
-.woocommerce nav.woocommerce-MyAccount-navigation,
-.woocommerce-account .woocommerce-MyAccount-navigation,
-.woocommerce-account .woocommerce-MyAccount-content { display: none !important; }
-
-/* Remove theme greeting block that can show "Hello ... Log out" when inside My Account */
-.woocommerce-MyAccount .woocommerce-MyAccount-content p { display: none !important; }
-
-/* Dashboard layout: sidebar + content for desktop/tablet, mobile uses bottom nav */
+/* Keep dashboard content width flexible. Let the theme (Astra) manage header/navigation. */
 .svntex-dashboard-wrapper { max-width: 1100px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
-.dashboard-sidebar { width: 260px; float: left; margin-right: 24px; }
-.dashboard-content { margin-left: 284px; }
-
-/* Make sure our top bar actions align */
 .svntex-dash-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
-
-/* Responsive: mobile and small tablets collapse sidebar and use bottom nav */
-@media (max-width: 900px) {
-    /* Keep sidebar container visible on mobile so compact tab can show; hide full nav list */
-    .dashboard-sidebar { display: block !important; }
-    .dashboard-sidebar .nav-list { display: none !important; }
-    .dashboard-content { margin-left: 0 !important; padding-bottom: 76px; }
-    .svntex-dash-top { padding-right: 12px; }
-    .mobile-nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-around; background: rgba(10,10,20,0.95); padding: .5rem 0; z-index: 9999; }
-}
-
-/* Tablet layout tweaks */
-@media (min-width: 901px) and (max-width: 1199px) {
-    .dashboard-sidebar { width: 220px; margin-right: 16px; }
-    .dashboard-content { margin-left: 236px; }
-}
-
-/* Nav list visual polish */
-.nav-list { list-style:none; margin:0; padding:0; }
-.nav-list .nav-link { display:block; padding:.8rem 1rem; color: #e6eefb; text-decoration:none; border-left:4px solid transparent; }
-.nav-list .nav-link.active, .nav-list .nav-link:hover { background: rgba(255,255,255,0.03); color: #fff; border-left-color: #7c5cff; }
-
-/* Ensure our widget area is readable on dark themes */
 .widget { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.06)); padding: 16px; border-radius: 8px; margin-bottom: 14px; }
-
-/* Compact 3-line tab styles */
-.compact-tab { display:flex; align-items:center; gap:8px; background:transparent; border:0; color:inherit; cursor:pointer; padding:6px 8px; border-radius:8px; }
-.compact-lines { display:inline-block; width:22px; }
-.compact-line { display:block; height:2px; background:#dfe9ff; margin:3px 0; border-radius:2px; }
-.compact-label { font-size:12px; opacity:0.9; }
-
-/* Hidden by default on desktop; visible on small screens and tablet */
-@media (max-width: 900px) {
-    .compact-tab { display:flex; }
-}
-
-</* When menu is open, previously used full-screen overlay. We'll show in-sidebar panel instead */
-/* sidebar open state */
-.dashboard-sidebar.open { position: relative; }
-.dashboard-sidebar.open .nav-list { display:block !important; position: absolute; left: 8px; top: 56px; width: 220px; max-width: 80vw; z-index: 1000; box-shadow: 0 8px 30px rgba(0,0,0,0.6); background: linear-gradient(180deg, rgba(18,18,30,0.98), rgba(10,10,20,0.95)); padding:12px; border-radius:8px; }
 </style>
-<style>
-/* Mobile drawer: when menu opens, show a white full-height panel similar to site nav */
-#svntex-compact-menu { display: none; }
-#svntex-compact-menu .nav-list { list-style:none; margin:0; padding:0; }
-#svntex-compact-menu .nav-item { border-bottom:1px solid rgba(0,0,0,0.06); }
-#svntex-compact-menu .nav-link { display:block; padding:16px 18px; color:#222; text-decoration:none; background:transparent; }
-#svntex-compact-menu .nav-link .nav-ico { margin-right:10px; }
-#svntex-compact-menu .nav-link:hover { background: rgba(0,0,0,0.03); }
-#svntex-compact-menu .nav-head { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid rgba(0,0,0,0.06); }
-#svntex-compact-menu .nav-head .brand { font-weight:700; color:#1b1b1b; }
-#svntex-compact-menu .close-btn { background:transparent;border:0;font-size:20px;cursor:pointer;color:#111 }
-
-/* Drawer visible state when body gets .menu-open */
-body.menu-open #svntex-compact-menu { display:block !important; position:fixed; left:0; top:0; bottom:0; width:100%; max-width:420px; background:#fff; z-index:10050; overflow:auto; box-shadow: 0 8px 30px rgba(0,0,0,0.25); }
-
-/* For larger screens keep previous compact behaviour hidden */
-@media (min-width: 901px) {
-    #svntex-compact-menu { display:none !important; }
-}
-</style>
+<!-- Theme handles mobile drawer and header; plugin does not render a separate mobile menu -->
 <style>
 /* Hide theme header and footer when our brand UI / My Account override is active */
 body.svntex-app-shell header,
@@ -122,38 +50,7 @@ body.svntex-myaccount-override footer { display: none !important; }
 body.svntex-app-shell .site { padding-top: 0 !important; }
 body.svntex-app-shell .site-main, body.svntex-myaccount-override .site-main { margin-top: 0 !important; }
 </style>
-<script>
-// Mobile drawer behavior: toggle body.menu-open and manage focus
-document.addEventListener('DOMContentLoaded', function(){
-    var hamburger = document.querySelector('.compact-tab');
-    var menu = document.getElementById('svntex-compact-menu');
-    var closeBtn = document.getElementById('svntex-menu-close');
-    if (!hamburger || !menu) return;
-    // ensure hamburger visible on small screens
-    hamburger.style.display = 'flex';
-    hamburger.addEventListener('click', function(e){
-        document.body.classList.add('menu-open');
-        menu.setAttribute('aria-hidden','false');
-        hamburger.setAttribute('aria-expanded','true');
-        closeBtn && closeBtn.focus();
-    });
-    function closeMenu(){
-        document.body.classList.remove('menu-open');
-        menu.setAttribute('aria-hidden','true');
-        hamburger.setAttribute('aria-expanded','false');
-        hamburger.focus();
-    }
-    closeBtn && closeBtn.addEventListener('click', closeMenu);
-    // click outside closes menu
-    document.addEventListener('click', function(e){
-        if (!document.body.classList.contains('menu-open')) return;
-        if (menu.contains(e.target) || hamburger.contains(e.target)) return;
-        closeMenu();
-    });
-    // escape
-    document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && document.body.classList.contains('menu-open')) closeMenu(); });
-});
-</script>
+<!-- Plugin defers mobile menu behavior to the active theme (Astra) -->
  
 <div class="svntex-dash-top">
     <a href="<?php echo esc_url( home_url('/') ); ?>" class="dash-brand">SVNTeX</a>
@@ -182,36 +79,8 @@ document.addEventListener('DOMContentLoaded', function(){
 <script>document.addEventListener('DOMContentLoaded',function(){var t=document.getElementById('svntex-debug-toggle'),b=document.getElementById('svntex-debug-body');if(!t||!b)return;t.addEventListener('click',function(){if(b.style.display==='none'){b.style.display='block';t.textContent='Debug ▴';}else{b.style.display='none';t.textContent='Debug ▾';}});});</script>
 
 <div class="svntex-dashboard-wrapper fade-in" data-svntex2-dashboard>
-    <aside class="dashboard-sidebar" role="navigation" aria-label="Dashboard Navigation">
-        <!-- Compact 3-line tab: clicking toggles full menu visibility -->
-        <button class="compact-tab" aria-expanded="false" aria-controls="svntex-compact-menu" title="Open menu">
-            <span class="compact-lines">
-                <em class="compact-line"></em>
-                <em class="compact-line"></em>
-                <em class="compact-line"></em>
-            </span>
-            <span class="compact-label">Menu</span>
-        </button>
-        <nav id="svntex-compact-menu">
-            <ul class="nav-list">
-                <li><a href="<?php echo esc_url( home_url('/dashboard') ); ?>" class="nav-link active" data-nav="home"><span class="nav-ico">🏠</span>Home</a></li>
-                <li><a href="#wallet" class="nav-link" data-nav="wallet"><span class="nav-ico">💰</span>Wallet</a></li>
-                <li><a href="#purchases" class="nav-link" data-nav="purchases"><span class="nav-ico">🛒</span>Purchases</a></li>
-                <li><a href="#referrals" class="nav-link" data-nav="referrals"><span class="nav-ico">👥</span>Referrals</a></li>
-                <li><a href="#kyc" class="nav-link" data-nav="kyc"><span class="nav-ico">🛡️</span>KYC</a></li>
-            <li><a href="<?php echo $logout_url; ?>" class="nav-link"><span class="nav-ico">🚪</span>Logout</a></li>
-            </ul>
-        </nav>
-    </aside>
-    <!-- Mobile Bottom Navigation -->
-    <nav class="mobile-nav" aria-label="Mobile Navigation">
-    <a href="<?php echo esc_url( home_url('/dashboard') ); ?>" class="mobile-nav-link" data-nav="home"><span class="nav-ico">🏠</span><span class="nav-label">Home</span></a>
-    <a href="#wallet" class="mobile-nav-link" data-nav="wallet"><span class="nav-ico">💰</span><span class="nav-label">Wallet</span></a>
-    <a href="#purchases" class="mobile-nav-link" data-nav="purchases"><span class="nav-ico">🛒</span><span class="nav-label">Purchases</span></a>
-    <a href="#referrals" class="mobile-nav-link" data-nav="referrals"><span class="nav-ico">👥</span><span class="nav-label">Referrals</span></a>
-    <a href="#kyc" class="mobile-nav-link" data-nav="kyc"><span class="nav-ico">🛡️</span><span class="nav-label">KYC</span></a>
-    <a href="<?php echo $logout_url; ?>" class="mobile-nav-link"><span class="nav-ico">🚪</span><span class="nav-label">Logout</span></a>
-    </nav>
+    <!-- Navigation is provided by the active theme (Astra). Remove sidebar/menu duplication. -->
+    <!-- Mobile navigation handled by theme. -->
     <main class="dashboard-content" role="main">
         <header class="content-header">
             <div class="header-row">

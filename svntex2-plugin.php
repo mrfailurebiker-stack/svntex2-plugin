@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SVNTeX 2.0 Customer System
  * Description: Foundation for SVNTeX 2.0 – registration, wallet ledger, referrals, KYC, withdrawals, PB/RB scaffolding with WooCommerce integration.
- * Version: 0.2.5
+ * Version: 0.2.6
  * Author: SVNTeX
  * Text Domain: svntex2
  * Requires at least: 6.0
@@ -257,7 +257,10 @@ function svntex2_is_brand_ui_context() : bool {
     if ( $auth_page === 'login' || $auth_page === 'register' ) return true;
     if ( is_front_page() || is_home() ) return true; // landing
     // My Account dashboard injection (presence of WooCommerce account page + logged in)
-    if ( function_exists( 'is_account_page' ) && is_account_page() && is_user_logged_in() ) return true;
+    // Do not treat the WooCommerce My Account page as a "brand UI" here so themes
+    // (for example Astra) can manage navigation and header/footer. Use the
+    // shortcode or dedicated integrations instead of overriding theme chrome.
+    // if ( function_exists( 'is_account_page' ) && is_account_page() && is_user_logged_in() ) return true;
     return false;
 }
 
@@ -374,8 +377,11 @@ add_action('template_redirect', function(){
         // Prevent redirect loop: if already on My Account page, do not redirect
         if ( untrailingslashit(home_url($_SERVER['REQUEST_URI'])) === untrailingslashit(wc_get_page_permalink('myaccount')) ) return;
    
-    // Allow site owners to disable override via filter
-    if ( ! apply_filters('svntex2_override_my_account', true) ) return;
+    // Allow site owners or themes to opt-in to the SVNTeX override. By default
+    // we defer to the active theme (Astra) so theme-managed navigation and
+    // account menus are preserved. Site owners can re-enable our override by
+    // returning true from this filter.
+    if ( ! apply_filters('svntex2_override_my_account', false) ) return;
         // Mobile redirect: always show dashboard, never WooCommerce My Account
         // But allow logout to work (detect logout URL more robustly)
         if ( wp_is_mobile() ) {
@@ -389,6 +395,9 @@ add_action('template_redirect', function(){
                 wp_redirect(wc_get_page_permalink('myaccount'));
             exit;
         }
+    // If we get here and the filter returned true, render the dashboard but do
+    // not aggressively hide theme header/footer; let theme CSS handle
+    // visibility so Astra can style navigation consistently.
     wp_enqueue_style( 'svntex2-style' );
     wp_enqueue_script( 'svntex2-dashboard' );
     wp_localize_script( 'svntex2-dashboard', 'SVNTEX2Dash', [
@@ -403,11 +412,6 @@ add_action('template_redirect', function(){
         <meta charset="<?php bloginfo('charset'); ?>" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
         <?php wp_head(); ?>
-        <style>
-            /* Ensure any residual WooCommerce containers are hidden if printed by other plugins */
-            .woocommerce-MyAccount-navigation, .woocommerce-MyAccount-content, .woocommerce nav.woocommerce-MyAccount-navigation { display:none !important; }
-            body.svntex-app-shell { overflow-x:hidden; }
-        </style>
     </head>
     <body <?php body_class('svntex-app-shell svntex-myaccount-override'); ?>>
         <main class="svntex-dashboard-override" style="min-height:100vh;display:flex;flex-direction:column;">
@@ -517,6 +521,81 @@ function svntex2_handle_logout() {
 // 10. EXTENSION HOOKS (for future add-ons)
 // -----------------------------------------------------------------------------
 do_action( 'svntex2_initialized' );
+
+/**
+ * Programmatically create a simple "SVNTeX Account" menu and add account links.
+ * This is admin-only and idempotent. Enable by returning true from
+ * `add_filter('svntex2_auto_add_menu_items', '__return_true');` in a site
+ * mu-plugin or theme functions.php, or call `svntex2_register_astra_account_menu_items()` manually.
+ */
+function svntex2_get_logout_url_for_menu() {
+    return esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
+}
+
+function svntex2_register_astra_account_menu_items() {
+    if ( ! is_admin() ) return; // admin-only operation
+    if ( ! current_user_can( 'manage_options' ) ) return;
+
+    // Only run automatically if filter enabled or when called directly
+    $auto = apply_filters( 'svntex2_auto_add_menu_items', false );
+    $already = get_option( 'svntex2_menu_items_added', 0 );
+    if ( ! $auto && ! defined( 'SVNTEX2_FORCE_ADD_MENU' ) ) return;
+    if ( $already && ! defined( 'SVNTEX2_FORCE_ADD_MENU' ) ) return;
+
+    $menu_name = apply_filters( 'svntex2_menu_name', 'SVNTeX Account' );
+    $menu_exists = wp_get_nav_menu_object( $menu_name );
+    if ( ! $menu_exists ) {
+        $menu_id = wp_create_nav_menu( $menu_name );
+    } else {
+        $menu_id = $menu_exists->term_id;
+    }
+
+    if ( ! $menu_id ) return;
+
+    // Desired items
+    $base = home_url('/dashboard');
+    $items = apply_filters( 'svntex2_menu_items', [
+        [ 'title' => 'Home', 'url' => $base ],
+        [ 'title' => 'Wallet', 'url' => $base . '#wallet' ],
+        [ 'title' => 'Top Up', 'url' => $base ],
+        [ 'title' => 'Purchases', 'url' => $base . '#purchases' ],
+        [ 'title' => 'Referrals', 'url' => $base . '#referrals' ],
+        [ 'title' => 'KYC', 'url' => $base . '#kyc' ],
+        [ 'title' => 'Logout', 'url' => svntex2_get_logout_url_for_menu() ],
+    ] );
+
+    // Fetch existing menu items to avoid duplicates
+    $existing = wp_get_nav_menu_items( $menu_id ) ?: [];
+    $existing_urls = array_map( function( $it ) { return untrailingslashit( $it->url ); }, $existing );
+
+    foreach ( $items as $it ) {
+        $url = untrailingslashit( $it['url'] );
+        if ( in_array( $url, $existing_urls, true ) ) continue; // skip duplicates
+        wp_update_nav_menu_item( $menu_id, 0, [
+            'menu-item-title' => $it['title'],
+            'menu-item-url' => $it['url'],
+            'menu-item-status' => 'publish',
+        ] );
+    }
+
+    // Try to assign the menu to a sensible theme location if available
+    $locations = get_nav_menu_locations();
+    $registered = get_registered_nav_menus();
+    // Prefer common Astra primary location keys
+    $preferred = [ 'primary', 'header', 'main', key( $registered ) ?: '' ];
+    foreach ( $preferred as $loc ) {
+        if ( ! $loc ) continue;
+        if ( array_key_exists( $loc, $registered ) ) {
+            $locations[ $loc ] = $menu_id;
+            set_theme_mod( 'nav_menu_locations', $locations );
+            break;
+        }
+    }
+
+    update_option( 'svntex2_menu_items_added', time() );
+}
+
+add_action( 'admin_init', 'svntex2_register_astra_account_menu_items' );
 
 // -----------------------------------------------------------------------------
 // 10.1 RUNTIME SCHEMA SAFETY (add new columns if missing)
