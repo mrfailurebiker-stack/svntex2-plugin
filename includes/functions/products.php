@@ -118,6 +118,16 @@ function svntex2_inventory_get_rows($variant_id){
     ]; }, $rows ?: []);
 }
 
+// 4b) Variant price range helper (min/max active variant prices)
+function svntex2_get_variant_price_range($product_id){
+    global $wpdb; $t = $wpdb->prefix.'svntex_product_variants';
+    $rows = $wpdb->get_row($wpdb->prepare("SELECT MIN(price) as min_price, MAX(price) as max_price FROM $t WHERE product_id=%d AND active=1 AND price IS NOT NULL", (int)$product_id));
+    if(!$rows || $rows->min_price === null){
+        return [ 'min'=>null, 'max'=>null ];
+    }
+    return [ 'min'=>(float)$rows->min_price, 'max'=>(float)$rows->max_price ];
+}
+
 // 5) Delivery rule resolver
 function svntex2_delivery_compute($product_id, $variant_id=null, $subtotal){
     global $wpdb; $t=$wpdb->prefix.'svntex_delivery_rules';

@@ -141,6 +141,16 @@ function svntex2_format_product_response(WP_Post $post){
         'price'=> is_null($r->price)? null : (float)$r->price, 'tax_class'=>$r->tax_class, 'unit'=>$r->unit,
         'active'=> (int)$r->active,
     ]; }, $var ?: []);
+    // Price range (active variants with price)
+    $range = svntex2_get_variant_price_range($post->ID);
+    $price_range = null;
+    if ($range['min'] !== null) {
+        if ($range['min'] === $range['max']) {
+            $price_range = [ 'type'=>'single', 'display'=>$range['min'] ];
+        } else {
+            $price_range = [ 'type'=>'range', 'display_min'=>$range['min'], 'display_max'=>$range['max'] ];
+        }
+    }
     return [
         'id'=>$post->ID,
         'title'=>$post->post_title,
@@ -148,6 +158,7 @@ function svntex2_format_product_response(WP_Post $post){
         'meta'=>$meta,
         'terms'=>$terms,
         'variants'=>$variants,
+        'price_range'=>$price_range,
         'permalink'=> get_permalink($post),
     ];
 }

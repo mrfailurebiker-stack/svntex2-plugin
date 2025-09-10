@@ -113,10 +113,20 @@ $cats = get_terms(['taxonomy'=>'svntex_category','hide_empty'=>false,'parent'=>0
     <div class="products-grid">
       <?php while($q->have_posts()): $q->the_post(); ?>
         <?php
-          // Derive a price: take first variant price if exists
+          // Derive price range from variants (min/max active prices)
           global $wpdb; $vt=$wpdb->prefix.'svntex_product_variants';
-          $price = $wpdb->get_var($wpdb->prepare("SELECT price FROM $vt WHERE product_id=%d AND price IS NOT NULL ORDER BY id ASC LIMIT 1", get_the_ID()));
-          $price_disp = $price!==null ? ( function_exists('wc_price') ? wc_price($price) : esc_html(number_format((float)$price,2)) ) : '—';
+          $range = $wpdb->get_row($wpdb->prepare("SELECT MIN(price) as min_p, MAX(price) as max_p FROM $vt WHERE product_id=%d AND active=1 AND price IS NOT NULL", get_the_ID()));
+          $price_disp = '—';
+          if ($range && $range->min_p !== null) {
+            $min_p = (float)$range->min_p; $max_p = (float)$range->max_p;
+            if ($min_p === $max_p) {
+              $price_disp = function_exists('wc_price') ? wc_price($min_p) : esc_html(number_format($min_p,2));
+            } else {
+              $min_fmt = function_exists('wc_price') ? wc_price($min_p) : esc_html(number_format($min_p,2));
+              $max_fmt = function_exists('wc_price') ? wc_price($max_p) : esc_html(number_format($max_p,2));
+              $price_disp = $min_fmt . ' – ' . $max_fmt;
+            }
+          }
           $rating_html = '';
           if (function_exists('wc_get_rating_html')) { $avg = get_post_meta(get_the_ID(),'_wc_average_rating',true); if($avg){ $rating_html = '<span class="p-rating">'.str_repeat('★', (int)round($avg)).'</span>'; } }
         ?>
