@@ -5,14 +5,8 @@
 <meta charset="<?php bloginfo('charset'); ?>" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title><?php bloginfo('name'); ?> – Welcome</title>
-<?php
-  // Ensure landing CSS is loaded through WP so caching/versioning works
-  if ( function_exists('wp_enqueue_style') ) {
-    wp_enqueue_style('svntex2-style');
-    wp_enqueue_style('svntex2-landing');
-  }
-  wp_head();
-?>
+<?php wp_head(); ?>
+<link rel="stylesheet" href="<?php echo esc_url( plugin_dir_url(SVNTEX2_PLUGIN_FILE).'assets/css/landing.css?v='.SVNTEX2_VERSION ); ?>" />
 </head>
 <body <?php body_class('svntex-landing'); ?>>
 <div class="svn-landing-shell">
@@ -45,7 +39,7 @@
         <button type="submit">Search</button>
       </form>
     </nav>
-  <nav class="nav-actions" aria-label="Primary">
+    <nav class="nav-actions" aria-label="Primary">
       <a href="<?php echo esc_url( site_url('/'.SVNTEX2_LOGIN_SLUG.'/') ); ?>">Log In</a>
       <a href="<?php echo esc_url( site_url('/'.SVNTEX2_REGISTER_SLUG.'/') ); ?>">Sign Up</a>
     </nav>
@@ -90,6 +84,39 @@
       <?php endforeach; ?>
     </section>
   </main>
+  <?php
+    // PRODUCTS SHOWCASE BELOW HERO
+    // Basic recent products grid (shows last 8). If none, displays a friendly notice.
+    $prod_args = [
+      'post_type' => 'svntex_product',
+      'posts_per_page' => 8,
+      'post_status' => 'publish'
+    ];
+    $prod_q = new WP_Query( $prod_args );
+  ?>
+  <section class="landing-products-section" aria-label="Latest Products">
+    <div class="lp-head">
+      <h2>Latest Products</h2>
+      <a class="view-all" href="<?php echo esc_url( get_post_type_archive_link('svntex_product') ); ?>">View All</a>
+    </div>
+    <?php if ( $prod_q->have_posts() ) : ?>
+      <div class="landing-products-grid">
+        <?php while ( $prod_q->have_posts() ) : $prod_q->the_post(); ?>
+          <article class="lp-card">
+            <a class="thumb" href="<?php the_permalink(); ?>" aria-label="View product <?php the_title_attribute(); ?>">
+              <?php if ( has_post_thumbnail() ) { the_post_thumbnail( 'medium' ); } else { echo '<div class="ph">No Image</div>'; } ?>
+            </a>
+            <div class="lp-body">
+              <h3 class="lp-title"><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h3>
+              <div class="lp-excerpt"><?php echo esc_html( wp_trim_words( get_the_excerpt() ?: strip_tags( get_the_content() ), 18, '…' ) ); ?></div>
+            </div>
+          </article>
+        <?php endwhile; wp_reset_postdata(); ?>
+      </div>
+    <?php else: ?>
+      <p class="no-products">No products added yet. Start by creating a product in the admin.</p>
+    <?php endif; ?>
+  </section>
   <footer class="footer">&copy; <?php echo date('Y'); ?> SVNTeX. All rights reserved.</footer>
 </div>
 <?php wp_footer(); ?>

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SVNTeX 2.0 Customer System
  * Description: Foundation for SVNTeX 2.0 – registration, wallet ledger, referrals, KYC, withdrawals, PB/RB scaffolding with WooCommerce integration.
- * Version: 0.2.11
+ * Version: 0.2.12
  * Author: SVNTeX
  * Text Domain: svntex2
  * Requires at least: 6.0
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
-define( 'SVNTEX2_VERSION',        '0.2.11' );
+define( 'SVNTEX2_VERSION',        '0.2.12' );
 define( 'SVNTEX2_PLUGIN_FILE',    __FILE__ );
 define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
@@ -462,9 +462,7 @@ function svntex2_render_auth_pages(){
 // Front page landing override (simple) – render modern landing if is home/front
 add_action('template_redirect', function(){
     // Force landing page for ALL users on homepage, regardless of theme/static page or login status
-    $req = $_SERVER['REQUEST_URI'] ?? '';
-    $is_home_uri = ($req === '/' || preg_match('#^/index\.php/?$#i', $req));
-    if ( is_front_page() || is_home() || $is_home_uri ) {
+    if ( is_front_page() || is_home() || $_SERVER['REQUEST_URI'] === '/' ) {
         $file = SVNTEX2_PLUGIN_DIR.'views/landing.php';
         if ( file_exists( $file ) ) {
             status_header(200); nocache_headers(); include $file; exit; }
