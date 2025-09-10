@@ -1156,3 +1156,39 @@ if ( ! file_exists( SVNTEX2_PLUGIN_DIR . 'assets/js/core.js' ) ) {
 
 
 // -----------------------------------------------------------------------------
+<?php
+/**
+ * Adds a custom GST number field to the WooCommerce product general tab.
+ */
+function svntex_add_gst_field_to_products() {
+    echo '<div class="options_group">';
+
+    woocommerce_wp_text_input(
+        array(
+            'id'          => '_svntex_gst_rate',
+            'label'       => __( 'GST Rate (%)', 'svntex' ),
+            'placeholder' => 'e.g., 18',
+            'desc_tip'    => 'true',
+            'description' => __( 'Enter the GST rate for this product as a percentage.', 'svntex' ),
+            'type'        => 'number',
+            'custom_attributes' => array(
+                'step' => 'any',
+                'min'  => '0'
+            )
+        )
+    );
+
+    echo '</div>';
+}
+add_action( 'woocommerce_product_options_general_product_data', 'svntex_add_gst_field_to_products' );
+
+/**
+ * Saves the custom GST number field value.
+ *
+ * @param int $product_id The ID of the product being saved.
+ */
+function svntex_save_gst_field( $product_id ) {
+    $gst_rate = isset( $_POST['_svntex_gst_rate'] ) ? sanitize_text_field( $_POST['_svntex_gst_rate'] ) : '';
+    update_post_meta( $product_id, '_svntex_gst_rate', $gst_rate );
+}
+add_action( 'woocommerce_process_product_meta', 'svntex_save_gst_field' );
