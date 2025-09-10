@@ -38,6 +38,14 @@ add_action('admin_menu', function(){
     remove_menu_page('edit.php?post_type=product');
 }, 999);
 
+// Disable block editor for this CPT to have a simpler description field
+add_filter('use_block_editor_for_post_type', function($use_block_editor, $post_type){
+    if ('svntex_product' === $post_type) {
+        return false;
+    }
+    return $use_block_editor;
+}, 10, 2);
+
 // One-time admin notice to surface where the new menu is
 add_action('admin_init', function(){ if(!get_option('svntex2_products_notice_dismissed')) update_option('svntex2_products_notice_dismissed', time()); });
 add_action('admin_notices', function(){
