@@ -21,9 +21,7 @@ $referral_count = ($referral_count === '') ? 0 : intval($referral_count);
 $wallet_balance = svntex2_wallet_get_balance($current_user->ID); // live ledger helper
 
 $orders = [];
-if ( function_exists('wc_get_orders') ) {
-    $orders = wc_get_orders([
-        'customer_id' => $current_user->ID,
+'customer_id' => $current_user->ID,
         'limit' => 5,
         'orderby' => 'date',
         'order' => 'DESC'
