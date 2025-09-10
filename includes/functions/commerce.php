@@ -7,14 +7,22 @@ if (!defined('ABSPATH')) exit;
  * - REST endpoints for AJAX add/remove/update, checkout, and order retrieval
  */
 
-// Ensure session cookie for guests
-add_action('init', function(){
+// Ensure session cookie for guests (moved to send_headers to avoid "headers already sent" warnings)
+function svntex2_ensure_guest_session_cookie(){
     if ( is_user_logged_in() ) return;
-    if ( isset($_COOKIE['svntex2_sid']) ) return;
+    if ( isset($_COOKIE['svntex2_sid']) && $_COOKIE['svntex2_sid'] !== '' ) return;
     $sid = wp_generate_uuid4();
-    setcookie('svntex2_sid', $sid, time()+DAY_IN_SECONDS*7, COOKIEPATH ?: '/', COOKIE_DOMAIN, is_ssl(), true);
-    $_COOKIE['svntex2_sid'] = $sid;
-});
+    if ( ! headers_sent() ) {
+        setcookie('svntex2_sid', $sid, time()+DAY_IN_SECONDS*7, COOKIEPATH ?: '/', COOKIE_DOMAIN, is_ssl(), true);
+    } else {
+        // Fallback: defer via JS if headers already sent (edge case)
+        add_action('wp_footer', function() use ($sid){
+            echo '<script>if(!document.cookie.match(/(^|; )svntex2_sid=/)){document.cookie="svntex2_sid='.esc_js($sid).';path=/;max-age='.(DAY_IN_SECONDS*7).'"}</script>';
+        });
+    }
+    $_COOKIE['svntex2_sid'] = $sid; // make available this request
+}
+add_action('send_headers','svntex2_ensure_guest_session_cookie');
 
 /**
  * Public (guest-friendly) rolling nonce used to mitigate CSRF / blind POST abuse.
