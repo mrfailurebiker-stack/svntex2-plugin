@@ -47,9 +47,10 @@ function svntex2_api_products_create(WP_REST_Request $r){
     if(is_wp_error($post_id)) return $post_id;
     if(!empty($r['categories'])) wp_set_object_terms($post_id, array_map('intval',(array)$r['categories']), 'svntex_category');
     if(!empty($r['tags'])) wp_set_object_terms($post_id, array_map('intval',(array)$r['tags']), 'svntex_tag');
-    if(isset($r['unit'])) update_post_meta($post_id,'unit', sanitize_text_field($r['unit']));
-    if(isset($r['tax_class'])) update_post_meta($post_id,'tax_class', sanitize_text_field($r['tax_class']));
-    if(isset($r['profit_margin'])) update_post_meta($post_id,'profit_margin', (float)$r['profit_margin']);
+    $map = [ 'unit','tax_class','profit_margin','product_sku','mrp','sale_price','gst_percent','cost_price' ];
+    foreach($map as $m){ if(isset($r[$m])) update_post_meta($post_id,$m, is_numeric($r[$m]) ? (float)$r[$m] : sanitize_text_field($r[$m])); }
+    if(isset($r['product_bullets'])) update_post_meta($post_id,'product_bullets', array_values(array_filter(array_map('sanitize_text_field',(array)$r['product_bullets']))));
+    if(isset($r['product_videos'])) update_post_meta($post_id,'product_videos', array_values(array_filter(array_map('esc_url_raw',(array)$r['product_videos']))));
     return svntex2_api_products_get(new WP_REST_Request('GET',[ 'id'=>$post_id ]));
 }
 
@@ -64,8 +65,10 @@ function svntex2_api_products_update(WP_REST_Request $r){
     if(count($data)>1) wp_update_post($data);
     if(isset($r['categories'])) wp_set_object_terms($post->ID, array_map('intval',(array)$r['categories']), 'svntex_category');
     if(isset($r['tags'])) wp_set_object_terms($post->ID, array_map('intval',(array)$r['tags']), 'svntex_tag');
-    foreach(['unit','tax_class'] as $k){ if(isset($r[$k])) update_post_meta($post->ID,$k, sanitize_text_field($r[$k])); }
-    if(isset($r['profit_margin'])) update_post_meta($post->ID,'profit_margin', (float)$r['profit_margin']);
+    $map = [ 'unit','tax_class','profit_margin','product_sku','mrp','sale_price','gst_percent','cost_price' ];
+    foreach($map as $m){ if(isset($r[$m])) update_post_meta($post->ID,$m, is_numeric($r[$m]) ? (float)$r[$m] : sanitize_text_field($r[$m])); }
+    if(isset($r['product_bullets'])) update_post_meta($post->ID,'product_bullets', array_values(array_filter(array_map('sanitize_text_field',(array)$r['product_bullets']))));
+    if(isset($r['product_videos'])) update_post_meta($post->ID,'product_videos', array_values(array_filter(array_map('esc_url_raw',(array)$r['product_videos']))));
     return svntex2_api_products_get($r);
 }
 
@@ -130,7 +133,15 @@ function svntex2_format_product_response(WP_Post $post){
         'unit'=> get_post_meta($post->ID,'unit', true),
         'tax_class'=> get_post_meta($post->ID,'tax_class', true),
         'profit_margin'=> (float) get_post_meta($post->ID,'profit_margin', true),
+        'sku'=> get_post_meta($post->ID,'product_sku', true),
+        'mrp'=> (float) get_post_meta($post->ID,'mrp', true),
+        'sale_price'=> (float) get_post_meta($post->ID,'sale_price', true),
+        'gst_percent'=> (float) get_post_meta($post->ID,'gst_percent', true),
+        // cost_price intentionally omitted from public meta block
     ];
+    $bullets = (array) get_post_meta($post->ID,'product_bullets', true); if(!$bullets) $bullets=[];
+    $videos = (array) get_post_meta($post->ID,'product_videos', true); if(!$videos) $videos=[];
+    $gallery = (array) get_post_meta($post->ID,'product_gallery', true); if(!$gallery) $gallery=[];
     $terms = [
         'categories'=> wp_get_object_terms($post->ID,'svntex_category',[ 'fields'=>'ids' ]),
         'tags'=> wp_get_object_terms($post->ID,'svntex_tag',[ 'fields'=>'ids' ]),
@@ -156,6 +167,8 @@ function svntex2_format_product_response(WP_Post $post){
         'title'=>$post->post_title,
         'description'=> apply_filters('the_content',$post->post_content),
         'meta'=>$meta,
+    'bullets'=>$bullets,
+    'media'=> [ 'gallery'=>$gallery, 'videos'=>$videos ],
         'terms'=>$terms,
         'variants'=>$variants,
         'price_range'=>$price_range,

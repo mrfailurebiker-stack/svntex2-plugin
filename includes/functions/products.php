@@ -46,6 +46,7 @@ function svntex2_generate_product_id(): string {
 // 3) Admin meta boxes
 add_action('add_meta_boxes', function(){
     add_meta_box('svntex_product_core','Product Details','svntex2_mb_product_core','svntex_product','normal','high');
+    add_meta_box('svntex_product_media','Media & Presentation','svntex2_mb_product_media','svntex_product','normal','default');
 });
 
 function svntex2_mb_product_core($post){
@@ -54,10 +55,48 @@ function svntex2_mb_product_core($post){
     $unit = get_post_meta($post->ID,'unit', true);
     $tax  = get_post_meta($post->ID,'tax_class', true);
     $margin = (float) get_post_meta($post->ID,'profit_margin', true);
+    $sku = get_post_meta($post->ID,'product_sku', true);
+    $mrp = get_post_meta($post->ID,'mrp', true);
+    $sale = get_post_meta($post->ID,'sale_price', true);
+    $gst = get_post_meta($post->ID,'gst_percent', true);
+    $cost = get_post_meta($post->ID,'cost_price', true);
+    $bullets = (array) get_post_meta($post->ID,'product_bullets', true);
+    if(empty($bullets)) $bullets = [];
+    echo '<style>.svntex-admin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:12px 0;} .svntex-admin-grid label{display:flex;flex-direction:column;font-size:12px;font-weight:600;gap:4px;} .svntex-inline-note{font-size:11px;color:#555;margin-top:4px;} .svntex-bullets textarea{width:100%;min-height:100px;font-family:monospace;}</style>';
     echo '<p><strong>Product ID:</strong> '.esc_html($pid).'</p>';
-    echo '<label>Unit <select name="svntex_unit"><option value="pieces" '.selected($unit,'pieces',false).'>Pieces</option><option value="kg" '.selected($unit,'kg',false).'>KG</option><option value="litres" '.selected($unit,'litres',false).'>Litres</option></select></label> ';
-    echo '<label style="margin-left:12px">Tax Class <select name="svntex_tax"><option value="GST" '.selected($tax,'GST',false).'>GST</option><option value="VAT" '.selected($tax,'VAT',false).'>VAT</option></select></label> ';
-    echo '<label style="margin-left:12px">Profit Margin % <input type="number" step="0.01" name="svntex_margin" value="'.esc_attr($margin).'" class="small-text" /></label>';
+    echo '<div class="svntex-admin-grid">';
+    echo '<label>SKU <input type="text" name="svntex_sku" value="'.esc_attr($sku).'" placeholder="Internal SKU" /></label>';
+    echo '<label>Unit <select name="svntex_unit"><option value="">—</option><option value="pieces" '.selected($unit,'pieces',false).'>Pieces</option><option value="kg" '.selected($unit,'kg',false).'>KG</option><option value="litres" '.selected($unit,'litres',false).'>Litres</option></select></label>';
+    echo '<label>Tax Class <select name="svntex_tax"><option value="">—</option><option value="GST" '.selected($tax,'GST',false).'>GST</option><option value="VAT" '.selected($tax,'VAT',false).'>VAT</option></select></label>';
+    echo '<label>GST % <input type="number" step="0.01" name="svntex_gst" value="'.esc_attr($gst).'" /></label>';
+    echo '<label>MRP <input type="number" step="0.01" name="svntex_mrp" value="'.esc_attr($mrp).'" /></label>';
+    echo '<label>Discount / Sale Price <input type="number" step="0.01" name="svntex_sale" value="'.esc_attr($sale).'" /></label>';
+    echo '<label>Cost Price (Admin Only) <input type="number" step="0.01" name="svntex_cost" value="'.esc_attr($cost).'" /></label>';
+    echo '<label>Profit Margin % <input type="number" step="0.01" name="svntex_margin" value="'.esc_attr($margin).'" class="small-text" /></label>';
+    echo '</div>';
+    echo '<div class="svntex-bullets"><label>Bullet Points (one per line)<textarea name="svntex_bullets">'.esc_textarea(implode("\n", $bullets)).'</textarea></label><p class="svntex-inline-note">These appear as feature bullets (Amazon style). Public.</p></div>';
+    echo '<p class="svntex-inline-note">Leave Profit Margin blank to auto-calc from Sale (or MRP) and Cost.</p>';
+}
+
+function svntex2_mb_product_media($post){
+    $gallery = (array) get_post_meta($post->ID,'product_gallery', true); if(empty($gallery)) $gallery=[];
+    $videos = (array) get_post_meta($post->ID,'product_videos', true); if(empty($videos)) $videos=[];
+    echo '<style>.svntex-media-wrap{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0;} .svntex-media-thumb{width:70px;height:70px;position:relative;border:1px solid #ccd0d4;background:#f8f9fa;border-radius:4px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:11px;color:#555;} .svntex-media-thumb img{width:100%;height:100%;object-fit:cover;} .svntex-remove{position:absolute;top:2px;right:2px;background:#d63638;color:#fff;border:none;border-radius:2px;padding:0 4px;font-size:11px;cursor:pointer;}</style>';
+    echo '<p style="margin-top:0">Add gallery images & optional product videos (YouTube / MP4 URLs). Featured Image uses the standard WordPress panel.</p>';
+    echo '<div id="svntex-gallery" class="svntex-media-wrap">';
+    if($gallery){
+        foreach($gallery as $id){
+            $thumb = wp_get_attachment_image($id,'thumbnail',false,[ 'style'=>'display:block;width:100%;height:100%;object-fit:cover;' ]);
+            if(!$thumb) $thumb = '<span>No Image</span>';
+            echo '<div class="svntex-media-thumb" data-id="'.intval($id).'">'.$thumb.'<button type="button" class="svntex-remove" title="Remove">×</button></div>';
+        }
+    }
+    echo '</div>';
+    echo '<input type="hidden" name="svntex_gallery_ids" id="svntex_gallery_ids" value="'.esc_attr(implode(',', $gallery)).'" />';
+    echo '<p><button type="button" class="button" id="svntex_add_gallery">Add Images</button></p>';
+    echo '<p><label>Video URLs (one per line)<br /><textarea name="svntex_videos" style="width:100%;min-height:90px;">'.esc_textarea(implode("\n", $videos)).'</textarea></label></p>';
+    echo '<p style="font-size:11px;color:#555;">Video URLs are optional; they can be embedded on the product page in future enhancements.</p>';
+    echo '<script>jQuery(function($){if(typeof wp==="undefined"||!wp.media)return;let frame;$(document).on("click","#svntex_add_gallery",function(e){e.preventDefault(); if(frame){frame.open();return;} frame=wp.media({title:"Select Images",multiple:true,library:{type:"image"}}); frame.on("select",function(){const sel=frame.state().get("selection");sel.each(function(att){const id=att.get("id"); if(!id) return; if($("#svntex-gallery .svntex-media-thumb[data-id="+id+"]").length) return; const url=att.get("sizes")&&att.get("sizes").thumbnail?att.get("sizes").thumbnail.url:att.get("url"); $("#svntex-gallery").append('<div class="svntex-media-thumb" data-id="'+id+'"><img src="'+url+'"/><button type="button" class="svntex-remove" title="Remove">×</button></div>'); updateHidden(); });}); frame.open();}); function updateHidden(){const ids=$('#svntex-gallery .svntex-media-thumb').map(function(){return $(this).data('id');}).get(); $('#svntex_gallery_ids').val(ids.join(',')); } $(document).on('click','.svntex-media-thumb .svntex-remove',function(){ $(this).closest('.svntex-media-thumb').remove(); updateHidden(); });});</script>';
 }
 
 add_action('save_post_svntex_product', function($post_id){
@@ -68,8 +107,54 @@ add_action('save_post_svntex_product', function($post_id){
     }
     if (isset($_POST['svntex_unit'])) update_post_meta($post_id,'unit', sanitize_text_field($_POST['svntex_unit']));
     if (isset($_POST['svntex_tax'])) update_post_meta($post_id,'tax_class', sanitize_text_field($_POST['svntex_tax']));
-    if (isset($_POST['svntex_margin'])) update_post_meta($post_id,'profit_margin', (float) $_POST['svntex_margin']);
+    if (isset($_POST['svntex_margin']) && $_POST['svntex_margin'] !== '') update_post_meta($post_id,'profit_margin', (float) $_POST['svntex_margin']);
+    if (isset($_POST['svntex_sku'])) update_post_meta($post_id,'product_sku', sanitize_text_field($_POST['svntex_sku']));
+    foreach(['mrp'=>'mrp','sale_price'=>'sale','gst_percent'=>'gst','cost_price'=>'cost'] as $meta=>$field){
+        $key='svntex_'.$field; if(isset($_POST[$key]) && $_POST[$key] !== '') update_post_meta($post_id,$meta,(float)$_POST[$key]);
+    }
+    if(isset($_POST['svntex_bullets'])){
+        $lines = array_filter(array_map('trim', explode("\n", (string)$_POST['svntex_bullets'])));
+        update_post_meta($post_id,'product_bullets', $lines);
+    }
+    if(isset($_POST['svntex_gallery_ids'])){
+        $ids = array_filter(array_map('intval', explode(',', sanitize_text_field($_POST['svntex_gallery_ids']))));
+        update_post_meta($post_id,'product_gallery', $ids);
+    }
+    if(isset($_POST['svntex_videos'])){
+        $vids = array_filter(array_map('trim', explode("\n", (string)$_POST['svntex_videos'])));
+        update_post_meta($post_id,'product_videos', $vids);
+    }
+    // Auto compute margin if blank and we have cost + (sale or mrp)
+    $existing_margin = get_post_meta($post_id,'profit_margin', true);
+    if($existing_margin === '' || $existing_margin === null){
+        $cost = (float) get_post_meta($post_id,'cost_price', true);
+        $sale = (float) get_post_meta($post_id,'sale_price', true);
+        $mrp  = (float) get_post_meta($post_id,'mrp', true);
+        $basis = $sale ?: $mrp;
+        if($basis > 0 && $cost > 0 && $basis > $cost){
+            $auto = (($basis - $cost)/$basis)*100.0;
+            update_post_meta($post_id,'profit_margin', round($auto,2));
+        }
+    }
 });
+
+// Admin columns for quick Amazon-like overview
+add_filter('manage_svntex_product_posts_columns', function($cols){
+    $insert = [ 'product_sku'=>'SKU', 'mrp'=>'MRP', 'sale_price'=>'Sale', 'gst_percent'=>'GST %', 'profit_margin'=>'Profit %' ];
+    // place after title
+    $new = []; foreach($cols as $k=>$v){ $new[$k]=$v; if($k==='title'){ foreach($insert as $ik=>$iv){ $new[$ik]=$iv; } } }
+    return $new;
+});
+add_action('manage_svntex_product_posts_custom_column', function($col,$post_id){
+    switch($col){
+        case 'product_sku': echo esc_html(get_post_meta($post_id,'product_sku', true)); break;
+        case 'mrp': $v=get_post_meta($post_id,'mrp', true); if($v!=='') echo esc_html(number_format_i18n((float)$v,2)); break;
+        case 'sale_price': $v=get_post_meta($post_id,'sale_price', true); if($v!=='') echo esc_html(number_format_i18n((float)$v,2)); break;
+        case 'gst_percent': $v=get_post_meta($post_id,'gst_percent', true); if($v!=='') echo esc_html((float)$v); break;
+        case 'profit_margin': $v=get_post_meta($post_id,'profit_margin', true); if($v!=='') echo esc_html((float)$v); break;
+    }
+},10,2);
+add_filter('manage_edit-svntex_product_sortable_columns', function($cols){ $cols['mrp']='mrp'; $cols['sale_price']='sale_price'; $cols['profit_margin']='profit_margin'; return $cols; });
 
 // 4) Variants + inventory helpers (DB layer)
 function svntex2_variant_upsert($product_id, $sku, $args=[]){
