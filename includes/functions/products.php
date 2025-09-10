@@ -128,8 +128,8 @@ function svntex2_get_variant_price_range($product_id){
     return [ 'min'=>(float)$rows->min_price, 'max'=>(float)$rows->max_price ];
 }
 
-// 5) Delivery rule resolver
-function svntex2_delivery_compute($product_id, $variant_id=null, $subtotal){
+// 5) Delivery rule resolver (param order updated: subtotal last optional variant avoided deprecation)
+function svntex2_delivery_compute($product_id, $subtotal, $variant_id = null){
     global $wpdb; $t=$wpdb->prefix.'svntex_delivery_rules';
     $get = function($scope,$id){
         global $wpdb; $t=$wpdb->prefix.'svntex_delivery_rules';

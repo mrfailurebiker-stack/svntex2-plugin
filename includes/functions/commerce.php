@@ -106,7 +106,7 @@ function svntex2_commerce_cart_totals(){
         $qty = max(1,(int)$q);
         $subtotal = $price * $qty; $items_total += $subtotal;
         // Delivery fee per line using delivery rules helper (graceful if function missing)
-        $fee = function_exists('svntex2_delivery_compute') ? svntex2_delivery_compute($pid, $vid ?: null, $subtotal) : 0.0;
+    $fee = function_exists('svntex2_delivery_compute') ? svntex2_delivery_compute($pid, $subtotal, ($vid ?: null)) : 0.0;
         $delivery_total += $fee;
         $lines[] = [ 'product_id'=>$pid,'variant_id'=>$vid,'qty'=>$qty,'price'=>$price,'subtotal'=>round($subtotal,2),'delivery'=>round($fee,2) ];
     }

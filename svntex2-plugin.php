@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SVNTeX 2.0 Customer System
  * Description: Foundation for SVNTeX 2.0 – registration, wallet ledger, referrals, KYC, withdrawals, PB/RB scaffolding with WooCommerce integration.
- * Version: 0.2.14
+ * Version: 0.2.19
  * Author: SVNTeX
  * Text Domain: svntex2
  * Requires at least: 6.0
@@ -518,7 +518,8 @@ function svntex2_render_auth_pages(){
     <script>function fmt(p){return '₹'+Number(p).toFixed(2);} function loadSummary(){fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart') ); ?>').then(r=>r.json()).then(c=>{document.getElementById('svn-co-summary').innerHTML='Items: '+fmt(c.items_total)+' | Delivery: '+fmt(c.delivery_total)+' | <strong>Grand: '+fmt(c.grand_total)+'</strong>';});} loadSummary(); document.getElementById('svn-co-form').addEventListener('submit',function(e){e.preventDefault();const f=e.target;const btn=document.getElementById('svn-place-order');if(btn.dataset.loading)return;btn.dataset.loading='1';const orig=btn.textContent;btn.textContent=btn.getAttribute('data-loading-text')||'Placing…';const payload={};[...f.elements].forEach(el=>{if(el.name)payload[el.name]=el.value});fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/checkout') ); ?>',{method:'POST',headers:{'Content-Type':'application/json','X-SVNTeX2-Nonce':(window.SVNTEX2_BRAND&&SVNTEX2_BRAND.nonce)||''},body:JSON.stringify(payload)}).then(r=>r.json()).then(o=>{if(o.order_id){document.getElementById('svn-co-result').innerHTML='Order placed. ID #'+o.order_id; f.reset(); loadSummary();}else{document.getElementById('svn-co-result').innerHTML='<span style=\"color:#dc2626\">Error: '+(o.message||'Failed')+'</span>';}}).catch(()=>{document.getElementById('svn-co-result').innerHTML='<span style=\"color:#dc2626\">Network error</span>';}).finally(()=>{btn.textContent=orig; delete btn.dataset.loading;});});</script><?php wp_footer(); ?></body></html><?php
         exit;
     }
-    } else { return; }
+    // End of handled pages; if not matched simply return to theme templates
+    else { return; }
     status_header(200); nocache_headers();
     // Capture template output so we can wrap with full HTML (ensures wp_head/wp_footer fire and styles load)
     ob_start();
