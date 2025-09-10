@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
-define( 'SVNTEX2_VERSION',        '0.2.16' );
+define( 'SVNTEX2_VERSION',        '0.2.17' );
 define( 'SVNTEX2_PLUGIN_FILE',    __FILE__ );
 define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
@@ -494,6 +494,168 @@ function svntex2_render_auth_pages(){
     </html><?php
     exit;
 }
+
+// Custom single product template for svntex_product (variant selector, dynamic pricing)
+add_action('template_redirect', function(){
+    if ( is_singular('svntex_product') ) {
+        global $post, $wpdb; if ( ! $post ) return; // safety
+        wp_enqueue_style( 'svntex2-style' );
+        wp_enqueue_style( 'svntex2-landing' );
+        // Gather variants
+        $vt = $wpdb->prefix.'svntex_product_variants';
+        $variants = $wpdb->get_results( $wpdb->prepare("SELECT id, sku, attributes, price, active FROM $vt WHERE product_id=%d AND active=1 ORDER BY id ASC", $post->ID) );
+        $v_export = [];
+        $attr_map = [];
+        foreach( $variants as $v ) {
+            $attrs = $v->attributes ? json_decode( $v->attributes, true ) : [];
+            if ( is_array($attrs) ) {
+                foreach($attrs as $k=>$val){
+                    if (!isset($attr_map[$k])) $attr_map[$k] = [];
+                    if ($val !== '' && !in_array($val, $attr_map[$k], true)) $attr_map[$k][] = $val;
+                }
+            } else { $attrs = []; }
+            $v_export[] = [
+                'id' => (int)$v->id,
+                'sku'=> $v->sku,
+                'price' => is_null($v->price)? null : (float)$v->price,
+                'attributes' => $attrs,
+            ];
+        }
+        // Compute price range
+        $range = [ 'min'=>null,'max'=>null ];
+        foreach($v_export as $vx){ if($vx['price'] !== null){ if($range['min']===null||$vx['price']<$range['min']) $range['min']=$vx['price']; if($range['max']===null||$vx['price']>$range['max']) $range['max']=$vx['price']; } }
+        // Sort attribute values
+        foreach($attr_map as $k=>$vals){ sort($attr_map[$k], SORT_NATURAL|SORT_FLAG_CASE); }
+        $single_view = SVNTEX2_PLUGIN_DIR.'views/product-single.php';
+        status_header(200); nocache_headers();
+        ob_start();
+        if ( file_exists( $single_view ) ) { include $single_view; } else {
+            echo '<p>Single product view missing.</p>';
+        }
+        $content = ob_get_clean();
+        ?><!DOCTYPE html>
+        <html <?php language_attributes(); ?>>
+        <head>
+            <meta charset="<?php bloginfo('charset'); ?>" />
+            <meta name="viewport" content="width=device-width,initial-scale=1" />
+            <title><?php echo esc_html( get_the_title( $post ) ); ?> – <?php bloginfo('name'); ?></title>
+            <?php wp_head(); ?>
+            <style>
+            .svn-single-shell{max-width:1200px;margin:0 auto;padding:clamp(1.25rem,2.5vw,2.25rem) clamp(1rem,2.5vw,2rem);display:grid;gap:2.2rem;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));}
+            .svn-gallery{background:linear-gradient(130deg,rgba(255,255,255,.05),rgba(148,163,184,.08));border:1px solid rgba(255,255,255,.08);border-radius:26px;overflow:hidden;min-height:320px;display:flex;align-items:center;justify-content:center;}
+            body:not(.dark) .svn-gallery{background:#fff;border-color:#e2e8f0;}
+            .svn-gallery img{width:100%;height:100%;object-fit:cover;display:block;}
+            .svn-p-summary h1{margin:0 0 1rem;font-size:clamp(1.5rem,3vw,2.4rem);font-weight:700;letter-spacing:.5px;}
+            .svn-price-block{display:flex;flex-direction:column;gap:.35rem;margin:1rem 0 1.2rem;}
+            .svn-price-main{font-size:clamp(1.2rem,2vw,1.65rem);font-weight:700;background:linear-gradient(90deg,var(--svn-accent),var(--svn-accent-alt));-webkit-background-clip:text;background-clip:text;color:transparent;}
+            .svn-price-range{font-size:.75rem;color:var(--svn-text-dim);}
+            .svn-variants{display:flex;flex-direction:column;gap:1rem;margin:1.25rem 0;}
+            .svn-variant-group label{font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:.4rem;color:var(--svn-text-dim);}
+            .svn-variant-group select{width:100%;padding:.7rem .75rem;border-radius:14px;border:1px solid rgba(255,255,255,.24);background:rgba(15,23,42,.6);color:#fff;font-size:.8rem;}
+            body:not(.dark) .svn-variant-group select{background:#fff;color:#0f172a;border-color:#cbd5e1;}
+            .svn-add-actions{display:flex;gap:.75rem;align-items:center;margin-top:1.25rem;}
+            .svn-add-actions button{flex:1;padding:.9rem 1.15rem;border-radius:18px;border:0;font-weight:600;font-size:.8rem;cursor:pointer;background:linear-gradient(90deg,var(--svn-accent),var(--svn-accent-alt));color:#fff;letter-spacing:.5px;}
+            .svn-add-actions button[disabled]{opacity:.55;cursor:not-allowed;}
+            .svn-meta-small{font-size:.65rem;color:var(--svn-text-dim);margin-top:.5rem;}
+            </style>
+        </head>
+        <body <?php body_class('svntex-landing svntex-product-single'); ?>>
+            <div class="svn-single-shell">
+                <div class="svn-gallery">
+                    <?php if ( has_post_thumbnail( $post ) ){ echo get_the_post_thumbnail( $post->ID, 'large' ); } else { echo '<div style="padding:2rem;color:var(--svn-text-dim);font-size:.8rem;">No Image</div>'; } ?>
+                </div>
+                <div class="svn-p-summary">
+                    <h1><?php echo esc_html( get_the_title( $post ) ); ?></h1>
+                    <div class="svn-price-block">
+                        <div class="svn-price-main" id="svn-price-display"></div>
+                        <div class="svn-price-range" id="svn-price-range"></div>
+                    </div>
+                    <div class="svn-variants" id="svn-variant-selectors"></div>
+                    <div class="svn-add-actions">
+                        <button type="button" id="svn-add-cart" disabled data-loading-text="Adding…">Add to Cart</button>
+                    </div>
+                    <div class="svn-meta-small">SKU: <span id="svn-sku-display">—</span></div>
+                    <article class="svn-desc" style="margin-top:2rem;font-size:.85rem;line-height:1.55;">
+                        <?php echo apply_filters('the_content', $post->post_content ); ?>
+                    </article>
+                </div>
+            </div>
+            <script>
+            window.SVNTEX2_PRODUCT = <?php echo wp_json_encode([
+                'id'=>$post->ID,
+                'variants'=>$v_export,
+                'attributes'=>$attr_map,
+                'price_range'=>$range,
+            ]); ?>;
+            (function(){
+                const data = window.SVNTEX2_PRODUCT;
+                const selWrap = document.getElementById('svn-variant-selectors');
+                const priceEl = document.getElementById('svn-price-display');
+                const rangeEl = document.getElementById('svn-price-range');
+                const skuEl = document.getElementById('svn-sku-display');
+                const btn = document.getElementById('svn-add-cart');
+                function fmt(p){ if(p==null) return '—'; return (window.wc && window.wc.price) ? window.wc.price(p): '₹'+p.toFixed(2); }
+                function renderRange(){
+                    if(data.price_range.min===null){ priceEl.textContent='—'; rangeEl.textContent=''; return; }
+                    if(data.price_range.min === data.price_range.max){ priceEl.textContent = fmt(data.price_range.min); rangeEl.textContent=''; }
+                    else { priceEl.textContent = fmt(data.price_range.min)+' – '+fmt(data.price_range.max); rangeEl.textContent='Select options to see exact price'; }
+                }
+                function buildSelectors(){
+                    const attrs = data.attributes; const keys = Object.keys(attrs);
+                    if(!keys.length){ // single variant maybe
+                        if(data.variants.length===1){
+                            const v=data.variants[0]; priceEl.textContent = fmt(v.price); skuEl.textContent=v.sku; btn.disabled=false; btn.dataset.variantId=v.id;
+                        } else { renderRange(); }
+                        return;
+                    }
+                    keys.forEach(k=>{
+                        const box=document.createElement('div'); box.className='svn-variant-group';
+                        const label=document.createElement('label'); label.textContent=k;
+                        const select=document.createElement('select'); select.name='attr_'+k;
+                        select.innerHTML='<option value="">Select '+k+'</option>'+attrs[k].map(v=>'\n<option value="'+v.replace(/"/g,'&quot;')+'">'+v+'</option>').join('');
+                        select.addEventListener('change',evaluate);
+                        box.appendChild(label); box.appendChild(select); selWrap.appendChild(box);
+                    });
+                    renderRange();
+                }
+                function evaluate(){
+                    const selects = selWrap.querySelectorAll('select');
+                    const chosen={}; let allChosen=true; selects.forEach(s=>{ if(s.value){ chosen[s.previousSibling.textContent]=s.value; } else { allChosen=false; } });
+                    if(!Object.keys(chosen).length){ renderRange(); skuEl.textContent='—'; btn.disabled=true; delete btn.dataset.variantId; return; }
+                    const matched = data.variants.filter(v=>{
+                        for(const k in chosen){ if(!v.attributes || v.attributes[k]!==chosen[k]) return false; }
+                        return true;
+                    });
+                    if(matched.length===1 && (allChosen || Object.keys(matched[0].attributes||{}).length===Object.keys(data.attributes).length)){
+                        const v=matched[0]; priceEl.textContent=fmt(v.price); rangeEl.textContent=''; skuEl.textContent=v.sku; btn.disabled=false; btn.dataset.variantId=v.id; return; }
+                    // multiple or partial matches
+                    if(matched.length){
+                        let min=null,max=null; matched.forEach(m=>{ if(m.price!=null){ if(min===null||m.price<min) min=m.price; if(max===null||m.price>max) max=m.price; } });
+                        if(min!==null){ priceEl.textContent = (min===max)? fmt(min): (fmt(min)+' – '+fmt(max)); rangeEl.textContent = matched.length+' options'; }
+                        else { renderRange(); }
+                        skuEl.textContent='—'; btn.disabled=true; delete btn.dataset.variantId; return;
+                    }
+                    // no match
+                    priceEl.textContent='Unavailable'; rangeEl.textContent=''; skuEl.textContent='—'; btn.disabled=true; delete btn.dataset.variantId;
+                }
+                buildSelectors();
+                btn.addEventListener('click', function(){
+                    if(btn.disabled || btn.dataset.loading) return;
+                    const vid = btn.dataset.variantId; if(!vid){ return; }
+                    const orig = btn.textContent; btn.dataset.loading='1'; btn.textContent=btn.getAttribute('data-loading-text')||'Adding…';
+                    fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart/add') ); ?>', {
+                        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ product_id: data.id, variant_id: vid, qty: 1 })
+                    }).then(r=>r.json()).then(j=>{ btn.textContent='Added'; setTimeout(()=>{ btn.textContent=orig; delete btn.dataset.loading; },1200); })
+                    .catch(()=>{ btn.textContent='Error'; setTimeout(()=>{ btn.textContent=orig; delete btn.dataset.loading; },1400); });
+                });
+            })();
+            </script>
+            <?php wp_footer(); ?>
+        </body>
+        </html><?php
+        exit;
+    }
+});
 
 // Front page landing override (simple) – render modern landing if is home/front
 add_action('template_redirect', function(){
