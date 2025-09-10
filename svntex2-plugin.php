@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SVNTeX 2.0 Customer System
  * Description: Foundation for SVNTeX 2.0 – registration, wallet ledger, referrals, KYC, withdrawals, PB/RB scaffolding with WooCommerce integration.
- * Version: 0.2.13
+ * Version: 0.2.14
  * Author: SVNTeX
  * Text Domain: svntex2
  * Requires at least: 6.0
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
-define( 'SVNTEX2_VERSION',        '0.2.13' );
+define( 'SVNTEX2_VERSION',        '0.2.14' );
 define( 'SVNTEX2_PLUGIN_FILE',    __FILE__ );
 define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
@@ -75,6 +75,9 @@ foreach ( $__pfiles as $__pf ) {
     $f = SVNTEX2_PLUGIN_DIR . 'includes/functions/' . $__pf;
     if ( file_exists( $f ) ) require_once $f;
 }
+// Commerce layer (cart + orders) custom
+$commerce = SVNTEX2_PLUGIN_DIR . 'includes/functions/commerce.php';
+if ( file_exists( $commerce ) ) require_once $commerce;
 
 // -----------------------------------------------------------------------------
 // 4. ACTIVATION: CREATE TABLES (idempotent via dbDelta)
@@ -248,6 +251,31 @@ function svntex2_activate() {
         sort_order INT NOT NULL DEFAULT 0,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         KEY product_id (product_id), KEY variant_id (variant_id), KEY media_type (media_type)
+    ) $charset";
+
+    // Orders + order items (simple custom commerce layer)
+    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_orders (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT UNSIGNED NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        items_total DECIMAL(14,2) NOT NULL DEFAULT 0,
+        delivery_total DECIMAL(14,2) NOT NULL DEFAULT 0,
+        grand_total DECIMAL(14,2) NOT NULL DEFAULT 0,
+        address LONGTEXT NULL,
+        meta LONGTEXT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        KEY user_id (user_id), KEY status (status), KEY created_at (created_at)
+    ) $charset";
+    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_order_items (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        order_id BIGINT UNSIGNED NOT NULL,
+        product_id BIGINT UNSIGNED NOT NULL,
+        variant_id BIGINT UNSIGNED NULL,
+        qty INT NOT NULL DEFAULT 1,
+        price DECIMAL(14,2) NOT NULL DEFAULT 0,
+        subtotal DECIMAL(14,2) NOT NULL DEFAULT 0,
+        meta LONGTEXT NULL,
+        KEY order_id (order_id), KEY product_id (product_id), KEY variant_id (variant_id)
     ) $charset";
 
     foreach ( $sql as $statement ) { dbDelta( $statement ); }

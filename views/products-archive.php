@@ -66,6 +66,7 @@ $cats = get_terms(['taxonomy'=>'svntex_category','hide_empty'=>false,'parent'=>0
   .p-title a{text-decoration:none;color:#fff;}
   .p-title a:hover{text-decoration:underline;}
   .p-meta{font-size:.65rem;color:var(--svn-text-dim);display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;}
+  .p-range{font-size:.6rem;opacity:.8;}
   .p-price{font-weight:700;font-size:.85rem;background:linear-gradient(90deg,var(--svn-accent),var(--svn-accent-alt));-webkit-background-clip:text;background-clip:text;color:transparent;}
   .p-rating{font-size:.6rem;color:#fbbf24;font-weight:600;}
   .p-actions{margin-top:auto;display:flex;gap:.45rem;}
@@ -129,10 +130,8 @@ $cats = get_terms(['taxonomy'=>'svntex_category','hide_empty'=>false,'parent'=>0
               <span class="p-price"><?php echo $price_disp; ?></span>
               <?php echo $rating_html; ?>
             </div>
-            <div class="p-actions">
-              <form method="post" action="<?php echo esc_url( home_url('/?add-to-cart='.get_the_ID()) ); ?>" style="flex:1;">
-                <button type="submit" class="btn-add">Add to Cart</button>
-              </form>
+            <div class="p-actions" data-product-actions data-product-id="<?php the_ID(); ?>" data-variant-id="0">
+              <button type="button" class="btn-add" data-add>Add to Cart</button>
             </div>
           </div>
         </article>
@@ -153,5 +152,22 @@ $cats = get_terms(['taxonomy'=>'svntex_category','hide_empty'=>false,'parent'=>0
   <?php endif; ?>
 </div>
 <?php wp_footer(); ?>
+<script>
+// AJAX add to cart
+document.addEventListener('click', function(e){
+  const btn = e.target.closest('[data-add]'); if(!btn) return;
+  const wrap = btn.closest('[data-product-actions]'); if(!wrap) return;
+  if(btn.dataset.loading) return;
+  btn.dataset.loading = '1';
+  const pid = wrap.getAttribute('data-product-id');
+  const vid = wrap.getAttribute('data-variant-id') || 0;
+  const orig = btn.textContent; btn.textContent = 'Adding…';
+  fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart/add') ); ?>', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ product_id: pid, variant_id: vid, qty: 1 })
+  }).then(r=>r.json()).then(data=>{
+    btn.textContent = 'Added'; setTimeout(()=>{ btn.textContent = orig; delete btn.dataset.loading; }, 1200);
+  }).catch(()=>{ btn.textContent='Error'; setTimeout(()=>{ btn.textContent=orig; delete btn.dataset.loading; },1400); });
+});
+</script>
 </body>
 </html>

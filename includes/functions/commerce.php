@@ -1,0 +1,142 @@
+<?php
+if (!defined('ABSPATH')) exit;
+
+/**
+ * Lightweight commerce layer (cart + orders) independent of Woo UI.
+ * - Cart stored in user meta (logged in) or transient (guest, keyed by session cookie)
+ * - REST endpoints for AJAX add/remove/update, checkout, and order retrieval
+ */
+
+// Ensure session cookie for guests
+add_action('init', function(){
+    if ( is_user_logged_in() ) return;
+    if ( isset($_COOKIE['svntex2_sid']) ) return;
+    $sid = wp_generate_uuid4();
+    setcookie('svntex2_sid', $sid, time()+DAY_IN_SECONDS*7, COOKIEPATH ?: '/', COOKIE_DOMAIN, is_ssl(), true);
+    $_COOKIE['svntex2_sid'] = $sid;
+});
+
+function svntex2_commerce_get_cart_key(){
+    if ( is_user_logged_in() ) return 'svntex2_cart_u_'.get_current_user_id();
+    $sid = $_COOKIE['svntex2_sid'] ?? '';
+    return $sid ? 'svntex2_cart_g_'.$sid : 'svntex2_cart_tmp';
+}
+
+function svntex2_commerce_get_cart(){
+    $k = svntex2_commerce_get_cart_key();
+    $raw = get_transient($k);
+    if (!$raw && is_user_logged_in()) { $raw = get_user_meta(get_current_user_id(),'svntex2_cart', true); }
+    $cart = is_array($raw)? $raw : [];
+    // Normalize lines: key productID:variantID (variant optional)
+    return $cart;
+}
+
+function svntex2_commerce_save_cart($cart){
+    $k = svntex2_commerce_get_cart_key();
+    set_transient($k, $cart, 12 * HOUR_IN_SECONDS);
+    if ( is_user_logged_in() ) update_user_meta(get_current_user_id(),'svntex2_cart',$cart);
+}
+
+function svntex2_commerce_cart_add($product_id,$variant_id,$qty){
+    $cart = svntex2_commerce_get_cart();
+    $key = $product_id.':'.(int)$variant_id;
+    $cart[$key] = ($cart[$key] ?? 0) + max(1,(int)$qty);
+    svntex2_commerce_save_cart($cart);
+    return $cart;
+}
+
+function svntex2_commerce_cart_remove($product_id,$variant_id){
+    $cart = svntex2_commerce_get_cart();
+    $key = $product_id.':'.(int)$variant_id;
+    unset($cart[$key]);
+    svntex2_commerce_save_cart($cart);
+    return $cart;
+}
+
+function svntex2_commerce_cart_update($product_id,$variant_id,$qty){
+    $cart = svntex2_commerce_get_cart();
+    $key = $product_id.':'.(int)$variant_id;
+    if ($qty <= 0) unset($cart[$key]); else $cart[$key] = (int)$qty;
+    svntex2_commerce_save_cart($cart);
+    return $cart;
+}
+
+function svntex2_commerce_cart_totals(){
+    global $wpdb; $vt=$wpdb->prefix.'svntex_product_variants';
+    $cart = svntex2_commerce_get_cart();
+    $lines=[]; $items_total=0; $delivery_total=0; // placeholder (per-line delivery later)
+    foreach($cart as $k=>$q){ list($pid,$vid)=array_map('intval',explode(':',$k));
+        $price = $vid ? $wpdb->get_var($wpdb->prepare("SELECT price FROM $vt WHERE id=%d", $vid)) : null;
+        if ($price===null){ // fallback to first variant
+            $price = $wpdb->get_var($wpdb->prepare("SELECT price FROM $vt WHERE product_id=%d ORDER BY id ASC LIMIT 1", $pid));
+        }
+        $price = $price!==null ? (float)$price : 0;
+        $subtotal = $price * $q; $items_total += $subtotal;
+        $lines[] = [ 'product_id'=>$pid,'variant_id'=>$vid,'qty'=>$q,'price'=>$price,'subtotal'=>round($subtotal,2) ];
+    }
+    $grand = $items_total + $delivery_total;
+    return [ 'lines'=>$lines,'items_total'=>round($items_total,2),'delivery_total'=>round($delivery_total,2),'grand_total'=>round($grand,2) ];
+}
+
+function svntex2_commerce_checkout($address){
+    global $wpdb; $orders=$wpdb->prefix.'svntex_orders'; $itemsT=$wpdb->prefix.'svntex_order_items';
+    $totals = svntex2_commerce_cart_totals();
+    if (empty($totals['lines'])) return new WP_Error('empty_cart','Cart empty');
+    $wpdb->insert($orders,[
+        'user_id'=> is_user_logged_in()? get_current_user_id(): null,
+        'status'=>'pending',
+        'items_total'=>$totals['items_total'],
+        'delivery_total'=>$totals['delivery_total'],
+        'grand_total'=>$totals['grand_total'],
+        'address'=> wp_json_encode($address),
+        'meta'=> null,
+    ]);
+    $order_id = (int)$wpdb->insert_id;
+    foreach($totals['lines'] as $ln){
+        $wpdb->insert($itemsT,[
+            'order_id'=>$order_id,
+            'product_id'=>$ln['product_id'],
+            'variant_id'=>$ln['variant_id'],
+            'qty'=>$ln['qty'],
+            'price'=>$ln['price'],
+            'subtotal'=>$ln['subtotal'],
+            'meta'=> null,
+        ]);
+    }
+    // Clear cart
+    svntex2_commerce_save_cart([]);
+    return [ 'order_id'=>$order_id,'status'=>'pending','totals'=>$totals ];
+}
+
+// REST endpoints
+add_action('rest_api_init', function(){
+    register_rest_route('svntex2/v1','/cart', [ [ 'methods'=>'GET','callback'=>function(){ return svntex2_commerce_cart_totals(); },'permission_callback'=>'__return_true' ] ]);
+    register_rest_route('svntex2/v1','/cart/add', [ [ 'methods'=>'POST','callback'=>function($r){
+        $pid=(int)$r['product_id']; $vid= isset($r['variant_id'])?(int)$r['variant_id']:0; $qty=max(1,(int)($r['qty']??1));
+        svntex2_commerce_cart_add($pid,$vid,$qty); return svntex2_commerce_cart_totals();
+    },'permission_callback'=>'__return_true' ] ]);
+    register_rest_route('svntex2/v1','/cart/update', [ [ 'methods'=>'POST','callback'=>function($r){
+        $pid=(int)$r['product_id']; $vid=(int)($r['variant_id']??0); $qty=(int)($r['qty']??0);
+        svntex2_commerce_cart_update($pid,$vid,$qty); return svntex2_commerce_cart_totals();
+    },'permission_callback'=>'__return_true' ] ]);
+    register_rest_route('svntex2/v1','/cart/remove', [ [ 'methods'=>'POST','callback'=>function($r){
+        $pid=(int)$r['product_id']; $vid=(int)($r['variant_id']??0);
+        svntex2_commerce_cart_remove($pid,$vid); return svntex2_commerce_cart_totals();
+    },'permission_callback'=>'__return_true' ] ]);
+    register_rest_route('svntex2/v1','/checkout', [ [ 'methods'=>'POST','callback'=>function($r){
+        $address = [
+            'name'=>sanitize_text_field($r['name']??''),
+            'line1'=>sanitize_text_field($r['line1']??''),
+            'line2'=>sanitize_text_field($r['line2']??''),
+            'city'=>sanitize_text_field($r['city']??''),
+            'state'=>sanitize_text_field($r['state']??''),
+            'zip'=>sanitize_text_field($r['zip']??''),
+            'country'=>sanitize_text_field($r['country']??'') ?: 'IN',
+            'phone'=>sanitize_text_field($r['phone']??''),
+        ];
+        if(!$address['name'] || !$address['line1'] || !$address['city'] || !$address['zip']) return new WP_Error('bad_address','Missing required address fields', ['status'=>400]);
+        return svntex2_commerce_checkout($address);
+    },'permission_callback'=>'__return_true' ] ]);
+});
+
+?>
