@@ -60,43 +60,58 @@ function svntex2_mb_product_core($post){
     $sale = get_post_meta($post->ID,'sale_price', true);
     $gst = get_post_meta($post->ID,'gst_percent', true);
     $cost = get_post_meta($post->ID,'cost_price', true);
-    $bullets = (array) get_post_meta($post->ID,'product_bullets', true);
-    if(empty($bullets)) $bullets = [];
-    echo '<style>.svntex-admin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:12px 0;} .svntex-admin-grid label{display:flex;flex-direction:column;font-size:12px;font-weight:600;gap:4px;} .svntex-inline-note{font-size:11px;color:#555;margin-top:4px;} .svntex-bullets textarea{width:100%;min-height:100px;font-family:monospace;}</style>';
-    echo '<p><strong>Product ID:</strong> '.esc_html($pid).'</p>';
-    echo '<div class="svntex-admin-grid">';
-    echo '<label>SKU <input type="text" name="svntex_sku" value="'.esc_attr($sku).'" placeholder="Internal SKU" /></label>';
-    echo '<label>Unit <select name="svntex_unit"><option value="">—</option><option value="pieces" '.selected($unit,'pieces',false).'>Pieces</option><option value="kg" '.selected($unit,'kg',false).'>KG</option><option value="litres" '.selected($unit,'litres',false).'>Litres</option></select></label>';
-    echo '<label>Tax Class <select name="svntex_tax"><option value="">—</option><option value="GST" '.selected($tax,'GST',false).'>GST</option><option value="VAT" '.selected($tax,'VAT',false).'>VAT</option></select></label>';
-    echo '<label>GST % <input type="number" step="0.01" name="svntex_gst" value="'.esc_attr($gst).'" /></label>';
-    echo '<label>MRP <input type="number" step="0.01" name="svntex_mrp" value="'.esc_attr($mrp).'" /></label>';
-    echo '<label>Discount / Sale Price <input type="number" step="0.01" name="svntex_sale" value="'.esc_attr($sale).'" /></label>';
-    echo '<label>Cost Price (Admin Only) <input type="number" step="0.01" name="svntex_cost" value="'.esc_attr($cost).'" /></label>';
-    echo '<label>Profit Margin % <input type="number" step="0.01" name="svntex_margin" value="'.esc_attr($margin).'" class="small-text" /></label>';
-    echo '</div>';
-    echo '<div class="svntex-bullets"><label>Bullet Points (one per line)<textarea name="svntex_bullets">'.esc_textarea(implode("\n", $bullets)).'</textarea></label><p class="svntex-inline-note">These appear as feature bullets (Amazon style). Public.</p></div>';
-    echo '<p class="svntex-inline-note">Leave Profit Margin blank to auto-calc from Sale (or MRP) and Cost.</p>';
+    $bullets = (array) get_post_meta($post->ID,'product_bullets', true); if(empty($bullets)) $bullets = [];
+    $bullets_text = esc_textarea( implode("\n", $bullets) );
+    $sku_attr = esc_attr($sku); $gst_attr=esc_attr($gst); $mrp_attr=esc_attr($mrp); $sale_attr=esc_attr($sale); $cost_attr=esc_attr($cost); $margin_attr=esc_attr($margin);
+    $pid_html = esc_html($pid);
+    $unit_options = sprintf('<option value="">—</option><option value="pieces" %s>Pieces</option><option value="kg" %s>KG</option><option value="litres" %s>Litres</option>',
+        selected($unit,'pieces',false), selected($unit,'kg',false), selected($unit,'litres',false));
+    $tax_options = sprintf('<option value="">—</option><option value="GST" %s>GST</option><option value="VAT" %s>VAT</option>',
+        selected($tax,'GST',false), selected($tax,'VAT',false));
+    echo <<<HTML
+<style>.svntex-admin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:12px 0}.svntex-admin-grid label{display:flex;flex-direction:column;font-size:12px;font-weight:600;gap:4px}.svntex-inline-note{font-size:11px;color:#555;margin-top:4px}.svntex-bullets textarea{width:100%;min-height:100px;font-family:monospace}</style>
+<p><strong>Product ID:</strong> {$pid_html}</p>
+<div class="svntex-admin-grid">
+  <label>SKU <input type="text" name="svntex_sku" value="{$sku_attr}" placeholder="Internal SKU" /></label>
+  <label>Unit <select name="svntex_unit">{$unit_options}</select></label>
+  <label>Tax Class <select name="svntex_tax">{$tax_options}</select></label>
+  <label>GST % <input type="number" step="0.01" name="svntex_gst" value="{$gst_attr}" /></label>
+  <label>MRP <input type="number" step="0.01" name="svntex_mrp" value="{$mrp_attr}" /></label>
+  <label>Discount / Sale Price <input type="number" step="0.01" name="svntex_sale" value="{$sale_attr}" /></label>
+  <label>Cost Price (Admin Only) <input type="number" step="0.01" name="svntex_cost" value="{$cost_attr}" /></label>
+  <label>Profit Margin % <input type="number" step="0.01" name="svntex_margin" value="{$margin_attr}" class="small-text" /></label>
+</div>
+<div class="svntex-bullets"><label>Bullet Points (one per line)<textarea name="svntex_bullets">{$bullets_text}</textarea></label><p class="svntex-inline-note">These appear as feature bullets (Amazon style). Public.</p></div>
+<p class="svntex-inline-note">Leave Profit Margin blank to auto-calc from Sale (or MRP) and Cost.</p>
+HTML;
 }
 
 function svntex2_mb_product_media($post){
     $gallery = (array) get_post_meta($post->ID,'product_gallery', true); if(empty($gallery)) $gallery=[];
     $videos = (array) get_post_meta($post->ID,'product_videos', true); if(empty($videos)) $videos=[];
-    echo '<style>.svntex-media-wrap{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0;} .svntex-media-thumb{width:70px;height:70px;position:relative;border:1px solid #ccd0d4;background:#f8f9fa;border-radius:4px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:11px;color:#555;} .svntex-media-thumb img{width:100%;height:100%;object-fit:cover;} .svntex-remove{position:absolute;top:2px;right:2px;background:#d63638;color:#fff;border:none;border-radius:2px;padding:0 4px;font-size:11px;cursor:pointer;}</style>';
-    echo '<p style="margin-top:0">Add gallery images & optional product videos (YouTube / MP4 URLs). Featured Image uses the standard WordPress panel.</p>';
-    echo '<div id="svntex-gallery" class="svntex-media-wrap">';
+    $gallery_ids = esc_attr( implode(',', $gallery) );
+    $videos_text = esc_textarea( implode("\n", $videos) );
+    echo <<<HTML
+<style>.svntex-media-wrap{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0}.svntex-media-thumb{width:70px;height:70px;position:relative;border:1px solid #ccd0d4;background:#f8f9fa;border-radius:4px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:11px;color:#555}.svntex-media-thumb img{width:100%;height:100%;object-fit:cover}.svntex-remove{position:absolute;top:2px;right:2px;background:#d63638;color:#fff;border:none;border-radius:2px;padding:0 4px;font-size:11px;cursor:pointer}</style>
+<p style="margin-top:0">Add gallery images & optional product videos (YouTube / MP4 URLs). Featured Image uses the standard WordPress panel.</p>
+<div id="svntex-gallery" class="svntex-media-wrap">
+HTML;
     if($gallery){
         foreach($gallery as $id){
-            $thumb = wp_get_attachment_image($id,'thumbnail',false,[ 'style'=>'display:block;width:100%;height:100%;object-fit:cover;' ]);
+            $id_int = (int)$id;
+            $thumb = wp_get_attachment_image($id_int,'thumbnail',false,[ 'style'=>'display:block;width:100%;height:100%;object-fit:cover;' ]);
             if(!$thumb) $thumb = '<span>No Image</span>';
-            echo '<div class="svntex-media-thumb" data-id="'.intval($id).'">'.$thumb.'<button type="button" class="svntex-remove" title="Remove">×</button></div>';
+            echo '<div class="svntex-media-thumb" data-id="'.$id_int.'">'.$thumb.'<button type="button" class="svntex-remove" title="Remove">&times;</button></div>';
         }
     }
-    echo '</div>';
-    echo '<input type="hidden" name="svntex_gallery_ids" id="svntex_gallery_ids" value="'.esc_attr(implode(',', $gallery)).'" />';
+    echo "</div>";
+    echo '<input type="hidden" name="svntex_gallery_ids" id="svntex_gallery_ids" value="'.$gallery_ids.'" />';
     echo '<p><button type="button" class="button" id="svntex_add_gallery">Add Images</button></p>';
-    echo '<p><label>Video URLs (one per line)<br /><textarea name="svntex_videos" style="width:100%;min-height:90px;">'.esc_textarea(implode("\n", $videos)).'</textarea></label></p>';
+    echo '<p><label>Video URLs (one per line)<br /><textarea name="svntex_videos" style="width:100%;min-height:90px;">'.$videos_text.'</textarea></label></p>';
     echo '<p style="font-size:11px;color:#555;">Video URLs are optional; they can be embedded on the product page in future enhancements.</p>';
-    echo '<script>jQuery(function($){if(typeof wp==="undefined"||!wp.media)return;let frame;$(document).on("click","#svntex_add_gallery",function(e){e.preventDefault(); if(frame){frame.open();return;} frame=wp.media({title:"Select Images",multiple:true,library:{type:"image"}}); frame.on("select",function(){const sel=frame.state().get("selection");sel.each(function(att){const id=att.get("id"); if(!id) return; if($("#svntex-gallery .svntex-media-thumb[data-id="+id+"]").length) return; const url=att.get("sizes")&&att.get("sizes").thumbnail?att.get("sizes").thumbnail.url:att.get("url"); $("#svntex-gallery").append('<div class="svntex-media-thumb" data-id="'+id+'"><img src="'+url+'"/><button type="button" class="svntex-remove" title="Remove">×</button></div>'); updateHidden(); });}); frame.open();}); function updateHidden(){const ids=$('#svntex-gallery .svntex-media-thumb').map(function(){return $(this).data('id');}).get(); $('#svntex_gallery_ids').val(ids.join(',')); } $(document).on('click','.svntex-media-thumb .svntex-remove',function(){ $(this).closest('.svntex-media-thumb').remove(); updateHidden(); });});</script>';
+    echo <<<JS
+<script>jQuery(function($){if(typeof wp==="undefined"||!wp.media)return;let frame;$(document).on('click','#svntex_add_gallery',function(e){e.preventDefault(); if(frame){frame.open();return;} frame=wp.media({title:'Select Images',multiple:true,library:{type:'image'}}); frame.on('select',function(){const sel=frame.state().get('selection'); sel.each(function(att){const id=att.get('id'); if(!id) return; if($('#svntex-gallery .svntex-media-thumb[data-id='+id+']').length) return; const size=att.get('sizes'); const url=size&&size.thumbnail?size.thumbnail.url:att.get('url'); $('#svntex-gallery').append('<div class="svntex-media-thumb" data-id="'+id+'"><img src="'+url+'"/><button type="button" class="svntex-remove" title="Remove">&times;</button></div>'); updateHidden(); });}); frame.open();}); function updateHidden(){const ids=$('#svntex-gallery .svntex-media-thumb').map(function(){return $(this).data('id');}).get(); $('#svntex_gallery_ids').val(ids.join(',')); } $(document).on('click','.svntex-media-thumb .svntex-remove',function(){ $(this).closest('.svntex-media-thumb').remove(); updateHidden(); });});</script>
+JS;
 }
 
 add_action('save_post_svntex_product', function($post_id){
@@ -268,4 +283,4 @@ add_shortcode('svntex_products', function($atts){
 
 // 7) REST scaffolding hooks will be in rest-products.php
 
-?>
+// (Intentionally no closing PHP tag)
