@@ -70,12 +70,7 @@ foreach ( [ 'referrals', 'kyc', 'withdrawals', 'pb', 'cron', 'admin', 'cli', 've
     $file = SVNTEX2_PLUGIN_DIR . 'includes/functions/' . $module . '.php';
     if ( file_exists( $file ) ) { require_once $file; }
 }
-// Products module (CPT + REST + inventory + delivery rules)
-$__pfiles = [ 'products.php', 'rest-products.php' ];
-foreach ( $__pfiles as $__pf ) {
-    $f = SVNTEX2_PLUGIN_DIR . 'includes/functions/' . $__pf;
-    if ( file_exists( $f ) ) require_once $f;
-}
+// Products module removed - using WooCommerce default
 // Commerce layer (cart + orders) custom
 $commerce = SVNTEX2_PLUGIN_DIR . 'includes/functions/commerce.php';
 if ( file_exists( $commerce ) ) require_once $commerce;
@@ -205,77 +200,7 @@ function svntex2_activate() {
         KEY status (status)
     ) $charset";
 
-    // Product/Inventory tables
-    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_product_variants (
-        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-        product_id BIGINT UNSIGNED NOT NULL,
-        sku VARCHAR(80) NOT NULL UNIQUE,
-        attributes LONGTEXT NULL,
-        price DECIMAL(14,2) NULL,
-        tax_class VARCHAR(20) NULL,
-        unit VARCHAR(12) NULL,
-        active TINYINT(1) NOT NULL DEFAULT 1,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY  (id),
-        KEY product_id (product_id),
-        KEY active (active),
-        KEY tax_class (tax_class)
-    ) $charset";
-
-    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_inventory_locations (
-        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-        code VARCHAR(20) NOT NULL UNIQUE,
-        name VARCHAR(120) NOT NULL,
-        address TEXT NULL,
-        active TINYINT(1) NOT NULL DEFAULT 1,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY  (id)
-    ) $charset";
-
-    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_inventory_stocks (
-        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-        variant_id BIGINT UNSIGNED NOT NULL,
-        location_id BIGINT UNSIGNED NOT NULL,
-        qty INT NOT NULL DEFAULT 0,
-        min_qty INT NOT NULL DEFAULT 0,
-        max_qty INT NULL,
-        reorder_threshold INT NULL,
-        backorder_enabled TINYINT(1) NOT NULL DEFAULT 0,
-        PRIMARY KEY  (id),
-        UNIQUE KEY var_loc (variant_id, location_id),
-        KEY qty (qty),
-        KEY backorder_enabled (backorder_enabled)
-    ) $charset";
-
-    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_delivery_rules (
-        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-        scope ENUM('global','product','variant') NOT NULL,
-        scope_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
-        mode ENUM('fixed','percent') NOT NULL,
-        amount DECIMAL(14,4) NOT NULL DEFAULT 0,
-        free_threshold DECIMAL(14,2) NULL,
-        override_global TINYINT(1) NOT NULL DEFAULT 0,
-        active TINYINT(1) NOT NULL DEFAULT 1,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY  (id),
-        KEY scope_idx (scope, scope_id),
-        KEY active (active)
-    ) $charset";
-
-    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_media_links (
-        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-        product_id BIGINT UNSIGNED NOT NULL,
-        variant_id BIGINT UNSIGNED NULL,
-        attachment_id BIGINT UNSIGNED NULL,
-        media_type VARCHAR(20) NOT NULL,
-        embed_url VARCHAR(255) NULL,
-        sort_order INT NOT NULL DEFAULT 0,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY  (id),
-        KEY product_id (product_id),
-        KEY variant_id (variant_id),
-        KEY media_type (media_type)
-    ) $charset";
+    // Product/Inventory tables removed - using WooCommerce default
 
     // Orders + order items (simple custom commerce layer)
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_orders (
@@ -455,8 +380,7 @@ function svntex2_register_auth_rewrites(){
     // Extra compatibility for environments that include index.php in pretty permalinks
     add_rewrite_rule( '^index\.php/'.SVNTEX2_LOGIN_SLUG.'/?$', 'index.php?svntex2_page=login', 'top' );
     add_rewrite_rule( '^index\.php/'.SVNTEX2_REGISTER_SLUG.'/?$', 'index.php?svntex2_page=register', 'top' );
-    // Dedicated products page (independent of theme shop / WooCommerce)
-    add_rewrite_rule( '^svntex-products/?$', 'index.php?svntex2_page=svntex_products', 'top' );
+// Dedicated products page removed - using WooCommerce default
     // Cart & Checkout pages
     add_rewrite_rule( '^svntex-cart/?$', 'index.php?svntex2_page=svntex_cart', 'top' );
     add_rewrite_rule( '^svntex-checkout/?$', 'index.php?svntex2_page=svntex_checkout', 'top' );
@@ -514,13 +438,7 @@ function svntex2_render_auth_pages(){
     wp_enqueue_style( 'svntex2-style' );
     wp_enqueue_style( 'svntex2-landing' );
         $file = SVNTEX2_PLUGIN_DIR.'views/customer-registration.php';
-    } elseif ( $page === 'svntex_products' ) {
-        wp_enqueue_style( 'svntex2-style' );
-        wp_enqueue_style( 'svntex2-landing' );
-        $custom = SVNTEX2_PLUGIN_DIR.'views/products-archive.php';
-        if ( file_exists( $custom ) ) {
-            status_header(200); nocache_headers(); include $custom; exit; }
-    } elseif ( $page === 'svntex_cart' ) {
+    // svntex_products page removed - using WooCommerce default
         wp_enqueue_style( 'svntex2-style' ); wp_enqueue_style( 'svntex2-landing' );
         status_header(200); nocache_headers();
         ?><!DOCTYPE html><html <?php language_attributes(); ?>><head><meta charset="<?php bloginfo('charset'); ?>" /><meta name="viewport" content="width=device-width,initial-scale=1" /><?php wp_head(); ?><style>.svn-cart-shell{max-width:1000px;margin:0 auto;padding:clamp(1.5rem,2vw,2.25rem);}table.svn-cart{width:100%;border-collapse:collapse;margin-top:1rem;}table.svn-cart th,table.svn-cart td{padding:.6rem .75rem;font-size:.75rem;text-align:left;border-bottom:1px solid rgba(255,255,255,.1);}body:not(.dark) table.svn-cart th,body:not(.dark) table.svn-cart td{border-color:#e2e8f0;} .svn-cart-actions{display:flex;gap:1rem;margin-top:1.25rem;} .svn-btn{padding:.8rem 1.1rem;border-radius:14px;border:0;font-weight:600;font-size:.75rem;background:linear-gradient(90deg,var(--svn-accent),var(--svn-accent-alt));color:#fff;cursor:pointer;} .svn-total-box{margin-top:1.5rem;padding:1rem 1.1rem;background:linear-gradient(150deg,rgba(255,255,255,.05),rgba(148,163,184,.08));border:1px solid rgba(255,255,255,.1);border-radius:18px;font-size:.8rem;display:flex;flex-direction:column;gap:.35rem;}body:not(.dark) .svn-total-box{background:#fff;border-color:#e2e8f0;}</style></head><body <?php body_class('svntex-landing svntex-cart-page'); ?>>
@@ -528,7 +446,7 @@ function svntex2_render_auth_pages(){
             <h1 style="margin:0 0 1rem;font-size:clamp(1.4rem,2.5vw,2.1rem);font-weight:700;">Your Cart</h1>
             <table class="svn-cart" id="svn-cart-table"><thead><tr><th>Product</th><th>Variant</th><th>Qty</th><th>Price</th><th>Subtotal</th><th></th></tr></thead><tbody></tbody></table>
             <div class="svn-total-box" id="svn-cart-totals"></div>
-            <div class="svn-cart-actions"><a href="<?php echo esc_url( home_url('/svntex-products/') ); ?>" class="svn-btn" style="text-decoration:none;">Continue Shopping</a><a href="<?php echo esc_url( home_url('/svntex-checkout/') ); ?>" class="svn-btn" id="svn-go-checkout">Checkout</a></div>
+            <div class="svn-cart-actions"><a href="<?php echo esc_url( wc_get_page_permalink('shop') ); ?>" class="svn-btn" style="text-decoration:none;">Continue Shopping</a><a href="<?php echo esc_url( home_url('/svntex-checkout/') ); ?>" class="svn-btn" id="svn-go-checkout">Checkout</a></div>
         </div>
         <script>function fmt(p){return '₹'+Number(p).toFixed(2);} function loadCart(){fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart') ); ?>').then(r=>r.json()).then(c=>{const tb=document.querySelector('#svn-cart-table tbody');tb.innerHTML='';c.lines.forEach(l=>{const tr=document.createElement('tr');tr.innerHTML='<td>'+l.product_id+'</td><td>'+(l.variant_id||'—')+'</td><td><input type="number" min="0" value="'+l.qty+'" style="width:60px" data-qty data-k="'+l.product_id+':'+l.variant_id+'" /></td><td>'+fmt(l.price)+'</td><td>'+fmt(l.subtotal)+'</td><td><button data-rm data-k="'+l.product_id+':'+l.variant_id+'" style="background:none;border:0;color:var(--svn-text-dim);cursor:pointer;">✕</button></td>';tb.appendChild(tr);});document.getElementById('svn-cart-totals').innerHTML='Items: '+fmt(c.items_total)+'<br/>Delivery: '+fmt(c.delivery_total)+'<br/><strong>Grand: '+fmt(c.grand_total)+'</strong>';});}
     document.addEventListener('input',e=>{const el=e.target.closest('[data-qty]');if(!el)return;const k=el.getAttribute('data-k').split(':');fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart/update') ); ?>',{method:'POST',headers:{'Content-Type':'application/json','X-SVNTeX2-Nonce':(window.SVNTEX2_BRAND&&SVNTEX2_BRAND.nonce)||''},body:JSON.stringify({product_id:k[0],variant_id:k[1],qty:el.value})}).then(()=>loadCart());});
@@ -972,7 +890,7 @@ function svntex2_register_astra_account_menu_items() {
         [ 'title' => 'Purchases', 'url' => $base . '#purchases' ],
         [ 'title' => 'Referrals', 'url' => $base . '#referrals' ],
     [ 'title' => 'KYC', 'url' => $base . '#kyc' ],
-    [ 'title' => 'Products', 'url' => home_url('/svntex-products/') ],
+    [ 'title' => 'Products', 'url' => wc_get_page_permalink('shop') ],
         [ 'title' => 'Logout', 'url' => svntex2_get_logout_url_for_menu() ],
     ] );
 
@@ -1063,78 +981,7 @@ add_action( 'plugins_loaded', function(){
         ) $charset");
     }
 
-    // Product/Inventory tables safety for upgrades
-    $charset = $wpdb->get_charset_collate();
-    $tbl_variants = $pref.'svntex_product_variants';
-    if ( $wpdb->get_var( $wpdb->prepare("SHOW TABLES LIKE %s", $tbl_variants) ) !== $tbl_variants ) {
-        $wpdb->query("CREATE TABLE $tbl_variants (
-            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            product_id BIGINT UNSIGNED NOT NULL,
-            sku VARCHAR(80) NOT NULL UNIQUE,
-            attributes LONGTEXT NULL,
-            price DECIMAL(14,2) NULL,
-            tax_class VARCHAR(20) NULL,
-            unit VARCHAR(12) NULL,
-            active TINYINT(1) NOT NULL DEFAULT 1,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            KEY product_id (product_id), KEY active (active), KEY tax_class (tax_class)
-        ) $charset");
-    }
-    $tbl_locations = $pref.'svntex_inventory_locations';
-    if ( $wpdb->get_var( $wpdb->prepare("SHOW TABLES LIKE %s", $tbl_locations) ) !== $tbl_locations ) {
-        $wpdb->query("CREATE TABLE $tbl_locations (
-            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            code VARCHAR(20) NOT NULL UNIQUE,
-            name VARCHAR(120) NOT NULL,
-            address TEXT NULL,
-            active TINYINT(1) NOT NULL DEFAULT 1,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-        ) $charset");
-    }
-    $tbl_stocks = $pref.'svntex_inventory_stocks';
-    if ( $wpdb->get_var( $wpdb->prepare("SHOW TABLES LIKE %s", $tbl_stocks) ) !== $tbl_stocks ) {
-        $wpdb->query("CREATE TABLE $tbl_stocks (
-            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            variant_id BIGINT UNSIGNED NOT NULL,
-            location_id BIGINT UNSIGNED NOT NULL,
-            qty INT NOT NULL DEFAULT 0,
-            min_qty INT NOT NULL DEFAULT 0,
-            max_qty INT NULL,
-            reorder_threshold INT NULL,
-            backorder_enabled TINYINT(1) NOT NULL DEFAULT 0,
-            UNIQUE KEY var_loc (variant_id, location_id),
-            KEY qty (qty), KEY backorder_enabled (backorder_enabled)
-        ) $charset");
-    }
-    $tbl_rules = $pref.'svntex_delivery_rules';
-    if ( $wpdb->get_var( $wpdb->prepare("SHOW TABLES LIKE %s", $tbl_rules) ) !== $tbl_rules ) {
-        $wpdb->query("CREATE TABLE $tbl_rules (
-            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            scope ENUM('global','product','variant') NOT NULL,
-            scope_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
-            mode ENUM('fixed','percent') NOT NULL,
-            amount DECIMAL(14,4) NOT NULL DEFAULT 0,
-            free_threshold DECIMAL(14,2) NULL,
-            override_global TINYINT(1) NOT NULL DEFAULT 0,
-            active TINYINT(1) NOT NULL DEFAULT 1,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            KEY scope_idx (scope, scope_id), KEY active (active)
-        ) $charset");
-    }
-    $tbl_media = $pref.'svntex_media_links';
-    if ( $wpdb->get_var( $wpdb->prepare("SHOW TABLES LIKE %s", $tbl_media) ) !== $tbl_media ) {
-        $wpdb->query("CREATE TABLE $tbl_media (
-            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            product_id BIGINT UNSIGNED NOT NULL,
-            variant_id BIGINT UNSIGNED NULL,
-            attachment_id BIGINT UNSIGNED NULL,
-            media_type VARCHAR(20) NOT NULL,
-            embed_url VARCHAR(255) NULL,
-            sort_order INT NOT NULL DEFAULT 0,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            KEY product_id (product_id), KEY variant_id (variant_id), KEY media_type (media_type)
-        ) $charset");
-    }
+    // Product/Inventory tables safety removed - using WooCommerce default
 } );
 
 // -----------------------------------------------------------------------------
