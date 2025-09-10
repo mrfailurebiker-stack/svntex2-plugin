@@ -18,6 +18,9 @@
 // -----------------------------------------------------------------------------
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
+// Diagnostic Notice 1: Check if plugin file is loaded
+add_action('admin_notices', function(){ echo '<div class="notice notice-info"><p><strong>SVNTeX2 Diagnostic:</strong> Main plugin file (svntex2-plugin.php) is running.</p></div>'; });
+
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
@@ -1147,9 +1150,6 @@ add_action( 'woocommerce_order_status_completed', function( $order_id ) {
     }
     // Determine dynamic rate using tiered slabs then allow override via filter
     if ( function_exists('svntex2_referrals_get_commission_rate') ) {
-        $base_rate = svntex2_referrals_get_commission_rate( $referrer_id, $order, $user_id );
-    } else {
-        $base_rate = SVNTEX2_REFERRAL_RATE;
     }
     $rate = (float) apply_filters( 'svntex2_referral_commission_rate', $base_rate, $order, $referrer_id, $user_id );
     if ( $rate > 0 ) {
