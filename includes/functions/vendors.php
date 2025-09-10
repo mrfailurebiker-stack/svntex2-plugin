@@ -1,6 +1,18 @@
 <?php
 if(!defined('ABSPATH')) exit;
 
+// Ensure vendors table exists (covers cases where plugin update added table after initial activation)
+add_action('plugins_loaded', function(){
+    global $wpdb; $table = $wpdb->prefix.'svntex_vendors';
+    $exists = $wpdb->get_var( $wpdb->prepare("SHOW TABLES LIKE %s", $table) );
+    if($exists !== $table){
+        require_once ABSPATH.'wp-admin/includes/upgrade.php';
+        $charset = $wpdb->get_charset_collate();
+        $sql = "CREATE TABLE $table (\n            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n            name VARCHAR(120) NOT NULL,\n            email VARCHAR(120) NULL,\n            phone VARCHAR(40) NULL,\n            notes TEXT NULL,\n            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n            KEY name (name)\n        ) $charset";
+        dbDelta($sql);
+    }
+}, 20);
+
 // Vendor CRUD helpers
 function svntex2_vendor_create($data){
     global $wpdb; $t=$wpdb->prefix.'svntex_vendors';
@@ -19,7 +31,10 @@ function svntex2_vendor_update($id,$data){
     return (int)$id;
 }
 function svntex2_vendor_get($id){ global $wpdb; $t=$wpdb->prefix.'svntex_vendors'; return $wpdb->get_row($wpdb->prepare("SELECT * FROM $t WHERE id=%d",(int)$id), ARRAY_A); }
-function svntex2_vendor_list($args=[]){ global $wpdb; $t=$wpdb->prefix.'svntex_vendors'; $rows=$wpdb->get_results("SELECT * FROM $t ORDER BY name ASC", ARRAY_A); return $rows ?: []; }
+function svntex2_vendor_list($args=[]){ global $wpdb; $t=$wpdb->prefix.'svntex_vendors';
+    $exists = $wpdb->get_var( $wpdb->prepare("SHOW TABLES LIKE %s", $t) );
+    if($exists !== $t) return [];
+    $rows=$wpdb->get_results("SELECT * FROM $t ORDER BY name ASC", ARRAY_A); return $rows ?: []; }
 function svntex2_vendor_delete($id){ global $wpdb; $t=$wpdb->prefix.'svntex_vendors'; return (bool)$wpdb->delete($t,['id'=>(int)$id]); }
 
 // REST endpoints for vendors
