@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SVNTeX 2.0 Customer System
  * Description: Foundation for SVNTeX 2.0 – registration, wallet ledger, referrals, KYC, withdrawals, PB/RB scaffolding with WooCommerce integration.
- * Version: 0.2.12
+ * Version: 0.2.13
  * Author: SVNTeX
  * Text Domain: svntex2
  * Requires at least: 6.0
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
-define( 'SVNTEX2_VERSION',        '0.2.12' );
+define( 'SVNTEX2_VERSION',        '0.2.13' );
 define( 'SVNTEX2_PLUGIN_FILE',    __FILE__ );
 define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
@@ -384,6 +384,8 @@ function svntex2_register_auth_rewrites(){
     // Extra compatibility for environments that include index.php in pretty permalinks
     add_rewrite_rule( '^index\.php/'.SVNTEX2_LOGIN_SLUG.'/?$', 'index.php?svntex2_page=login', 'top' );
     add_rewrite_rule( '^index\.php/'.SVNTEX2_REGISTER_SLUG.'/?$', 'index.php?svntex2_page=register', 'top' );
+    // Dedicated products page (independent of theme shop / WooCommerce)
+    add_rewrite_rule( '^svntex-products/?$', 'index.php?svntex2_page=svntex_products', 'top' );
     add_rewrite_tag( '%svntex2_page%', '([^&]+)' );
 }
 
@@ -438,6 +440,12 @@ function svntex2_render_auth_pages(){
     wp_enqueue_style( 'svntex2-style' );
     wp_enqueue_style( 'svntex2-landing' );
         $file = SVNTEX2_PLUGIN_DIR.'views/customer-registration.php';
+    } elseif ( $page === 'svntex_products' ) {
+        wp_enqueue_style( 'svntex2-style' );
+        wp_enqueue_style( 'svntex2-landing' );
+        $custom = SVNTEX2_PLUGIN_DIR.'views/products-archive.php';
+        if ( file_exists( $custom ) ) {
+            status_header(200); nocache_headers(); include $custom; exit; }
     } else { return; }
     status_header(200); nocache_headers();
     // Capture template output so we can wrap with full HTML (ensures wp_head/wp_footer fire and styles load)
@@ -686,7 +694,8 @@ function svntex2_register_astra_account_menu_items() {
         [ 'title' => 'Top Up', 'url' => $base ],
         [ 'title' => 'Purchases', 'url' => $base . '#purchases' ],
         [ 'title' => 'Referrals', 'url' => $base . '#referrals' ],
-        [ 'title' => 'KYC', 'url' => $base . '#kyc' ],
+    [ 'title' => 'KYC', 'url' => $base . '#kyc' ],
+    [ 'title' => 'Products', 'url' => home_url('/svntex-products/') ],
         [ 'title' => 'Logout', 'url' => svntex2_get_logout_url_for_menu() ],
     ] );
 

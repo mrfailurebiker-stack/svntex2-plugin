@@ -45,8 +45,9 @@ $logout_url = esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
  
 <div class="svntex-dash-top">
     <nav class="dash-actions" aria-label="Quick actions">
-        <a class="mini" href="#kyc">KYC</a>
-        <a class="mini" href="<?php echo esc_url( function_exists('wc_get_cart_url') ? wc_get_cart_url() : home_url('/cart/') ); ?>">Cart</a>
+    <a class="mini" href="#kyc">KYC</a>
+    <a class="mini" href="<?php echo esc_url( get_post_type_archive_link('svntex_product') ); ?>">Products</a>
+    <a class="mini" href="<?php echo esc_url( function_exists('wc_get_cart_url') ? wc_get_cart_url() : home_url('/cart/') ); ?>">Cart</a>
         <a class="mini" href="#wallet">Wallet <span class="mini-badge"><?php echo function_exists('wc_price') ? wp_strip_all_tags( wc_price($wallet_balance) ) : esc_html(number_format($wallet_balance,2)); ?></span></a>
         <a class="mini" href="<?php echo $logout_url; ?>">Logout</a>
     </nav>
