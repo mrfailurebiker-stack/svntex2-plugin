@@ -20,12 +20,13 @@ $referral_count = get_user_meta($current_user->ID,'referral_count', true);
 $referral_count = ($referral_count === '') ? 0 : intval($referral_count);
 $wallet_balance = svntex2_wallet_get_balance($current_user->ID); // live ledger helper
 
-$orders = wc_get_orders([
-    'customer_id' => $current_user->ID,
-    'limit' => 5,
-    'orderby' => 'date',
-    'order' => 'DESC'
-]);
+$orders = [];
+'customer_id' => $current_user->ID,
+        'limit' => 5,
+        'orderby' => 'date',
+        'order' => 'DESC'
+    ]);
+}
 
 $logout_url = esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
 ?>
