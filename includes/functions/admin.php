@@ -23,7 +23,8 @@ function svntex2_admin_root(){
     $active = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'overview';
     $tabs = [
         'overview' => 'Overview',
-    'users' => 'Users',
+        'products' => 'Products', // New Products Tab
+		'users' => 'Users',
         'referrals' => 'Referrals',
         'kyc' => 'KYC',
         'withdrawals' => 'Withdrawals',
@@ -57,6 +58,12 @@ function svntex2_admin_root(){
 
     echo '<div class="svntex2-tab-content">';
     switch($active){
+        case 'products':
+            // Redirect to the standard WordPress products admin page for our CPT
+            $url = admin_url('edit.php?post_type=svntex_product');
+            echo "<script>window.location.href = '" . esc_url_raw($url) . "';</script>";
+            echo '<p>Redirecting to products... <a href="'.esc_url($url).'">Click here if you are not redirected</a>.</p>';
+            break;
         case 'referrals': svntex2_admin_referrals(); break;
         case 'kyc': svntex2_admin_kyc(); break;
         case 'withdrawals': svntex2_admin_withdrawals(); break;

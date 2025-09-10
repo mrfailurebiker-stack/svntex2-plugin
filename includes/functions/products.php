@@ -14,8 +14,8 @@ add_action('init', function(){
         'show_in_rest' => true,
         'rewrite' => [ 'slug' => 'products' ],
         'show_ui' => true,
+        'show_in_menu' => false, // Hide from top-level menu
         'menu_icon' => 'dashicons-products',
-        'menu_position' => 56,
     'supports' => ['title','editor','thumbnail','excerpt'],
     'capability_type' => 'post',
     'show_in_admin_bar' => true,
@@ -24,6 +24,11 @@ add_action('init', function(){
     register_taxonomy('svntex_collection','svntex_product',[ 'label'=>'Collections','hierarchical'=>false,'show_ui'=>true,'show_in_rest'=>true ]);
     register_taxonomy('svntex_tag','svntex_product',[ 'label'=>'Tags','hierarchical'=>false,'show_ui'=>true,'show_in_rest'=>true ]);
 });
+
+// Hide default WooCommerce products menu
+add_action('admin_menu', function(){
+    remove_menu_page('edit.php?post_type=product');
+}, 999);
 
 // One-time admin notice to surface where the new menu is
 add_action('admin_init', function(){ if(!get_option('svntex2_products_notice_dismissed')) update_option('svntex2_products_notice_dismissed', time()); });
