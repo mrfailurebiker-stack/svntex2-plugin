@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
-define( 'SVNTEX2_VERSION',        '0.2.17' );
+define( 'SVNTEX2_VERSION',        '0.2.18' );
 define( 'SVNTEX2_PLUGIN_FILE',    __FILE__ );
 define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
@@ -414,6 +414,9 @@ function svntex2_register_auth_rewrites(){
     add_rewrite_rule( '^index\.php/'.SVNTEX2_REGISTER_SLUG.'/?$', 'index.php?svntex2_page=register', 'top' );
     // Dedicated products page (independent of theme shop / WooCommerce)
     add_rewrite_rule( '^svntex-products/?$', 'index.php?svntex2_page=svntex_products', 'top' );
+    // Cart & Checkout pages
+    add_rewrite_rule( '^svntex-cart/?$', 'index.php?svntex2_page=svntex_cart', 'top' );
+    add_rewrite_rule( '^svntex-checkout/?$', 'index.php?svntex2_page=svntex_checkout', 'top' );
     add_rewrite_tag( '%svntex2_page%', '([^&]+)' );
 }
 
@@ -474,6 +477,46 @@ function svntex2_render_auth_pages(){
         $custom = SVNTEX2_PLUGIN_DIR.'views/products-archive.php';
         if ( file_exists( $custom ) ) {
             status_header(200); nocache_headers(); include $custom; exit; }
+    } elseif ( $page === 'svntex_cart' ) {
+        wp_enqueue_style( 'svntex2-style' ); wp_enqueue_style( 'svntex2-landing' );
+        status_header(200); nocache_headers();
+        ?><!DOCTYPE html><html <?php language_attributes(); ?>><head><meta charset="<?php bloginfo('charset'); ?>" /><meta name="viewport" content="width=device-width,initial-scale=1" /><?php wp_head(); ?><style>.svn-cart-shell{max-width:1000px;margin:0 auto;padding:clamp(1.5rem,2vw,2.25rem);}table.svn-cart{width:100%;border-collapse:collapse;margin-top:1rem;}table.svn-cart th,table.svn-cart td{padding:.6rem .75rem;font-size:.75rem;text-align:left;border-bottom:1px solid rgba(255,255,255,.1);}body:not(.dark) table.svn-cart th,body:not(.dark) table.svn-cart td{border-color:#e2e8f0;} .svn-cart-actions{display:flex;gap:1rem;margin-top:1.25rem;} .svn-btn{padding:.8rem 1.1rem;border-radius:14px;border:0;font-weight:600;font-size:.75rem;background:linear-gradient(90deg,var(--svn-accent),var(--svn-accent-alt));color:#fff;cursor:pointer;} .svn-total-box{margin-top:1.5rem;padding:1rem 1.1rem;background:linear-gradient(150deg,rgba(255,255,255,.05),rgba(148,163,184,.08));border:1px solid rgba(255,255,255,.1);border-radius:18px;font-size:.8rem;display:flex;flex-direction:column;gap:.35rem;}body:not(.dark) .svn-total-box{background:#fff;border-color:#e2e8f0;}</style></head><body <?php body_class('svntex-landing svntex-cart-page'); ?>>
+        <div class="svn-cart-shell">
+            <h1 style="margin:0 0 1rem;font-size:clamp(1.4rem,2.5vw,2.1rem);font-weight:700;">Your Cart</h1>
+            <table class="svn-cart" id="svn-cart-table"><thead><tr><th>Product</th><th>Variant</th><th>Qty</th><th>Price</th><th>Subtotal</th><th></th></tr></thead><tbody></tbody></table>
+            <div class="svn-total-box" id="svn-cart-totals"></div>
+            <div class="svn-cart-actions"><a href="<?php echo esc_url( home_url('/svntex-products/') ); ?>" class="svn-btn" style="text-decoration:none;">Continue Shopping</a><a href="<?php echo esc_url( home_url('/svntex-checkout/') ); ?>" class="svn-btn" id="svn-go-checkout">Checkout</a></div>
+        </div>
+        <script>function fmt(p){return '₹'+Number(p).toFixed(2);} function loadCart(){fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart') ); ?>').then(r=>r.json()).then(c=>{const tb=document.querySelector('#svn-cart-table tbody');tb.innerHTML='';c.lines.forEach(l=>{const tr=document.createElement('tr');tr.innerHTML='<td>'+l.product_id+'</td><td>'+(l.variant_id||'—')+'</td><td><input type="number" min="0" value="'+l.qty+'" style="width:60px" data-qty data-k="'+l.product_id+':'+l.variant_id+'" /></td><td>'+fmt(l.price)+'</td><td>'+fmt(l.subtotal)+'</td><td><button data-rm data-k="'+l.product_id+':'+l.variant_id+'" style="background:none;border:0;color:var(--svn-text-dim);cursor:pointer;">✕</button></td>';tb.appendChild(tr);});document.getElementById('svn-cart-totals').innerHTML='Items: '+fmt(c.items_total)+'<br/>Delivery: '+fmt(c.delivery_total)+'<br/><strong>Grand: '+fmt(c.grand_total)+'</strong>';});}
+        document.addEventListener('input',e=>{const el=e.target.closest('[data-qty]');if(!el)return;const k=el.getAttribute('data-k').split(':');fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart/update') ); ?>',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:k[0],variant_id:k[1],qty:el.value})}).then(()=>loadCart());});
+        document.addEventListener('click',e=>{const rm=e.target.closest('[data-rm]');if(!rm)return;const k=rm.getAttribute('data-k').split(':');fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart/remove') ); ?>',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:k[0],variant_id:k[1]})}).then(()=>loadCart());});
+        loadCart();</script><?php wp_footer(); ?></body></html><?php
+        exit;
+    } elseif ( $page === 'svntex_checkout' ) {
+        wp_enqueue_style( 'svntex2-style' ); wp_enqueue_style( 'svntex2-landing' );
+        status_header(200); nocache_headers();
+        ?><!DOCTYPE html><html <?php language_attributes(); ?>><head><meta charset="<?php bloginfo('charset'); ?>" /><meta name="viewport" content="width=device-width,initial-scale=1" /><?php wp_head(); ?><style>.svn-checkout-shell{max-width:860px;margin:0 auto;padding:clamp(1.5rem,2vw,2.2rem);} form.svn-co{display:grid;gap:1rem;} form.svn-co input{padding:.75rem .8rem;border-radius:14px;border:1px solid rgba(255,255,255,.25);background:rgba(15,23,42,.6);color:#fff;font-size:.8rem;}body:not(.dark) form.svn-co input{background:#fff;color:#0f172a;border-color:#cbd5e1;} .svn-co label{font-size:.6rem;font-weight:600;text-transform:uppercase;letter-spacing:.55px;color:var(--svn-text-dim);display:block;margin-bottom:.35rem;} .svn-co button{padding:.9rem 1.1rem;border-radius:18px;border:0;background:linear-gradient(90deg,var(--svn-accent),var(--svn-accent-alt));color:#fff;font-weight:600;font-size:.85rem;cursor:pointer;}</style></head><body <?php body_class('svntex-landing svntex-checkout-page'); ?>>
+        <div class="svn-checkout-shell">
+            <h1 style="margin:0 0 1.2rem;font-size:clamp(1.5rem,2.6vw,2.3rem);font-weight:700;">Checkout</h1>
+            <div id="svn-co-summary" style="font-size:.75rem;margin-bottom:1.25rem;color:var(--svn-text-dim);">Loading cart…</div>
+            <form class="svn-co" id="svn-co-form">
+                <div><label>Name</label><input name="name" required /></div>
+                <div><label>Phone</label><input name="phone" /></div>
+                <div><label>Address Line 1</label><input name="line1" required /></div>
+                <div><label>Address Line 2</label><input name="line2" /></div>
+                <div><label>City</label><input name="city" required /></div>
+                <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+                    <div style="flex:1 1 140px"><label>State</label><input name="state" /></div>
+                    <div style="flex:1 1 140px"><label>ZIP</label><input name="zip" required /></div>
+                    <div style="flex:1 1 140px"><label>Country</label><input name="country" value="IN" /></div>
+                </div>
+                <button type="submit" id="svn-place-order" data-loading-text="Placing…">Place Order</button>
+                <div id="svn-co-result" style="font-size:.75rem;margin-top:.75rem;"></div>
+            </form>
+        </div>
+        <script>function fmt(p){return '₹'+Number(p).toFixed(2);} function loadSummary(){fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart') ); ?>').then(r=>r.json()).then(c=>{document.getElementById('svn-co-summary').innerHTML='Items: '+fmt(c.items_total)+' | Delivery: '+fmt(c.delivery_total)+' | <strong>Grand: '+fmt(c.grand_total)+'</strong>';});} loadSummary(); document.getElementById('svn-co-form').addEventListener('submit',function(e){e.preventDefault();const f=e.target;const btn=document.getElementById('svn-place-order');if(btn.dataset.loading)return;btn.dataset.loading='1';const orig=btn.textContent;btn.textContent=btn.getAttribute('data-loading-text')||'Placing…';const payload={};[...f.elements].forEach(el=>{if(el.name)payload[el.name]=el.value});fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/checkout') ); ?>',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json()).then(o=>{if(o.order_id){document.getElementById('svn-co-result').innerHTML='Order placed. ID #'+o.order_id; f.reset(); loadSummary();}else{document.getElementById('svn-co-result').innerHTML='<span style="color:#dc2626">Error: '+(o.message||'Failed')+'</span>';}}).catch(()=>{document.getElementById('svn-co-result').innerHTML='<span style="color:#dc2626">Network error</span>';}).finally(()=>{btn.textContent=orig; delete btn.dataset.loading;});});</script><?php wp_footer(); ?></body></html><?php
+        exit;
+    }
     } else { return; }
     status_header(200); nocache_headers();
     // Capture template output so we can wrap with full HTML (ensures wp_head/wp_footer fire and styles load)

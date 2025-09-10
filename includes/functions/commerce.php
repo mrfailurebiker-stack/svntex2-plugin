@@ -64,15 +64,19 @@ function svntex2_commerce_cart_update($product_id,$variant_id,$qty){
 function svntex2_commerce_cart_totals(){
     global $wpdb; $vt=$wpdb->prefix.'svntex_product_variants';
     $cart = svntex2_commerce_get_cart();
-    $lines=[]; $items_total=0; $delivery_total=0; // placeholder (per-line delivery later)
+    $lines=[]; $items_total=0; $delivery_total=0;
     foreach($cart as $k=>$q){ list($pid,$vid)=array_map('intval',explode(':',$k));
         $price = $vid ? $wpdb->get_var($wpdb->prepare("SELECT price FROM $vt WHERE id=%d", $vid)) : null;
         if ($price===null){ // fallback to first variant
             $price = $wpdb->get_var($wpdb->prepare("SELECT price FROM $vt WHERE product_id=%d ORDER BY id ASC LIMIT 1", $pid));
         }
         $price = $price!==null ? (float)$price : 0;
-        $subtotal = $price * $q; $items_total += $subtotal;
-        $lines[] = [ 'product_id'=>$pid,'variant_id'=>$vid,'qty'=>$q,'price'=>$price,'subtotal'=>round($subtotal,2) ];
+        $qty = max(1,(int)$q);
+        $subtotal = $price * $qty; $items_total += $subtotal;
+        // Delivery fee per line using delivery rules helper (graceful if function missing)
+        $fee = function_exists('svntex2_delivery_compute') ? svntex2_delivery_compute($pid, $vid ?: null, $subtotal) : 0.0;
+        $delivery_total += $fee;
+        $lines[] = [ 'product_id'=>$pid,'variant_id'=>$vid,'qty'=>$qty,'price'=>$price,'subtotal'=>round($subtotal,2),'delivery'=>round($fee,2) ];
     }
     $grand = $items_total + $delivery_total;
     return [ 'lines'=>$lines,'items_total'=>round($items_total,2),'delivery_total'=>round($delivery_total,2),'grand_total'=>round($grand,2) ];
@@ -136,6 +140,23 @@ add_action('rest_api_init', function(){
         ];
         if(!$address['name'] || !$address['line1'] || !$address['city'] || !$address['zip']) return new WP_Error('bad_address','Missing required address fields', ['status'=>400]);
         return svntex2_commerce_checkout($address);
+    },'permission_callback'=>'__return_true' ] ]);
+    register_rest_route('svntex2/v1','/order/(?P<id>\d+)', [ [ 'methods'=>'GET','callback'=>function($r){
+        global $wpdb; $oid=(int)$r['id']; if(!$oid) return new WP_Error('bad_request','id required',['status'=>400]);
+        $orders=$wpdb->prefix.'svntex_orders'; $itemsT=$wpdb->prefix.'svntex_order_items';
+        $ord = $wpdb->get_row($wpdb->prepare("SELECT * FROM $orders WHERE id=%d", $oid)); if(!$ord) return new WP_Error('not_found','Order not found',['status'=>404]);
+        // Basic ownership check (if order has user_id ensure current matches) – guests open
+        if ($ord->user_id && (int)$ord->user_id !== get_current_user_id() && ! current_user_can('manage_options')) return new WP_Error('forbidden','Not allowed',['status'=>403]);
+        $items = $wpdb->get_results($wpdb->prepare("SELECT * FROM $itemsT WHERE order_id=%d", $oid));
+        return [
+            'id'=>(int)$ord->id,
+            'status'=>$ord->status,
+            'items_total'=>(float)$ord->items_total,
+            'delivery_total'=>(float)$ord->delivery_total,
+            'grand_total'=>(float)$ord->grand_total,
+            'address'=> $ord->address ? json_decode($ord->address,true):null,
+            'items'=> array_map(function($it){ return [ 'product_id'=>(int)$it->product_id,'variant_id'=>(int)$it->variant_id,'qty'=>(int)$it->qty,'price'=>(float)$it->price,'subtotal'=>(float)$it->subtotal ]; }, $items ?: [] )
+        ];
     },'permission_callback'=>'__return_true' ] ]);
 });
 
