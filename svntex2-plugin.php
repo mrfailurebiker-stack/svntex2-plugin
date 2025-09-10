@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
-define( 'SVNTEX2_VERSION',        '0.2.18' );
+define( 'SVNTEX2_VERSION',        '0.2.19' );
 define( 'SVNTEX2_PLUGIN_FILE',    __FILE__ );
 define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
@@ -367,7 +367,8 @@ add_action( 'wp_enqueue_scripts', function(){
     wp_enqueue_style( 'svntex2-landing' ); // gradient / feature card tokens reused
     // Provide a JS settings object (extensible) once
     wp_register_script( 'svntex2-brand-init', SVNTEX2_PLUGIN_URL . 'assets/js/brand-init.js', [], SVNTEX2_VERSION, true );
-    wp_add_inline_script( 'svntex2-brand-init', 'window.SVNTEX2_BRAND = { version: "'.esc_js( SVNTEX2_VERSION ).'" };' );
+    $public_nonce = function_exists('svntex2_public_nonce') ? svntex2_public_nonce() : '';
+    wp_add_inline_script( 'svntex2-brand-init', 'window.SVNTEX2_BRAND = { version: "'.esc_js( SVNTEX2_VERSION ).'", nonce: "'.esc_js($public_nonce).'" };' );
     wp_enqueue_script( 'svntex2-brand-init' );
 }, 20 );
 
@@ -488,8 +489,8 @@ function svntex2_render_auth_pages(){
             <div class="svn-cart-actions"><a href="<?php echo esc_url( home_url('/svntex-products/') ); ?>" class="svn-btn" style="text-decoration:none;">Continue Shopping</a><a href="<?php echo esc_url( home_url('/svntex-checkout/') ); ?>" class="svn-btn" id="svn-go-checkout">Checkout</a></div>
         </div>
         <script>function fmt(p){return '₹'+Number(p).toFixed(2);} function loadCart(){fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart') ); ?>').then(r=>r.json()).then(c=>{const tb=document.querySelector('#svn-cart-table tbody');tb.innerHTML='';c.lines.forEach(l=>{const tr=document.createElement('tr');tr.innerHTML='<td>'+l.product_id+'</td><td>'+(l.variant_id||'—')+'</td><td><input type="number" min="0" value="'+l.qty+'" style="width:60px" data-qty data-k="'+l.product_id+':'+l.variant_id+'" /></td><td>'+fmt(l.price)+'</td><td>'+fmt(l.subtotal)+'</td><td><button data-rm data-k="'+l.product_id+':'+l.variant_id+'" style="background:none;border:0;color:var(--svn-text-dim);cursor:pointer;">✕</button></td>';tb.appendChild(tr);});document.getElementById('svn-cart-totals').innerHTML='Items: '+fmt(c.items_total)+'<br/>Delivery: '+fmt(c.delivery_total)+'<br/><strong>Grand: '+fmt(c.grand_total)+'</strong>';});}
-        document.addEventListener('input',e=>{const el=e.target.closest('[data-qty]');if(!el)return;const k=el.getAttribute('data-k').split(':');fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart/update') ); ?>',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:k[0],variant_id:k[1],qty:el.value})}).then(()=>loadCart());});
-        document.addEventListener('click',e=>{const rm=e.target.closest('[data-rm]');if(!rm)return;const k=rm.getAttribute('data-k').split(':');fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart/remove') ); ?>',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:k[0],variant_id:k[1]})}).then(()=>loadCart());});
+    document.addEventListener('input',e=>{const el=e.target.closest('[data-qty]');if(!el)return;const k=el.getAttribute('data-k').split(':');fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart/update') ); ?>',{method:'POST',headers:{'Content-Type':'application/json','X-SVNTeX2-Nonce':(window.SVNTEX2_BRAND&&SVNTEX2_BRAND.nonce)||''},body:JSON.stringify({product_id:k[0],variant_id:k[1],qty:el.value})}).then(()=>loadCart());});
+    document.addEventListener('click',e=>{const rm=e.target.closest('[data-rm]');if(!rm)return;const k=rm.getAttribute('data-k').split(':');fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart/remove') ); ?>',{method:'POST',headers:{'Content-Type':'application/json','X-SVNTeX2-Nonce':(window.SVNTEX2_BRAND&&SVNTEX2_BRAND.nonce)||''},body:JSON.stringify({product_id:k[0],variant_id:k[1]})}).then(()=>loadCart());});
         loadCart();</script><?php wp_footer(); ?></body></html><?php
         exit;
     } elseif ( $page === 'svntex_checkout' ) {
@@ -514,7 +515,7 @@ function svntex2_render_auth_pages(){
                 <div id="svn-co-result" style="font-size:.75rem;margin-top:.75rem;"></div>
             </form>
         </div>
-        <script>function fmt(p){return '₹'+Number(p).toFixed(2);} function loadSummary(){fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart') ); ?>').then(r=>r.json()).then(c=>{document.getElementById('svn-co-summary').innerHTML='Items: '+fmt(c.items_total)+' | Delivery: '+fmt(c.delivery_total)+' | <strong>Grand: '+fmt(c.grand_total)+'</strong>';});} loadSummary(); document.getElementById('svn-co-form').addEventListener('submit',function(e){e.preventDefault();const f=e.target;const btn=document.getElementById('svn-place-order');if(btn.dataset.loading)return;btn.dataset.loading='1';const orig=btn.textContent;btn.textContent=btn.getAttribute('data-loading-text')||'Placing…';const payload={};[...f.elements].forEach(el=>{if(el.name)payload[el.name]=el.value});fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/checkout') ); ?>',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json()).then(o=>{if(o.order_id){document.getElementById('svn-co-result').innerHTML='Order placed. ID #'+o.order_id; f.reset(); loadSummary();}else{document.getElementById('svn-co-result').innerHTML='<span style="color:#dc2626">Error: '+(o.message||'Failed')+'</span>';}}).catch(()=>{document.getElementById('svn-co-result').innerHTML='<span style="color:#dc2626">Network error</span>';}).finally(()=>{btn.textContent=orig; delete btn.dataset.loading;});});</script><?php wp_footer(); ?></body></html><?php
+    <script>function fmt(p){return '₹'+Number(p).toFixed(2);} function loadSummary(){fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart') ); ?>').then(r=>r.json()).then(c=>{document.getElementById('svn-co-summary').innerHTML='Items: '+fmt(c.items_total)+' | Delivery: '+fmt(c.delivery_total)+' | <strong>Grand: '+fmt(c.grand_total)+'</strong>';});} loadSummary(); document.getElementById('svn-co-form').addEventListener('submit',function(e){e.preventDefault();const f=e.target;const btn=document.getElementById('svn-place-order');if(btn.dataset.loading)return;btn.dataset.loading='1';const orig=btn.textContent;btn.textContent=btn.getAttribute('data-loading-text')||'Placing…';const payload={};[...f.elements].forEach(el=>{if(el.name)payload[el.name]=el.value});fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/checkout') ); ?>',{method:'POST',headers:{'Content-Type':'application/json','X-SVNTeX2-Nonce':(window.SVNTEX2_BRAND&&SVNTEX2_BRAND.nonce)||''},body:JSON.stringify(payload)}).then(r=>r.json()).then(o=>{if(o.order_id){document.getElementById('svn-co-result').innerHTML='Order placed. ID #'+o.order_id; f.reset(); loadSummary();}else{document.getElementById('svn-co-result').innerHTML='<span style=\"color:#dc2626\">Error: '+(o.message||'Failed')+'</span>';}}).catch(()=>{document.getElementById('svn-co-result').innerHTML='<span style=\"color:#dc2626\">Network error</span>';}).finally(()=>{btn.textContent=orig; delete btn.dataset.loading;});});</script><?php wp_footer(); ?></body></html><?php
         exit;
     }
     } else { return; }
@@ -687,7 +688,7 @@ add_action('template_redirect', function(){
                     const vid = btn.dataset.variantId; if(!vid){ return; }
                     const orig = btn.textContent; btn.dataset.loading='1'; btn.textContent=btn.getAttribute('data-loading-text')||'Adding…';
                     fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart/add') ); ?>', {
-                        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ product_id: data.id, variant_id: vid, qty: 1 })
+                        method:'POST', headers:{'Content-Type':'application/json','X-SVNTeX2-Nonce': (window.SVNTEX2_BRAND && window.SVNTEX2_BRAND.nonce)||''}, body: JSON.stringify({ product_id: data.id, variant_id: vid, qty: 1 })
                     }).then(r=>r.json()).then(j=>{ btn.textContent='Added'; setTimeout(()=>{ btn.textContent=orig; delete btn.dataset.loading; },1200); })
                     .catch(()=>{ btn.textContent='Error'; setTimeout(()=>{ btn.textContent=orig; delete btn.dataset.loading; },1400); });
                 });

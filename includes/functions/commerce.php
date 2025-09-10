@@ -16,6 +16,38 @@ add_action('init', function(){
     $_COOKIE['svntex2_sid'] = $sid;
 });
 
+/**
+ * Public (guest-friendly) rolling nonce used to mitigate CSRF / blind POST abuse.
+ * - Derived from session cookie (guest) or user id (logged in) + current hour.
+ * - Accepts current hour and previous hour to reduce clock boundary failures.
+ * - Not a replacement for auth; just lightweight hardening for open cart endpoints.
+ */
+function svntex2_public_nonce_source_key(){
+    if ( is_user_logged_in() ) return 'u:'.get_current_user_id();
+    $sid = $_COOKIE['svntex2_sid'] ?? '';
+    if ( ! $sid ) { // guarantee a sid for guests
+        $sid = wp_generate_uuid4();
+        setcookie('svntex2_sid', $sid, time()+DAY_IN_SECONDS*7, COOKIEPATH ?: '/', COOKIE_DOMAIN, is_ssl(), true);
+        $_COOKIE['svntex2_sid'] = $sid;
+    }
+    return 'g:'.$sid;
+}
+function svntex2_public_nonce(){
+    $key = svntex2_public_nonce_source_key();
+    $hour = gmdate('Y-m-d-H');
+    return substr( wp_hash( 'svntex2|'.$key.'|'.$hour ), 0, 16 );
+}
+function svntex2_verify_public_nonce( $nonce ){
+    if ( ! $nonce ) return false;
+    $key = svntex2_public_nonce_source_key();
+    $hours = [ gmdate('Y-m-d-H'), gmdate('Y-m-d-H', time()-3600) ];
+    foreach ( $hours as $h ) {
+        $calc = substr( wp_hash( 'svntex2|'.$key.'|'.$h ), 0, 16 );
+        if ( hash_equals( $calc, $nonce ) ) return true;
+    }
+    return false;
+}
+
 function svntex2_commerce_get_cart_key(){
     if ( is_user_logged_in() ) return 'svntex2_cart_u_'.get_current_user_id();
     $sid = $_COOKIE['svntex2_sid'] ?? '';
@@ -114,19 +146,20 @@ function svntex2_commerce_checkout($address){
 
 // REST endpoints
 add_action('rest_api_init', function(){
-    register_rest_route('svntex2/v1','/cart', [ [ 'methods'=>'GET','callback'=>function(){ return svntex2_commerce_cart_totals(); },'permission_callback'=>'__return_true' ] ]);
+    register_rest_route('svntex2/v1','/cart', [ [ 'methods'=>'GET','callback'=>function(){ return svntex2_commerce_cart_totals(); },'permission_callback'=>'__return_true' ] ]); // read-only can stay public
+    $secure_cb = function( $request ){ $nonce = $request->get_header('X-SVNTeX2-Nonce'); if ( ! $nonce ) $nonce = $request['nonce'] ?? ''; if ( svntex2_verify_public_nonce( $nonce ) ) return true; return new WP_Error('forbidden','Invalid nonce',['status'=>403]); };
     register_rest_route('svntex2/v1','/cart/add', [ [ 'methods'=>'POST','callback'=>function($r){
         $pid=(int)$r['product_id']; $vid= isset($r['variant_id'])?(int)$r['variant_id']:0; $qty=max(1,(int)($r['qty']??1));
         svntex2_commerce_cart_add($pid,$vid,$qty); return svntex2_commerce_cart_totals();
-    },'permission_callback'=>'__return_true' ] ]);
+    },'permission_callback'=>$secure_cb ] ]);
     register_rest_route('svntex2/v1','/cart/update', [ [ 'methods'=>'POST','callback'=>function($r){
         $pid=(int)$r['product_id']; $vid=(int)($r['variant_id']??0); $qty=(int)($r['qty']??0);
         svntex2_commerce_cart_update($pid,$vid,$qty); return svntex2_commerce_cart_totals();
-    },'permission_callback'=>'__return_true' ] ]);
+    },'permission_callback'=>$secure_cb ] ]);
     register_rest_route('svntex2/v1','/cart/remove', [ [ 'methods'=>'POST','callback'=>function($r){
         $pid=(int)$r['product_id']; $vid=(int)($r['variant_id']??0);
         svntex2_commerce_cart_remove($pid,$vid); return svntex2_commerce_cart_totals();
-    },'permission_callback'=>'__return_true' ] ]);
+    },'permission_callback'=>$secure_cb ] ]);
     register_rest_route('svntex2/v1','/checkout', [ [ 'methods'=>'POST','callback'=>function($r){
         $address = [
             'name'=>sanitize_text_field($r['name']??''),
@@ -140,13 +173,14 @@ add_action('rest_api_init', function(){
         ];
         if(!$address['name'] || !$address['line1'] || !$address['city'] || !$address['zip']) return new WP_Error('bad_address','Missing required address fields', ['status'=>400]);
         return svntex2_commerce_checkout($address);
-    },'permission_callback'=>'__return_true' ] ]);
+    },'permission_callback'=>$secure_cb ] ]);
     register_rest_route('svntex2/v1','/order/(?P<id>\d+)', [ [ 'methods'=>'GET','callback'=>function($r){
         global $wpdb; $oid=(int)$r['id']; if(!$oid) return new WP_Error('bad_request','id required',['status'=>400]);
         $orders=$wpdb->prefix.'svntex_orders'; $itemsT=$wpdb->prefix.'svntex_order_items';
         $ord = $wpdb->get_row($wpdb->prepare("SELECT * FROM $orders WHERE id=%d", $oid)); if(!$ord) return new WP_Error('not_found','Order not found',['status'=>404]);
         // Basic ownership check (if order has user_id ensure current matches) – guests open
         if ($ord->user_id && (int)$ord->user_id !== get_current_user_id() && ! current_user_can('manage_options')) return new WP_Error('forbidden','Not allowed',['status'=>403]);
+        if ( ! $ord->user_id && ! current_user_can('manage_options') ) return new WP_Error('forbidden','Guest order lookup disabled',['status'=>403]);
         $items = $wpdb->get_results($wpdb->prepare("SELECT * FROM $itemsT WHERE order_id=%d", $oid));
         return [
             'id'=>(int)$ord->id,
@@ -157,7 +191,7 @@ add_action('rest_api_init', function(){
             'address'=> $ord->address ? json_decode($ord->address,true):null,
             'items'=> array_map(function($it){ return [ 'product_id'=>(int)$it->product_id,'variant_id'=>(int)$it->variant_id,'qty'=>(int)$it->qty,'price'=>(float)$it->price,'subtotal'=>(float)$it->subtotal ]; }, $items ?: [] )
         ];
-    },'permission_callback'=>'__return_true' ] ]);
+    },'permission_callback'=>$secure_cb ] ]);
 });
 
 ?>

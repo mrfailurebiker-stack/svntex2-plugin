@@ -253,7 +253,7 @@ document.addEventListener('click', function(e){
   const vid = wrap.getAttribute('data-variant-id') || 0;
   const orig = btn.textContent; btn.textContent = 'Adding…';
   fetch('<?php echo esc_url_raw( rest_url('svntex2/v1/cart/add') ); ?>', {
-    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ product_id: pid, variant_id: vid, qty: 1 })
+    method:'POST', headers:{'Content-Type':'application/json','X-SVNTeX2-Nonce': (window.SVNTEX2_BRAND && SVNTEX2_BRAND.nonce)||''}, body: JSON.stringify({ product_id: pid, variant_id: vid, qty: 1 })
   }).then(r=>r.json()).then(data=>{
     btn.textContent = 'Added'; setTimeout(()=>{ btn.textContent = orig; delete btn.dataset.loading; }, 1200);
   }).catch(()=>{ btn.textContent='Error'; setTimeout(()=>{ btn.textContent=orig; delete btn.dataset.loading; },1400); });
