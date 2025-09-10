@@ -5,9 +5,17 @@ if (!defined('ABSPATH')) exit;
 add_action('init', function(){
     register_post_type('svntex_product', [
         'labels' => [
-            'name' => 'SVNTeX Products',
-            'singular_name' => 'SVNTeX Product',
-            'menu_name' => 'SVNTeX Products',
+            'name' => __('SVNTeX Products', 'svntex2'),
+            'singular_name' => __('SVNTeX Product', 'svntex2'),
+            'menu_name' => __('SVNTeX Products', 'svntex2'),
+            'add_new' => __('Add Product', 'svntex2'),
+            'add_new_item' => __('Add New Product', 'svntex2'),
+            'edit_item' => __('Edit Product', 'svntex2'),
+            'new_item' => __('New Product', 'svntex2'),
+            'view_item' => __('View Product', 'svntex2'),
+            'search_items' => __('Search Products', 'svntex2'),
+            'not_found' => __('No products found', 'svntex2'),
+            'not_found_in_trash' => __('No products found in Trash', 'svntex2'),
         ],
         'public' => true,
         'has_archive' => true,
@@ -16,9 +24,9 @@ add_action('init', function(){
         'show_ui' => true,
         'show_in_menu' => false, // Hide from top-level menu
         'menu_icon' => 'dashicons-products',
-    'supports' => ['title','editor','thumbnail','excerpt'],
-    'capability_type' => 'post',
-    'show_in_admin_bar' => true,
+		'supports' => ['title','editor','thumbnail','excerpt'],
+		'capability_type' => 'post',
+		'show_in_admin_bar' => true,
     ]);
     register_taxonomy('svntex_category','svntex_product',[ 'label'=>'Product Categories','hierarchical'=>true,'show_ui'=>true,'show_in_rest'=>true ]);
     register_taxonomy('svntex_collection','svntex_product',[ 'label'=>'Collections','hierarchical'=>false,'show_ui'=>true,'show_in_rest'=>true ]);
@@ -51,7 +59,8 @@ function svntex2_generate_product_id(): string {
 // 3) Admin meta boxes
 add_action('add_meta_boxes', function(){
     add_meta_box('svntex_product_core','Product Details','svntex2_mb_product_core','svntex_product','normal','high');
-    add_meta_box('svntex_product_media','Media & Presentation','svntex2_mb_product_media','svntex_product','normal','default');
+    add_meta_box('svntex_product_media','Product Media (4 Images + Video)','svntex2_mb_product_media','svntex_product','normal','default');
+    add_meta_box('svntex_product_vendor','Vendor','svntex2_mb_product_vendor','svntex_product','side','default');
 });
 
 function svntex2_mb_product_core($post){
@@ -101,7 +110,7 @@ function svntex2_mb_product_media($post){
     $videos_text = esc_textarea( implode("\n", $videos) );
     echo <<<HTML
 <style>.svntex-media-wrap{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0}.svntex-media-thumb{width:70px;height:70px;position:relative;border:1px solid #ccd0d4;background:#f8f9fa;border-radius:4px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:11px;color:#555}.svntex-media-thumb img{width:100%;height:100%;object-fit:cover}.svntex-remove{position:absolute;top:2px;right:2px;background:#d63638;color:#fff;border:none;border-radius:2px;padding:0 4px;font-size:11px;cursor:pointer}</style>
-<p style="margin-top:0">Add gallery images & optional product videos (YouTube / MP4 URLs). Featured Image uses the standard WordPress panel.</p>
+<p style="margin-top:0">Add up to 4 gallery images & optional product videos (YouTube / MP4 URLs). The main "Featured Image" is handled by the standard WordPress panel on the right.</p>
 <div id="svntex-gallery" class="svntex-media-wrap">
 HTML;
     if($gallery){
@@ -114,11 +123,11 @@ HTML;
     }
     echo "</div>";
     echo '<input type="hidden" name="svntex_gallery_ids" id="svntex_gallery_ids" value="'.$gallery_ids.'" />';
-    echo '<p><button type="button" class="button" id="svntex_add_gallery">Add Images</button></p>';
+    echo '<p><button type="button" class="button" id="svntex_add_gallery">Add Gallery Images</button></p>';
     echo '<p><label>Video URLs (one per line)<br /><textarea name="svntex_videos" style="width:100%;min-height:90px;">'.$videos_text.'</textarea></label></p>';
-    echo '<p style="font-size:11px;color:#555;">Video URLs are optional; they can be embedded on the product page in future enhancements.</p>';
+    echo '<p style="font-size:11px;color:#555;">Video URLs are optional and can be embedded on the product page.</p>';
     echo <<<JS
-<script>jQuery(function($){if(typeof wp==="undefined"||!wp.media)return;let frame;$(document).on('click','#svntex_add_gallery',function(e){e.preventDefault(); if(frame){frame.open();return;} frame=wp.media({title:'Select Images',multiple:true,library:{type:'image'}}); frame.on('select',function(){const sel=frame.state().get('selection'); sel.each(function(att){const id=att.get('id'); if(!id) return; if($('#svntex-gallery .svntex-media-thumb[data-id='+id+']').length) return; const size=att.get('sizes'); const url=size&&size.thumbnail?size.thumbnail.url:att.get('url'); $('#svntex-gallery').append('<div class="svntex-media-thumb" data-id="'+id+'"><img src="'+url+'"/><button type="button" class="svntex-remove" title="Remove">&times;</button></div>'); updateHidden(); });}); frame.open();}); function updateHidden(){const ids=$('#svntex-gallery .svntex-media-thumb').map(function(){return $(this).data('id');}).get(); $('#svntex_gallery_ids').val(ids.join(',')); } $(document).on('click','.svntex-media-thumb .svntex-remove',function(){ $(this).closest('.svntex-media-thumb').remove(); updateHidden(); });});</script>
+<script>jQuery(function($){if(typeof wp==="undefined"||!wp.media)return;let frame;$(document).on('click','#svntex_add_gallery',function(e){e.preventDefault(); if(frame){frame.open();return;} frame=wp.media({title:'Select up to 4 Images',multiple:true,library:{type:'image'}}); frame.on('select',function(){const sel=frame.state().get('selection'); const currentCount = $('#svntex-gallery .svntex-media-thumb').length; const remaining = 4 - currentCount; if (sel.length > remaining) { alert('You can only add '+remaining+' more image(s).'); return; } sel.each(function(att){const id=att.get('id'); if(!id) return; if($('#svntex-gallery .svntex-media-thumb[data-id='+id+']').length) return; const size=att.get('sizes'); const url=size&&size.thumbnail?size.thumbnail.url:att.get('url'); $('#svntex-gallery').append('<div class="svntex-media-thumb" data-id="'+id+'"><img src="'+url+'"/><button type="button" class="svntex-remove" title="Remove">&times;</button></div>'); updateHidden(); });}); frame.open();}); function updateHidden(){const ids=$('#svntex-gallery .svntex-media-thumb').map(function(){return $(this).data('id');}).get(); $('#svntex_gallery_ids').val(ids.join(',')); if(ids.length >= 4) { $('#svntex_add_gallery').hide(); } else { $('#svntex_add_gallery').show(); } } $(document).on('click','.svntex-media-thumb .svntex-remove',function(){ $(this).closest('.svntex-media-thumb').remove(); updateHidden(); }); updateHidden(); });</script>
 JS;
 }
 
