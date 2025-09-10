@@ -9,32 +9,87 @@ if (!defined('ABSPATH')) exit;
 wp_enqueue_style('svntex2-style');
 wp_enqueue_style('svntex2-landing');
 
-// Capture search parameters
-$search = sanitize_text_field($_GET['q'] ?? '');
+// Capture search / filter parameters
+$search   = sanitize_text_field($_GET['q'] ?? '');
 $category = isset($_GET['cat']) ? (int) $_GET['cat'] : 0;
-$sku = sanitize_text_field($_GET['sku'] ?? '');
+$sku      = sanitize_text_field($_GET['sku'] ?? '');
+$pmin     = isset($_GET['price_min']) && $_GET['price_min'] !== '' ? (float) $_GET['price_min'] : null;
+$pmax     = isset($_GET['price_max']) && $_GET['price_max'] !== '' ? (float) $_GET['price_max'] : null;
+$tags_sel = isset($_GET['tags']) ? array_filter(array_map('intval', (array) $_GET['tags'])) : [];
+$sort     = isset($_GET['sort']) ? sanitize_text_field($_GET['sort']) : '';
 
-// Build WP_Query args
+// Build WP_Query base args
 $args = [
-  'post_type' => 'svntex_product',
+  'post_type'      => 'svntex_product',
   'posts_per_page' => 24,
-  'paged' => max(1, (int)($_GET['pg'] ?? 1)),
-  's' => $search,
+  'paged'          => max(1, (int)($_GET['pg'] ?? 1)),
+  's'              => $search,
+  'tax_query'      => [],
 ];
 if ($category) {
-  $args['tax_query'] = [ [ 'taxonomy' => 'svntex_category','field' => 'term_id','terms' => $category ] ];
+  $args['tax_query'][] = [ 'taxonomy' => 'svntex_category','field' => 'term_id','terms' => $category ];
 }
-// SKU filter via meta-like variant table search (simplified: search variants table)
-$variant_ids = [];
+if ($tags_sel) {
+  $args['tax_query'][] = [ 'taxonomy' => 'svntex_tag','field' => 'term_id','terms' => $tags_sel ];
+}
+if (!$args['tax_query']) unset($args['tax_query']);
+
+// Constrain by variants for SKU / price filters
+global $wpdb; $vt = $wpdb->prefix.'svntex_product_variants';
+$constraint_ids = null; // null means no variant-derived constraint yet
 if ($sku) {
-  global $wpdb; $t = $wpdb->prefix.'svntex_product_variants';
-  $pids = $wpdb->get_col($wpdb->prepare("SELECT DISTINCT product_id FROM $t WHERE sku LIKE %s", '%'.$wpdb->esc_like($sku).'%'));
-  if ($pids) { $args['post__in'] = array_map('intval',$pids); $args['posts_per_page'] = 48; }
-  else { $args['post__in'] = [0]; }
+  $sku_pids = $wpdb->get_col($wpdb->prepare("SELECT DISTINCT product_id FROM $vt WHERE sku LIKE %s", '%'.$wpdb->esc_like($sku).'%'));
+  $constraint_ids = $sku_pids ? array_map('intval',$sku_pids) : [0];
 }
+if ($pmin !== null || $pmax !== null) {
+  $conds = [];
+  if ($pmin !== null) $conds[] = $wpdb->prepare('price >= %f', $pmin);
+  if ($pmax !== null) $conds[] = $wpdb->prepare('price <= %f', $pmax);
+  $sql = "SELECT DISTINCT product_id FROM $vt WHERE active=1 AND price IS NOT NULL" . ($conds ? ' AND '.implode(' AND ',$conds):'');
+  $price_pids = $wpdb->get_col($sql);
+  if ($constraint_ids === null) { $constraint_ids = $price_pids ? array_map('intval',$price_pids) : [0]; }
+  else {
+    $constraint_ids = array_values(array_intersect($constraint_ids, $price_pids ? array_map('intval',$price_pids) : [0]));
+    if (!$constraint_ids) $constraint_ids = [0];
+  }
+}
+if ($constraint_ids !== null) {
+  $args['post__in'] = $constraint_ids;
+  $args['posts_per_page'] = 48; // show more when filtering via variants
+}
+
+// Sorting
+switch($sort){
+  case 'newest':
+    $args['orderby'] = 'date'; $args['order'] = 'DESC'; break;
+  case 'price_asc':
+  case 'price_desc':
+    // We'll manual sort after query using variant min price
+    break;
+}
+
 $q = new WP_Query($args);
 
+// Post-query price-based sorting (if requested)
+if (in_array($sort,['price_asc','price_desc'],true) && $q->have_posts()) {
+  $posts = $q->posts;
+  // Map product -> min_price
+  $ids = wp_list_pluck($posts,'ID'); if($ids){
+    $in = implode(',', array_map('intval',$ids));
+    $rows = $wpdb->get_results("SELECT product_id, MIN(price) as mp FROM $vt WHERE product_id IN ($in) AND active=1 AND price IS NOT NULL GROUP BY product_id");
+    $map = [];
+    foreach($rows as $r){ $map[(int)$r->product_id] = (float)$r->mp; }
+    usort($posts,function($a,$b) use ($map,$sort){
+      $pa = $map[$a->ID] ?? PHP_FLOAT_MAX; $pb = $map[$b->ID] ?? PHP_FLOAT_MAX;
+      if ($pa == $pb) return 0;
+      return ($sort==='price_asc') ? ($pa < $pb ? -1:1) : ($pa > $pb ? -1:1);
+    });
+    $q->posts = $posts; // replace order
+  }
+}
+
 $cats = get_terms(['taxonomy'=>'svntex_category','hide_empty'=>false,'parent'=>0]);
+$tags_all = get_terms(['taxonomy'=>'svntex_tag','hide_empty'=>false,'number'=>100]);
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
@@ -104,9 +159,34 @@ $cats = get_terms(['taxonomy'=>'svntex_category','hide_empty'=>false,'parent'=>0
       <label>SKU</label>
       <input type="text" name="sku" value="<?php echo esc_attr($sku); ?>" placeholder="SKU" />
     </div>
+    <div>
+      <label>Price Min</label>
+      <input type="number" step="0.01" name="price_min" value="<?php echo $pmin !== null? esc_attr($pmin):''; ?>" placeholder="Min" />
+    </div>
+    <div>
+      <label>Price Max</label>
+      <input type="number" step="0.01" name="price_max" value="<?php echo $pmax !== null? esc_attr($pmax):''; ?>" placeholder="Max" />
+    </div>
+    <div>
+      <label>Tags</label>
+      <select name="tags[]" multiple size="2" style="height:40px;">
+        <?php foreach($tags_all as $tg): ?>
+          <option value="<?php echo (int)$tg->term_id; ?>" <?php echo in_array($tg->term_id,$tags_sel,true)?'selected':''; ?>><?php echo esc_html($tg->name); ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <div>
+      <label>Sort</label>
+      <select name="sort">
+        <option value="">Default</option>
+        <option value="price_asc" <?php selected($sort,'price_asc'); ?>>Price ↑</option>
+        <option value="price_desc" <?php selected($sort,'price_desc'); ?>>Price ↓</option>
+        <option value="newest" <?php selected($sort,'newest'); ?>>Newest</option>
+      </select>
+    </div>
     <div style="align-self:stretch;display:flex;gap:.5rem;">
       <button type="submit">Search</button>
-      <a href="<?php echo esc_url( remove_query_arg(['q','cat','sku','pg']) ); ?>" style="padding:.75rem 1rem;font-size:.7rem;font-weight:600;text-decoration:none;border-radius:14px;background:rgba(255,255,255,.15);color:#fff;display:inline-flex;align-items:center;">Reset</a>
+      <a href="<?php echo esc_url( remove_query_arg(['q','cat','sku','pg','price_min','price_max','tags','sort']) ); ?>" style="padding:.75rem 1rem;font-size:.7rem;font-weight:600;text-decoration:none;border-radius:14px;background:rgba(255,255,255,.15);color:#fff;display:inline-flex;align-items:center;">Reset</a>
     </div>
   </form>
   <?php if ( $q->have_posts() ): ?>

@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
-define( 'SVNTEX2_VERSION',        '0.2.15' );
+define( 'SVNTEX2_VERSION',        '0.2.16' );
 define( 'SVNTEX2_PLUGIN_FILE',    __FILE__ );
 define( 'SVNTEX2_PLUGIN_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'SVNTEX2_PLUGIN_URL',     plugin_dir_url( __FILE__ ) );
