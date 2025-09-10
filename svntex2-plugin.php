@@ -18,9 +18,6 @@
 // -----------------------------------------------------------------------------
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-// Diagnostic Notice 1: Check if plugin file is loaded
-add_action('admin_notices', function(){ echo '<div class="notice notice-info"><p><strong>SVNTeX2 Diagnostic:</strong> Main plugin file (svntex2-plugin.php) is running.</p></div>'; });
-
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS
 // -----------------------------------------------------------------------------
@@ -98,7 +95,7 @@ function svntex2_activate() {
 
     $sql = [];
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_wallet_transactions (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         user_id BIGINT UNSIGNED NOT NULL,
         type VARCHAR(32) NOT NULL,
         amount DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -106,21 +103,26 @@ function svntex2_activate() {
         reference_id VARCHAR(64) NULL,
         meta LONGTEXT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        KEY user_id (user_id), KEY type (type), KEY created_at (created_at)
+        PRIMARY KEY  (id),
+        KEY user_id (user_id),
+        KEY type (type),
+        KEY created_at (created_at)
     ) $charset";
 
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_referrals (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         referrer_id BIGINT UNSIGNED NOT NULL,
         referee_id BIGINT UNSIGNED NOT NULL,
         qualified TINYINT(1) NOT NULL DEFAULT 0,
         first_purchase_amount DECIMAL(12,2) NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY pair (referrer_id, referee_id), KEY referrer_id (referrer_id)
+        PRIMARY KEY  (id),
+        UNIQUE KEY pair (referrer_id, referee_id),
+        KEY referrer_id (referrer_id)
     ) $charset";
 
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_kyc_submissions (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         user_id BIGINT UNSIGNED NOT NULL UNIQUE,
         status VARCHAR(20) NOT NULL DEFAULT 'pending',
         aadhaar_hash VARCHAR(128) NULL,
@@ -132,11 +134,12 @@ function svntex2_activate() {
         documents LONGTEXT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NULL,
+        PRIMARY KEY  (id),
         KEY status (status)
     ) $charset";
 
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_withdrawals (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         user_id BIGINT UNSIGNED NOT NULL,
         amount DECIMAL(12,2) NOT NULL,
         status VARCHAR(20) NOT NULL DEFAULT 'requested',
@@ -145,22 +148,25 @@ function svntex2_activate() {
         admin_note TEXT NULL,
         requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         processed_at DATETIME NULL,
-        KEY user_id (user_id), KEY status (status)
+        PRIMARY KEY  (id),
+        KEY user_id (user_id),
+        KEY status (status)
     ) $charset";
 
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_profit_distributions (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         month_year CHAR(7) NOT NULL,
         company_profit DECIMAL(14,2) NOT NULL,
         eligible_members INT UNSIGNED NOT NULL,
         profit_value DECIMAL(14,4) NOT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id),
         UNIQUE KEY month_year (month_year)
     ) $charset";
 
     // Admin-entered monthly profit input components (revenue, wallet remaining, cogs, maintenance %)
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_profit_inputs (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         month_year CHAR(7) NOT NULL UNIQUE,
         revenue DECIMAL(14,2) NOT NULL DEFAULT 0,
         remaining_wallet DECIMAL(14,2) NOT NULL DEFAULT 0,
@@ -168,22 +174,24 @@ function svntex2_activate() {
         maintenance_percent DECIMAL(5,4) NOT NULL DEFAULT 0,
         notes TEXT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME NULL
+        updated_at DATETIME NULL,
+        PRIMARY KEY  (id)
     ) $charset";
 
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_pb_payouts (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         user_id BIGINT UNSIGNED NOT NULL,
         month_year CHAR(7) NOT NULL,
         slab_percent DECIMAL(5,2) NOT NULL,
         payout_amount DECIMAL(14,2) NOT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id),
         KEY user_month (user_id, month_year)
     ) $charset";
 
     // Suspense table for withheld PB payouts (KYC pending / suspended etc.)
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_pb_suspense (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         user_id BIGINT UNSIGNED NOT NULL,
         month_year CHAR(7) NOT NULL,
         slab_percent DECIMAL(5,2) NULL,
@@ -192,13 +200,14 @@ function svntex2_activate() {
         status VARCHAR(20) NOT NULL DEFAULT 'held',
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         released_at DATETIME NULL,
+        PRIMARY KEY  (id),
         KEY user_month (user_id, month_year),
         KEY status (status)
     ) $charset";
 
     // Product/Inventory tables
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_product_variants (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         product_id BIGINT UNSIGNED NOT NULL,
         sku VARCHAR(80) NOT NULL UNIQUE,
         attributes LONGTEXT NULL,
@@ -207,20 +216,24 @@ function svntex2_activate() {
         unit VARCHAR(12) NULL,
         active TINYINT(1) NOT NULL DEFAULT 1,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        KEY product_id (product_id), KEY active (active), KEY tax_class (tax_class)
+        PRIMARY KEY  (id),
+        KEY product_id (product_id),
+        KEY active (active),
+        KEY tax_class (tax_class)
     ) $charset";
 
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_inventory_locations (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         code VARCHAR(20) NOT NULL UNIQUE,
         name VARCHAR(120) NOT NULL,
         address TEXT NULL,
         active TINYINT(1) NOT NULL DEFAULT 1,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id)
     ) $charset";
 
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_inventory_stocks (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         variant_id BIGINT UNSIGNED NOT NULL,
         location_id BIGINT UNSIGNED NOT NULL,
         qty INT NOT NULL DEFAULT 0,
@@ -228,12 +241,14 @@ function svntex2_activate() {
         max_qty INT NULL,
         reorder_threshold INT NULL,
         backorder_enabled TINYINT(1) NOT NULL DEFAULT 0,
+        PRIMARY KEY  (id),
         UNIQUE KEY var_loc (variant_id, location_id),
-        KEY qty (qty), KEY backorder_enabled (backorder_enabled)
+        KEY qty (qty),
+        KEY backorder_enabled (backorder_enabled)
     ) $charset";
 
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_delivery_rules (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         scope ENUM('global','product','variant') NOT NULL,
         scope_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
         mode ENUM('fixed','percent') NOT NULL,
@@ -242,11 +257,13 @@ function svntex2_activate() {
         override_global TINYINT(1) NOT NULL DEFAULT 0,
         active TINYINT(1) NOT NULL DEFAULT 1,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        KEY scope_idx (scope, scope_id), KEY active (active)
+        PRIMARY KEY  (id),
+        KEY scope_idx (scope, scope_id),
+        KEY active (active)
     ) $charset";
 
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_media_links (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         product_id BIGINT UNSIGNED NOT NULL,
         variant_id BIGINT UNSIGNED NULL,
         attachment_id BIGINT UNSIGNED NULL,
@@ -254,12 +271,15 @@ function svntex2_activate() {
         embed_url VARCHAR(255) NULL,
         sort_order INT NOT NULL DEFAULT 0,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        KEY product_id (product_id), KEY variant_id (variant_id), KEY media_type (media_type)
+        PRIMARY KEY  (id),
+        KEY product_id (product_id),
+        KEY variant_id (variant_id),
+        KEY media_type (media_type)
     ) $charset";
 
     // Orders + order items (simple custom commerce layer)
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_orders (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         user_id BIGINT UNSIGNED NULL,
         status VARCHAR(20) NOT NULL DEFAULT 'pending',
         items_total DECIMAL(14,2) NOT NULL DEFAULT 0,
@@ -268,10 +288,13 @@ function svntex2_activate() {
         address LONGTEXT NULL,
         meta LONGTEXT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        KEY user_id (user_id), KEY status (status), KEY created_at (created_at)
+        PRIMARY KEY  (id),
+        KEY user_id (user_id),
+        KEY status (status),
+        KEY created_at (created_at)
     ) $charset";
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_order_items (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         order_id BIGINT UNSIGNED NOT NULL,
         product_id BIGINT UNSIGNED NOT NULL,
         variant_id BIGINT UNSIGNED NULL,
@@ -279,17 +302,21 @@ function svntex2_activate() {
         price DECIMAL(14,2) NOT NULL DEFAULT 0,
         subtotal DECIMAL(14,2) NOT NULL DEFAULT 0,
         meta LONGTEXT NULL,
-        KEY order_id (order_id), KEY product_id (product_id), KEY variant_id (variant_id)
+        PRIMARY KEY  (id),
+        KEY order_id (order_id),
+        KEY product_id (product_id),
+        KEY variant_id (variant_id)
     ) $charset";
 
     // Vendors (suppliers) table – foundational for vendor linkage & communications
     $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_vendors (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         name VARCHAR(120) NOT NULL,
         email VARCHAR(120) NULL,
         phone VARCHAR(40) NULL,
         notes TEXT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id),
         KEY name (name)
     ) $charset";
 
@@ -1150,6 +1177,9 @@ add_action( 'woocommerce_order_status_completed', function( $order_id ) {
     }
     // Determine dynamic rate using tiered slabs then allow override via filter
     if ( function_exists('svntex2_referrals_get_commission_rate') ) {
+        $base_rate = svntex2_referrals_get_commission_rate( $referrer_id, $order, $user_id );
+    } else {
+        $base_rate = SVNTEX2_REFERRAL_RATE;
     }
     $rate = (float) apply_filters( 'svntex2_referral_commission_rate', $base_rate, $order, $referrer_id, $user_id );
     if ( $rate > 0 ) {
