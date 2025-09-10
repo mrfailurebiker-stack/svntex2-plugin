@@ -65,7 +65,8 @@ require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/helpers.php';        // Wa
 require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/shortcodes.php';     // Shortcodes (dashboard + extras)
 require_once SVNTEX2_PLUGIN_DIR . 'includes/functions/rest.php';           // REST endpoints
 // Newly scaffolded domain modules (placeholders / partial implementations)
-foreach ( [ 'referrals', 'kyc', 'withdrawals', 'pb', 'cron', 'admin', 'cli' ] as $module ) {
+// Added 'vendors' module for custom supplier management (stock + communication layer foundation)
+foreach ( [ 'referrals', 'kyc', 'withdrawals', 'pb', 'cron', 'admin', 'cli', 'vendors' ] as $module ) {
     $file = SVNTEX2_PLUGIN_DIR . 'includes/functions/' . $module . '.php';
     if ( file_exists( $file ) ) { require_once $file; }
 }
@@ -276,6 +277,17 @@ function svntex2_activate() {
         subtotal DECIMAL(14,2) NOT NULL DEFAULT 0,
         meta LONGTEXT NULL,
         KEY order_id (order_id), KEY product_id (product_id), KEY variant_id (variant_id)
+    ) $charset";
+
+    // Vendors (suppliers) table – foundational for vendor linkage & communications
+    $sql[] = "CREATE TABLE {$wpdb->prefix}svntex_vendors (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(120) NOT NULL,
+        email VARCHAR(120) NULL,
+        phone VARCHAR(40) NULL,
+        notes TEXT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        KEY name (name)
     ) $charset";
 
     foreach ( $sql as $statement ) { dbDelta( $statement ); }

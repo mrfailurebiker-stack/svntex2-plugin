@@ -126,6 +126,13 @@ function svntex2_commerce_checkout($address){
     global $wpdb; $orders=$wpdb->prefix.'svntex_orders'; $itemsT=$wpdb->prefix.'svntex_order_items';
     $totals = svntex2_commerce_cart_totals();
     if (empty($totals['lines'])) return new WP_Error('empty_cart','Cart empty');
+    // Build variant -> qty map for stock enforcement (skip lines with no variant)
+    $variant_qty = [];
+    foreach($totals['lines'] as $ln){ if($ln['variant_id']){ $variant_qty[$ln['variant_id']] = ($variant_qty[$ln['variant_id']] ?? 0) + (int)$ln['qty']; } }
+    if(!empty($variant_qty) && function_exists('svntex2_inventory_batch_decrement')){
+        $dec = svntex2_inventory_batch_decrement($variant_qty);
+        if(is_wp_error($dec)) return $dec; // do not proceed, stock insufficient
+    }
     $wpdb->insert($orders,[
         'user_id'=> is_user_logged_in()? get_current_user_id(): null,
         'status'=>'pending',

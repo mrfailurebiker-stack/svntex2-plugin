@@ -475,27 +475,43 @@ function svntex2_admin_settings(){
         $mode = sanitize_key($_POST['pb_distribution_mode'] ?? 'normalized');
         if( ! in_array($mode,['normalized','direct_formula'], true) ) $mode='normalized';
         update_option('svntex2_pb_distribution_mode',$mode);
-        $auto = isset($_POST['pb_auto_release']) ? 1 : 0; update_option('svntex2_pb_auto_release',$auto);
-        $manual_profit = isset($_POST['manual_profit_value']) ? floatval($_POST['manual_profit_value']) : 0.0; update_option('svntex2_manual_profit_value',$manual_profit);
+        update_option('svntex2_pb_auto_release', isset($_POST['pb_auto_release']) ? 1 : 0);
+        update_option('svntex2_manual_profit_value', isset($_POST['manual_profit_value']) ? floatval($_POST['manual_profit_value']) : 0.0);
+        // Inventory / stock alerts
+        update_option('svntex2_low_stock_threshold', max(0, (int)($_POST['low_stock_threshold'] ?? 5)) );
+        update_option('svntex2_stock_notify_enabled', isset($_POST['stock_notify_enabled']) ? 1 : 0 );
+        $emails = sanitize_text_field( $_POST['stock_notify_emails'] ?? '' );
+        update_option('svntex2_stock_notify_emails', $emails );
         echo '<div class="updated notice"><p>Settings saved.</p></div>';
     }
     $mode = get_option('svntex2_pb_distribution_mode','normalized');
     $auto = (int)get_option('svntex2_pb_auto_release',0);
     $manual_profit = (float) get_option('svntex2_manual_profit_value',0);
+    $low_stock_threshold = (int) get_option('svntex2_low_stock_threshold',5);
+    $stock_notify_enabled = (int) get_option('svntex2_stock_notify_enabled',1);
+    $stock_notify_emails  = get_option('svntex2_stock_notify_emails','');
     echo '<h2>Settings</h2>';
-    echo '<form method="post" class="svntex2-inline-form" style="flex-direction:column;align-items:flex-start;gap:14px;max-width:520px">';
+    echo '<form method="post" class="svntex2-inline-form" style="flex-direction:column;align-items:flex-start;gap:14px;max-width:720px">';
     wp_nonce_field('svntex2_save_settings','svntex2_settings_nonce');
-    echo '<label><strong>PB Distribution Mode</strong><br/>';
+    echo '<fieldset style="border:1px solid #e2e8f0;padding:14px 18px;border-radius:10px;max-width:600px"><legend><strong>Profit Bonus (PB)</strong></legend>';
+    echo '<label><strong>Distribution Mode</strong><br/>';
     echo '<select name="pb_distribution_mode">';
     foreach(['normalized'=>'Normalized Share (Σ slab %)','direct_formula'=>'Direct Formula (profit_value * slab %)'] as $k=>$label){
         printf('<option value="%s" %s>%s</option>', esc_attr($k), selected($mode,$k,false), esc_html($label));
     }
     echo '</select></label>';
-    echo '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="pb_auto_release" value="1" '.checked($auto,1,false).'/> Auto-release suspense when user becomes Active</label>';
-    echo '<label><strong>Manual Profit Override (current month)</strong><br/><input type="number" step="0.01" name="manual_profit_value" value="'.esc_attr($manual_profit).'" placeholder="0.00"/> <small>0 = disabled (use computed profit)</small></label>';
+    echo '<label style="display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" name="pb_auto_release" value="1" '.checked($auto,1,false).'/> Auto-release suspense when user becomes Active</label>';
+    echo '<label style="margin-top:6px"><strong>Manual Profit Override (current month)</strong><br/><input type="number" step="0.01" name="manual_profit_value" value="'.esc_attr($manual_profit).'" placeholder="0.00"/> <small>0 = disabled (use computed profit)</small></label>';
+    echo '<p style="font-size:11px;color:#64748b;margin:6px 0 0;">Normalized mode divides company profit proportionally by total slab % values. Direct Formula mode uses average profit value times each user slab %.</p>';
+    echo '</fieldset>';
+    echo '<fieldset style="border:1px solid #e2e8f0;padding:14px 18px;border-radius:10px;max-width:600px"><legend><strong>Inventory Alerts</strong></legend>';
+    echo '<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="stock_notify_enabled" value="1" '.checked($stock_notify_enabled,1,false).'/> Enable Low / Out-of-Stock Emails</label>';
+    echo '<label><strong>Low Stock Threshold</strong><br/><input type="number" name="low_stock_threshold" value="'.esc_attr($low_stock_threshold).'" class="small-text" /> <small>Trigger low stock alert when remaining &lt;= this qty.</small></label>';
+    echo '<label><strong>Notification Emails</strong><br/><input type="text" name="stock_notify_emails" value="'.esc_attr($stock_notify_emails).'" style="min-width:380px" placeholder="comma,separated@emails" /> <small>Blank = admin email fallback.</small></label>';
+    echo '<p style="font-size:11px;color:#64748b;margin:6px 0 0;">Low stock alert throttled to once per variant every 6h while below threshold. Out-of-stock alert throttled to every 3h while zero.</p>';
+    echo '</fieldset>';
     echo '<button class="button button-primary" name="svntex2_save_settings" value="1">Save Settings</button>';
     echo '</form>';
-    echo '<h3>Info</h3><p>Normalized mode divides company profit proportionally by total slab % values. Direct Formula mode uses average profit value times each user slab %.</p>';
 }
 
 /** Inline styles (kept minimal & scoped) */

@@ -63,6 +63,8 @@ function svntex2_mb_product_core($post){
     $bullets = (array) get_post_meta($post->ID,'product_bullets', true); if(empty($bullets)) $bullets = [];
     $bullets_text = esc_textarea( implode("\n", $bullets) );
     $sku_attr = esc_attr($sku); $gst_attr=esc_attr($gst); $mrp_attr=esc_attr($mrp); $sale_attr=esc_attr($sale); $cost_attr=esc_attr($cost); $margin_attr=esc_attr($margin);
+    $stock_status = get_post_meta($post->ID,'stock_status', true) ?: 'in_stock';
+    $stock_options = '<option value="in_stock"'.selected($stock_status,'in_stock',false).'>In Stock</option><option value="out_of_stock"'.selected($stock_status,'out_of_stock',false).'>Out of Stock</option>';
     $pid_html = esc_html($pid);
     $unit_options = sprintf('<option value="">—</option><option value="pieces" %s>Pieces</option><option value="kg" %s>KG</option><option value="litres" %s>Litres</option>',
         selected($unit,'pieces',false), selected($unit,'kg',false), selected($unit,'litres',false));
@@ -80,6 +82,7 @@ function svntex2_mb_product_core($post){
   <label>Discount / Sale Price <input type="number" step="0.01" name="svntex_sale" value="{$sale_attr}" /></label>
   <label>Cost Price (Admin Only) <input type="number" step="0.01" name="svntex_cost" value="{$cost_attr}" /></label>
   <label>Profit Margin % <input type="number" step="0.01" name="svntex_margin" value="{$margin_attr}" class="small-text" /></label>
+    <label>Stock Status <select name="svntex_stock_status">{$stock_options}</select></label>
 </div>
 <div class="svntex-bullets"><label>Bullet Points (one per line)<textarea name="svntex_bullets">{$bullets_text}</textarea></label><p class="svntex-inline-note">These appear as feature bullets (Amazon style). Public.</p></div>
 <p class="svntex-inline-note">Leave Profit Margin blank to auto-calc from Sale (or MRP) and Cost.</p>
@@ -127,6 +130,10 @@ add_action('save_post_svntex_product', function($post_id){
     foreach(['mrp'=>'mrp','sale_price'=>'sale','gst_percent'=>'gst','cost_price'=>'cost'] as $meta=>$field){
         $key='svntex_'.$field; if(isset($_POST[$key]) && $_POST[$key] !== '') update_post_meta($post_id,$meta,(float)$_POST[$key]);
     }
+    if(isset($_POST['svntex_stock_status'])){
+        $ss = $_POST['svntex_stock_status']==='out_of_stock'?'out_of_stock':'in_stock';
+        update_post_meta($post_id,'stock_status',$ss);
+    }
     if(isset($_POST['svntex_bullets'])){
         $lines = array_filter(array_map('trim', explode("\n", (string)$_POST['svntex_bullets'])));
         update_post_meta($post_id,'product_bullets', $lines);
@@ -155,7 +162,7 @@ add_action('save_post_svntex_product', function($post_id){
 
 // Admin columns for quick Amazon-like overview
 add_filter('manage_svntex_product_posts_columns', function($cols){
-    $insert = [ 'product_sku'=>'SKU', 'mrp'=>'MRP', 'sale_price'=>'Sale', 'gst_percent'=>'GST %', 'profit_margin'=>'Profit %' ];
+    $insert = [ 'product_sku'=>'SKU', 'mrp'=>'MRP', 'sale_price'=>'Sale', 'gst_percent'=>'GST %', 'profit_margin'=>'Profit %', 'stock_status'=>'Stock' ];
     // place after title
     $new = []; foreach($cols as $k=>$v){ $new[$k]=$v; if($k==='title'){ foreach($insert as $ik=>$iv){ $new[$ik]=$iv; } } }
     return $new;
@@ -167,6 +174,7 @@ add_action('manage_svntex_product_posts_custom_column', function($col,$post_id){
         case 'sale_price': $v=get_post_meta($post_id,'sale_price', true); if($v!=='') echo esc_html(number_format_i18n((float)$v,2)); break;
         case 'gst_percent': $v=get_post_meta($post_id,'gst_percent', true); if($v!=='') echo esc_html((float)$v); break;
         case 'profit_margin': $v=get_post_meta($post_id,'profit_margin', true); if($v!=='') echo esc_html((float)$v); break;
+    case 'stock_status': $v=get_post_meta($post_id,'stock_status', true) ?: 'in_stock'; echo $v==='in_stock'?'<span style="color:#16a34a;font-weight:600;">In</span>':'<span style="color:#dc2626;font-weight:600;">Out</span>'; break;
     }
 },10,2);
 add_filter('manage_edit-svntex_product_sortable_columns', function($cols){ $cols['mrp']='mrp'; $cols['sale_price']='sale_price'; $cols['profit_margin']='profit_margin'; return $cols; });
@@ -216,6 +224,47 @@ function svntex2_inventory_get_rows($variant_id){
         'backorder_enabled'=> (int)$r->backorder_enabled,
         'location'=>['code'=>$r->code,'name'=>$r->name,'active'=>(int)$r->active],
     ]; }, $rows ?: []);
+}
+
+/**
+ * Atomically decrement inventory for multiple variants.
+ * @param array $variant_qty_map [ variant_id => required_qty ]
+ * @return true|WP_Error
+ */
+function svntex2_inventory_batch_decrement(array $variant_qty_map){
+    global $wpdb; if(empty($variant_qty_map)) return true;
+    $stkT=$wpdb->prefix.'svntex_inventory_stocks'; $varT=$wpdb->prefix.'svntex_product_variants';
+    // Validate positive quantities
+    foreach($variant_qty_map as $vid=>$q){ if($q<=0){ unset($variant_qty_map[$vid]); } }
+    if(!$variant_qty_map) return true;
+    $wpdb->query('START TRANSACTION');
+    $touched_products = [];
+    // Low stock threshold: option configurable + filter override
+    $low_threshold = (int) apply_filters('svntex2_low_stock_threshold', get_option('svntex2_low_stock_threshold', 5));
+    foreach($variant_qty_map as $vid=>$need){
+        $vid=(int)$vid; $need=(int)$need; if($need<=0) continue;
+        // Lock rows for this variant
+        $rows = $wpdb->get_results($wpdb->prepare("SELECT id,qty FROM $stkT WHERE variant_id=%d ORDER BY qty DESC FOR UPDATE", $vid));
+        $total=0; foreach($rows as $r){ $total += (int)$r->qty; }
+        if($total < $need){ $wpdb->query('ROLLBACK'); return new WP_Error('out_of_stock','Insufficient stock for variant '.$vid,[ 'variant_id'=>$vid,'required'=>$need,'available'=>$total ]); }
+        $remain=$need;
+        foreach($rows as $r){ if($remain<=0) break; $take = min($remain,(int)$r->qty); if($take>0){ $wpdb->update($stkT,[ 'qty'=>(int)$r->qty - $take ],[ 'id'=>$r->id ]); $remain -= $take; } }
+        // After decrement, compute remaining to trigger low stock action
+        $after_total = (int)$wpdb->get_var($wpdb->prepare("SELECT SUM(qty) FROM $stkT WHERE variant_id=%d", $vid));
+        if($after_total > 0 && $after_total <= $low_threshold){
+            do_action('svntex2_low_stock_variant',$vid,$after_total,$low_threshold);
+        }
+        if($after_total === 0){ do_action('svntex2_out_of_stock_variant',$vid); }
+        // Track product for status update
+        $pid = (int)$wpdb->get_var($wpdb->prepare("SELECT product_id FROM $varT WHERE id=%d", $vid)); if($pid) $touched_products[$pid]=true;
+    }
+    // Auto-sync product stock_status (simple rule: if all variant stock == 0 -> out_of_stock; else in_stock)
+    foreach(array_keys($touched_products) as $pid){
+        $total_variant_stock = (int)$wpdb->get_var($wpdb->prepare("SELECT SUM(s.qty) FROM $varT v LEFT JOIN $stkT s ON s.variant_id=v.id WHERE v.product_id=%d", $pid));
+        update_post_meta($pid,'stock_status', $total_variant_stock>0 ? 'in_stock' : 'out_of_stock');
+    }
+    $wpdb->query('COMMIT');
+    return true;
 }
 
 // 4b) Variant price range helper (min/max active variant prices)
@@ -284,3 +333,58 @@ add_shortcode('svntex_products', function($atts){
 // 7) REST scaffolding hooks will be in rest-products.php
 
 // (Intentionally no closing PHP tag)
+
+// 8) Inventory alert email notifications (low stock / out of stock)
+// These leverage the existing actions fired in svntex2_inventory_batch_decrement.
+add_action('svntex2_low_stock_variant', function($variant_id, $remaining, $threshold){
+    // Check if notifications disabled
+    if(!get_option('svntex2_stock_notify_enabled', 1)) return;
+    $variant_id = (int)$variant_id; $remaining = (int)$remaining; $threshold = (int)$threshold;
+    // Throttle: one email per variant per 6h while still below/equal threshold
+    if( get_transient('svntex2_low_stock_sent_'.$variant_id) ) return;
+    global $wpdb; $varT = $wpdb->prefix.'svntex_product_variants';
+    $row = $wpdb->get_row( $wpdb->prepare("SELECT v.id,v.sku,v.product_id, p.post_title FROM $varT v LEFT JOIN {$wpdb->posts} p ON p.ID=v.product_id WHERE v.id=%d", $variant_id) );
+    if(!$row) return;
+    $emails_raw = get_option('svntex2_stock_notify_emails','');
+    $emails = array_filter(array_map('sanitize_email', array_map('trim', explode(',', (string)$emails_raw))));
+    if(!$emails) { $admin_email = get_option('admin_email'); if($admin_email) $emails = [$admin_email]; }
+    if(!$emails) return; // nowhere to send
+    $subject = sprintf('Low Stock: %s (Variant #%d)', $row->post_title ?: 'Product', $variant_id);
+    $body  = "A product variant has reached low stock.\n\n";
+    $body .= "Product: ".$row->post_title."\n";
+    $body .= "Variant ID: ".$variant_id."\n";
+    $body .= "SKU: ".$row->sku."\n";
+    $body .= "Remaining Qty: ".$remaining." (threshold: ".$threshold.")\n";
+    $body .= "Time: ".current_time('mysql')."\n";
+    if(function_exists('svntex2_inventory_get_rows')){
+        $rows = svntex2_inventory_get_rows($variant_id);
+        if($rows){
+            $body .= "\nLocation Breakdown:\n";
+            foreach($rows as $r){ $body .= sprintf(" - %s: %d\n", $r['location']['code'], $r['qty']); }
+        }
+    }
+    $body .= "\nThis alert will repeat after 6h if stock is still low.\n";
+    foreach($emails as $em){ wp_mail($em, $subject, $body); }
+    set_transient('svntex2_low_stock_sent_'.$variant_id, 1, 6 * HOUR_IN_SECONDS);
+}, 10, 3);
+
+add_action('svntex2_out_of_stock_variant', function($variant_id){
+    if(!get_option('svntex2_stock_notify_enabled', 1)) return;
+    $variant_id = (int)$variant_id;
+    // Throttle separate from low stock: one per 3h while zero
+    if( get_transient('svntex2_oos_sent_'.$variant_id) ) return;
+    global $wpdb; $varT = $wpdb->prefix.'svntex_product_variants';
+    $row = $wpdb->get_row( $wpdb->prepare("SELECT v.id,v.sku,v.product_id, p.post_title FROM $varT v LEFT JOIN {$wpdb->posts} p ON p.ID=v.product_id WHERE v.id=%d", $variant_id) );
+    if(!$row) return;
+    $emails_raw = get_option('svntex2_stock_notify_emails','');
+    $emails = array_filter(array_map('sanitize_email', array_map('trim', explode(',', (string)$emails_raw))));
+    if(!$emails) { $admin_email = get_option('admin_email'); if($admin_email) $emails = [$admin_email]; }
+    if(!$emails) return;
+    $subject = sprintf('Out of Stock: %s (Variant #%d)', $row->post_title ?: 'Product', $variant_id);
+    $body  = "A product variant has reached zero stock.\n\n";
+    $body .= "Product: ".$row->post_title."\nVariant ID: ".$variant_id."\nSKU: ".$row->sku."\nTime: ".current_time('mysql')."\n";
+    $body .= "\nRestock to reset alert throttling.\n";
+    foreach($emails as $em){ wp_mail($em, $subject, $body); }
+    set_transient('svntex2_oos_sent_'.$variant_id, 1, 3 * HOUR_IN_SECONDS);
+}, 10, 1);
+

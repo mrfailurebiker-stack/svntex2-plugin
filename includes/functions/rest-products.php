@@ -24,6 +24,22 @@ add_action('rest_api_init', function(){
     register_rest_route('svntex2/v1','/variant/(?P<id>\d+)/inventory', [
         [ 'methods'=>'GET','callback'=>'svntex2_api_variant_inventory','permission_callback'=>'svntex2_api_can_manage' ],
     ]);
+    // Stock settings (read/update)
+    register_rest_route('svntex2/v1','/stock/settings', [
+        [ 'methods'=>'GET','callback'=>function(){
+            return [
+                'low_stock_threshold'=>(int) get_option('svntex2_low_stock_threshold',5),
+                'notify_enabled'=>(int) get_option('svntex2_stock_notify_enabled',1),
+                'notify_emails'=> get_option('svntex2_stock_notify_emails',''),
+            ];
+        }, 'permission_callback'=>'svntex2_api_can_manage' ],
+        [ 'methods'=>'POST','callback'=>function($r){
+            if(isset($r['low_stock_threshold'])) update_option('svntex2_low_stock_threshold', max(0,(int)$r['low_stock_threshold']) );
+            if(isset($r['notify_enabled'])) update_option('svntex2_stock_notify_enabled', $r['notify_enabled']?1:0 );
+            if(isset($r['notify_emails'])) update_option('svntex2_stock_notify_emails', sanitize_text_field($r['notify_emails']) );
+            return [ 'updated'=>true ];
+        }, 'permission_callback'=>'svntex2_api_can_manage' ],
+    ]);
 });
 
 function svntex2_api_can_manage(){ return current_user_can('manage_options'); }
@@ -132,7 +148,8 @@ function svntex2_format_product_response(WP_Post $post){
         'product_id'=> get_post_meta($post->ID,'product_id', true),
         'unit'=> get_post_meta($post->ID,'unit', true),
         'tax_class'=> get_post_meta($post->ID,'tax_class', true),
-        'profit_margin'=> (float) get_post_meta($post->ID,'profit_margin', true),
+    // Profit margin: hide from non-managers in public responses
+    'profit_margin'=> current_user_can('manage_options') ? (float) get_post_meta($post->ID,'profit_margin', true) : null,
         'sku'=> get_post_meta($post->ID,'product_sku', true),
         'mrp'=> (float) get_post_meta($post->ID,'mrp', true),
         'sale_price'=> (float) get_post_meta($post->ID,'sale_price', true),
@@ -162,7 +179,15 @@ function svntex2_format_product_response(WP_Post $post){
             $price_range = [ 'type'=>'range', 'display_min'=>$range['min'], 'display_max'=>$range['max'] ];
         }
     }
-    return [
+    // Stock status (manual) + quick aggregate (admin only aggregate across variants)
+    $stock_status = get_post_meta($post->ID,'stock_status', true) ?: 'in_stock';
+    $total_stock = null;
+    if(current_user_can('manage_options')){
+        global $wpdb; $vt=$wpdb->prefix.'svntex_product_variants'; $stkT=$wpdb->prefix.'svntex_inventory_stocks';
+        $total_stock = (int)$wpdb->get_var($wpdb->prepare("SELECT SUM(s.qty) FROM $vt v LEFT JOIN $stkT s ON s.variant_id=v.id WHERE v.product_id=%d", $post->ID));
+        if(!$total_stock) $total_stock = 0;
+    }
+    $base = [
         'id'=>$post->ID,
         'title'=>$post->post_title,
         'description'=> apply_filters('the_content',$post->post_content),
@@ -173,7 +198,13 @@ function svntex2_format_product_response(WP_Post $post){
         'variants'=>$variants,
         'price_range'=>$price_range,
         'permalink'=> get_permalink($post),
+        'stock_status'=>$stock_status,
+        'total_stock'=> $total_stock,
     ];
+    // Allow extensions (vendors etc.) to append extra structured data
+    $extra = apply_filters('svntex2_product_formatter_extra', [], $post);
+    if(is_array($extra) && $extra){ $base = array_merge($base,$extra); }
+    return $base;
 }
 
 ?>
