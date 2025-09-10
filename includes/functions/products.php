@@ -67,8 +67,14 @@ function svntex2_generate_product_id(): string {
 // 3) Admin meta boxes
 add_action('add_meta_boxes', function(){
     add_meta_box('svntex_product_core','Product Details','svntex2_mb_product_core','svntex_product','normal','high');
-    add_meta_box('svntex_product_media','Product Media (4 Images + Video)','svntex2_mb_product_media','svntex_product','normal','default');
+    add_meta_box('svntex_product_media','Product Media','svntex2_mb_product_media','svntex_product','normal','default');
     add_meta_box('svntex_product_vendor','Vendor','svntex2_mb_product_vendor','svntex_product','side','default');
+
+    // Clean up the UI by removing non-essential meta boxes
+    remove_meta_box('postcustom', 'svntex_product', 'normal'); // Custom Fields
+    remove_meta_box('astra_settings_meta_box', 'svntex_product', 'side'); // Astra theme settings
+    remove_meta_box('slugdiv', 'svntex_product', 'normal'); // Slug
+    remove_meta_box('authordiv', 'svntex_product', 'normal'); // Author
 });
 
 function svntex2_mb_product_core($post){
