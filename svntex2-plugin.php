@@ -24,10 +24,9 @@ function svntex_include_files() {
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/enqueue.php';
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/products.php';
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/rest-products.php';
-    require_once SVNTEX_PLUGIN_DIR . 'includes/functions/vendor.php';
+    require_once SVNTEX_PLUGIN_DIR . 'includes/functions/vendors.php';
 
     // Classes
-    require_once SVNTEX_PLUGIN_DIR . 'includes/classes/class-svntex-dashboard.php';
 }
 add_action( 'init', 'svntex_include_files' );
 
