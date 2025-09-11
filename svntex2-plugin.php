@@ -24,7 +24,6 @@ function svntex_include_files() {
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/enqueue.php';
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/products.php';
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/rest-products.php';
-    require_once SVNTEX_PLUGIN_DIR . 'includes/functions/rest-users.php';
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/vendor.php';
 
     // Classes
