@@ -31,7 +31,7 @@ function svntex_include_files() {
     // Classes
     require_once SVNTEX_PLUGIN_DIR . 'includes/classes/class-svntex-dashboard.php';
 }
-add_action( 'plugins_loaded', 'svntex_include_files' );
+add_action( 'init', 'svntex_include_files' );
 
 
 /**
