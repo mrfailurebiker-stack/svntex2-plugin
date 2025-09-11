@@ -36,7 +36,6 @@ add_action( 'init', 'svntex_include_files' );
  */
 function svntex_init() {
     // Initialize classes
-    SVNTEX_Dashboard::instance();
 }
 add_action( 'init', 'svntex_init' );
 
