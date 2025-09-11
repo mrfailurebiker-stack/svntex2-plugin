@@ -1,1 +1,138 @@
-# (paste the YAML above here)
+name: Deploy Plugin via SSH
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only show rsync changes (no write)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up PHP (only if test file present)
+        if: hashFiles('tests/smoke-test.php') != ''
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+      - name: Run smoke test
+        if: hashFiles('tests/smoke-test.php') != ''
+        run: php tests/smoke-test.php
+      - name: Skip (no test file)
+        if: hashFiles('tests/smoke-test.php') == ''
+        run: echo "No tests/smoke-test.php found; 
+continuing."
+
+  deploy:
+    name: Rsync Deploy
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add host key
+        run: |
+          mkdir -p ~/.ssh
+            ssh-keyscan -p "${{ secrets.DEPLOY_PORT }}" 
+"${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Verify plugin directory exists
+        run: |
+          test -d svntex2-plugin || { echo 
+"svntex2-plugin dir missing"; exit 1; }
+          ls -1 svntex2-plugin | head
+
+      - name: Build zip artifact
+        run: |
+          mkdir -p dist
+          zip -r dist/svntex2-plugin.zip svntex2-plugin \
+            -x "*_backup_*" -x "*backup*" -x "*/tests/*" 
+-x "*/node_modules/*" -x ".git/*"
+          ls -lh dist
+
+      - name: Upload artifact (for rollback)
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-zip
+          path: dist/svntex2-plugin.zip
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Prepare rsync flags
+        id: prep
+        run: |
+          DRY="${{ github.event.inputs.dry_run == 'true' 
+&& '--dry-run' || '' }}"
+          echo "dry=${DRY}" >> "$GITHUB_OUTPUT"
+          echo "path=${{ secrets.DEPLOY_PATH }}" >> 
+"$GITHUB_OUTPUT"
+
+      - name: Deploy plugin (rsync)
+        run: |
+          RSYNC="rsync -avz --delete \
+            --exclude='*_backup_*' \
+            --exclude='*backup*' \
+            --exclude='tests' \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            ${{ steps.prep.outputs.dry }}"
+          echo "[cmd] $RSYNC -e 'ssh -p ${{ 
+secrets.DEPLOY_PORT }} -o StrictHostKeyChecking=yes' 
+./svntex2-plugin/ ${{ secrets.DEPLOY_USER }}@${{ 
+secrets.DEPLOY_HOST }}:${{ steps.prep.outputs.path }}"
+          $RSYNC -e "ssh -p ${{ secrets.DEPLOY_PORT }} -o 
+StrictHostKeyChecking=yes" \
+            ./svntex2-plugin/ \
+            "${{ secrets.DEPLOY_USER }}@${{ 
+secrets.DEPLOY_HOST }}:${{ steps.prep.outputs.path }}"
+
+      - name: Deploy CSS (optional separate path)
+        if: secrets.DEPLOY_CSS_SUBPATH != ''
+        run: |
+          RSYNC="rsync -avz --delete ${{ 
+steps.prep.outputs.dry }} -e 'ssh -p ${{ 
+secrets.DEPLOY_PORT }} -o StrictHostKeyChecking=yes'"
+          $RSYNC ./svntex2-plugin/css/ "${{ 
+secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ 
+secrets.DEPLOY_CSS_SUBPATH }}"
+
+      - name: Post-deploy health check
+        if: secrets.DEPLOY_HEALTH_URL != ''
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = 
+"true" ]; then
+            echo "Dry run; skipping health check."
+            exit 0
+          fi
+          curl -fsSL -o /dev/null -w "HTTP 
+%{http_code}\n" "${{ secrets.DEPLOY_HEALTH_URL }}" || {
+            echo "Health check failed"; exit 1;
+          }
+
+      - name: Done
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = 
+"true" ]; then
+            echo "Dry run complete (no remote changes 
+written)."
+          else
+            echo "Deployment completed."
+          finano .github/workflows/deploy.yml  
