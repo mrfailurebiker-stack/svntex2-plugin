@@ -10,37 +10,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Validate required inputs
-      run: |
-        for v in FTP_SERVER FTP_USERNAME FTP_PASSWORD FTP_SERVER_DIR; do
-          [ -n "${!v}" ] || { echo "Missing value: $v (set as Secret or Variable)"; exit 1; }
-        done
-      env:
-        FTP_SERVER: ${{ secrets.FTP_SERVER || vars.FTP_SERVER }}
-        FTP_USERNAME: ${{ secrets.FTP_USERNAME || vars.FTP_USERNAME }}
-        FTP_PASSWORD: ${{ secrets.FTP_PASSWORD || vars.FTP_PASSWORD }}
-        FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR || vars.FTP_SERVER_DIR }}
-
-    - name: Deploy via FTPS
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
-      with:
-        server: ${{ secrets.FTP_SERVER || vars.FTP_SERVER }}
-        username: ${{ secrets.FTP_USERNAME || vars.FTP_USERNAME }}
-        password: ${{ secrets.FTP_PASSWORD || vars.FTP_PASSWORD }}
-        server-dir: ${{ secrets.FTP_SERVER_DIR || vars.FTP_SERVER_DIR }}
-        protocol: ftps
-        # port is optional; defaults to 21. Set FTP_PORT secret/variable if custom.
-        # port: ${{ secrets.FTP_PORT || vars.FTP_PORT }}
-        local-dir: .
-        state-name: .ftp-deploy-sync-state.json
-        exclude: |
-          **/.git*
-          **/.github/**
-          **/node_modules/**
-          **/.DS_Store
-          **/*.log
-          dev/**
-          docs/**
+      - name: Deploy via FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: 145.79.211.169
+          username: u271371274
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: /public_html/wp-content/plugins/svntex2-plugin/
+          protocol: ftps
+          port: 21
+          local-dir: .
+          state-name: .ftp-deploy-sync-state.json
+          exclude: |
+            **/.git*
+            **/.github/**
+            **/node_modules/**
+            **/.DS_Store
+            **/*.log
+            dev/**
+            docs/**
