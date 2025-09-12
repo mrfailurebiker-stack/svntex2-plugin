@@ -25,3 +25,4 @@ composer.lock
 # Env files
 .env
 .env.local
+.ftp-deploy-sync-state.json
