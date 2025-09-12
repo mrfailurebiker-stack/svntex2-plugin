@@ -21,15 +21,13 @@ jobs:
         [ -n "${{ secrets.REMOTE_TARGET }}" ] || { echo "Missing secret: REMOTE_TARGET"; exit 1; }
 
     - name: Deploy to Hostinger
-      # Pin to main for latest fixes; inputs on main use camelCase
       uses: easingthemes/ssh-deploy@main
       with:
-        sshPrivateKey: ${{ secrets.SSH_PRIVATE_KEY }}
-        args: "-rlgoDzvc -i --delete"
-        source: "./"
-        remoteHost: ${{ secrets.REMOTE_HOST }}
-        remoteUser: ${{ secrets.REMOTE_USER }}
-        # optional: set via repo secret if non-standard
-        # remotePort: ${{ secrets.REMOTE_PORT }}
-        target: ${{ secrets.REMOTE_TARGET }}
-        exclude: "/.git/, /.github/, /dev/, /docs/, /node_modules/"
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        ARGS: "-rlgoDzvc -i --delete"
+        SOURCE: "./"
+        REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+        REMOTE_USER: ${{ secrets.REMOTE_USER }}
+        # REMOTE_PORT: ${{ secrets.REMOTE_PORT }}
+        TARGET: ${{ secrets.REMOTE_TARGET }}
+        EXCLUDE: "/.git/, /.github/, /dev/, /docs/, /node_modules/"
