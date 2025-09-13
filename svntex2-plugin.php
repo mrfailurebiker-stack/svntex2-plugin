@@ -29,6 +29,7 @@ if ( ! defined('SVNTEX2_DASHBOARD_SLUG') ) define('SVNTEX2_DASHBOARD_SLUG', 'das
  */
 function svntex_include_files() {
     // Functions
+    require_once SVNTEX_PLUGIN_DIR . 'includes/functions/debug.php';
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/helpers.php';
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/enqueue.php';
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/products.php';
