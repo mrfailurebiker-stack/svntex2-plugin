@@ -82,15 +82,31 @@ function svntex2_do_login(){
   $pass  = (string)($_POST['password'] ?? '');
   $remember = !empty($_POST['remember']);
   if(!$login || !$pass){ wp_send_json_error(['message'=>'Missing credentials']); }
-  // resolve user by email, login or customer_id meta
-  $user = null;
-  if ( is_email($login) ) { $user = get_user_by('email', $login); }
-  if ( ! $user ) { $user = get_user_by('login', $login); }
+  // Resolve user by multiple identifiers (email, username, nicename, customer_id, mobile, employee_id)
+  $user = null; $login_trim = trim($login);
+  if ( is_email($login_trim) ) { $user = get_user_by('email', $login_trim); }
+  if ( ! $user ) { $user = get_user_by('login', $login_trim); }
+  if ( ! $user ) { $user = get_user_by('slug', sanitize_title($login_trim)); }
   if ( ! $user ) {
-    $ids = get_users([ 'meta_key'=>'customer_id', 'meta_value'=> $login, 'fields'=>'ids', 'number'=>1 ]);
-    if($ids){ $user = get_user_by('id', $ids[0]); }
+    // Try a broader search over login/email/nicename
+    $q = new WP_User_Query([
+      'search' => $login_trim,
+      'search_columns' => ['user_login','user_email','user_nicename'],
+      'number' => 1,
+      'fields' => 'all',
+    ]);
+    $results = $q->get_results();
+    if ( ! empty($results) ) { $user = $results[0]; }
   }
-  if( ! $user ) { wp_send_json_error(['message'=>'User not found']); }
+  if ( ! $user ) {
+    // Try by metas
+    $meta_keys = ['customer_id','mobile','employee_id'];
+    foreach ($meta_keys as $mk) {
+      $ids = get_users([ 'meta_key'=>$mk, 'meta_value'=> $login_trim, 'fields'=>'ids', 'number'=>1 ]);
+      if($ids){ $user = get_user_by('id', $ids[0]); break; }
+    }
+  }
+  if( ! $user ) { wp_send_json_error(['message'=>'User not found. Try your Username (SVNXXXXXX) or registered email.']); }
   $auth = wp_signon([ 'user_login'=>$user->user_login, 'user_password'=>$pass, 'remember'=>$remember ], is_ssl());
   if ( is_wp_error($auth) ) { wp_send_json_error(['message'=>'Invalid credentials']); }
   wp_set_current_user($auth->ID);
