@@ -21,16 +21,26 @@
     <script>
     (function(){
       const b=document.getElementById('btnLogin'); const msg=document.getElementById('msg');
+      async function getNonce(){
+        const r = await fetch('/wp-admin/admin-ajax.php?action=svntex2_get_login_nonce',{credentials:'include'});
+        const j = await r.json();
+        if(!j.success) throw new Error('nonce');
+        return j.data.nonce;
+      }
       b.addEventListener('click', async ()=>{
         msg.textContent='Signing in...';
         try {
+          const nonce = await getNonce();
           const fd = new FormData();
           fd.append('action','svntex2_do_login');
+          fd.append('svntex2_login_nonce', nonce);
           fd.append('login_id', document.getElementById('login_id').value);
           fd.append('password', document.getElementById('password').value);
           // Fetch admin-ajax on same origin
           const r = await fetch('/wp-admin/admin-ajax.php',{ method:'POST', body: fd, credentials:'include' });
-          const j = await r.json();
+          let j; const ct=r.headers.get('content-type')||'';
+          if(ct.includes('application/json')){ j = await r.json(); }
+          else { const t=await r.text(); try{ j=JSON.parse(t); }catch{ throw new Error('bad_response:'+t.slice(0,120)); } }
           if(j.success){ location.href='/admin/panel.html'; }
           else { msg.textContent = (j.data && j.data.message) || 'Login failed'; }
         } catch(e){ msg.textContent='Network error'; }

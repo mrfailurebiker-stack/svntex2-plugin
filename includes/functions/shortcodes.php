@@ -60,6 +60,22 @@ add_shortcode('svntex_dashboard', function(){
 
 // AJAX login handler
 add_action('wp_ajax_nopriv_svntex2_do_login', 'svntex2_do_login');
+// Public endpoint to fetch login nonce for static admin portal
+add_action('wp_ajax_nopriv_svntex2_get_login_nonce', function(){
+  $nonce = wp_create_nonce('svntex2_login');
+  wp_send_json_success([ 'nonce' => $nonce ]);
+});
+add_action('wp_ajax_svntex2_get_login_nonce', function(){
+  $nonce = wp_create_nonce('svntex2_login');
+  wp_send_json_success([ 'nonce' => $nonce ]);
+});
+
+// Endpoint to get REST nonce so static admin can call WP REST API
+add_action('wp_ajax_svntex2_get_rest_nonce', function(){
+  if ( ! is_user_logged_in() ) { wp_send_json_error(['message'=>'Not logged in'], 401); }
+  $nonce = wp_create_nonce('wp_rest');
+  wp_send_json_success([ 'nonce' => $nonce ]);
+});
 function svntex2_do_login(){
   check_ajax_referer('svntex2_login','svntex2_login_nonce');
   $login = sanitize_text_field($_POST['login_id'] ?? '');

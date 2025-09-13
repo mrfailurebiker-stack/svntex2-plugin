@@ -20,12 +20,19 @@
     </main>
     <script>
     (async function(){
+      async function getRestNonce(){
+        const r = await fetch('/wp-admin/admin-ajax.php?action=svntex2_get_rest_nonce', { credentials:'include' });
+        try { const j = await r.json(); if(j.success) return j.data.nonce; } catch(e){}
+        return null;
+      }
+      const nonce = await getRestNonce();
+      const headers = nonce ? { 'X-WP-Nonce': nonce } : {};
       // Basic gate: check logged-in cookie from WP
-      const res = await fetch('/wp-json/wp/v2/users/me', { credentials: 'include' });
+      const res = await fetch('/wp-json/wp/v2/users/me', { credentials: 'include', headers });
       if(!res.ok){ location.href='/admin/'; return; }
       const me = await res.json();
       // Load users via WP REST (admins only)
-      const ures = await fetch('/wp-json/wp/v2/users?per_page=10&orderby=registered&order=desc',{ credentials:'include' });
+      const ures = await fetch('/wp-json/wp/v2/users?per_page=10&orderby=registered&order=desc',{ credentials:'include', headers });
       const users = ures.ok ? await ures.json() : [];
       const box = document.getElementById('usersBox');
       box.innerHTML = users.map(u=>`<div>#${u.id} — ${u.name} (${u.email||'-'})</div>`).join('') || 'No users.';
