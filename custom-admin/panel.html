@@ -96,7 +96,7 @@
               <label>Categories<select name="categories" id="prodCats" multiple size="5"></select></label>
               <div>
                 <label>Featured Image
-                  <input type="file" id="prodImage" accept="image/*" />
+                  <input type="file" id="prodImage" accept="image/png, image/jpeg, image/jpg, image/webp" />
                 </label>
                 <div id="imgPreview" class="muted" style="margin-top:8px"></div>
               </div>
@@ -176,9 +176,8 @@
       const layout = document.getElementById('layout');
       const sidebar = document.getElementById('sidebar');
       document.getElementById('btnToggle').addEventListener('click', ()=>{
-        const hidden = getComputedStyle(sidebar).display === 'none';
         if(window.matchMedia('(max-width:900px)').matches){ sidebar.classList.toggle('open'); }
-        else { layout.style.gridTemplateColumns = layout.style.gridTemplateColumns === '0px 1fr' ? '260px 1fr' : '0px 1fr'; }
+        else { layout.classList.toggle('collapsed'); }
       });
 
       function toast(t){
@@ -350,6 +349,8 @@
   const imgInput = document.getElementById('prodImage');
       imgInput.addEventListener('change', async (e)=>{
         const file = e.target.files && e.target.files[0]; if(!file){ return; }
+        const okTypes = ['image/png','image/jpeg','image/jpg','image/webp'];
+        if(!okTypes.includes(file.type)){ toast('Unsupported image type'); e.target.value=''; return; }
         const fd = new FormData(); fd.append('file', file, file.name);
         const r = await fetch('/wp-json/wp/v2/media', { method:'POST', credentials:'include', headers: { ...headers }, body: fd });
         if(!r.ok){ toast('Upload failed'); return; }
@@ -359,6 +360,8 @@
       const vidInput = document.getElementById('prodVideo');
       vidInput.addEventListener('change', async (e)=>{
         const file = e.target.files && e.target.files[0]; if(!file){ return; }
+        const okVideo = ['video/mp4','video/webm','video/ogg'];
+        if(!okVideo.includes(file.type)){ toast('Unsupported video type'); e.target.value=''; return; }
         const fd = new FormData(); fd.append('file', file, file.name);
         fd.append('post', prodForm.id.value || 0);
         const r = await fetch('/wp-json/wp/v2/media', { method:'POST', credentials:'include', headers: { ...headers }, body: fd });
