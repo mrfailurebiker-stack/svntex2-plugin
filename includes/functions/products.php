@@ -1,5 +1,5 @@
-// Custom product management features have been removed.
 <?php
+// Custom product management features have been removed (legacy notes kept as comments only).
 if (!defined('ABSPATH')) exit;
 
 /** Register Product post type 'svntex_product' and taxonomy 'svntex_category' */
@@ -30,5 +30,4 @@ add_action('init', function(){
 	]);
 });
 
-// Intentionally no closing PHP tag
-// This file is kept for reference but is no longer active.
+// Intentionally no closing PHP tag.
