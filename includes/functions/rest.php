@@ -167,4 +167,73 @@ add_action('rest_api_init', function(){
         ],
     ]);
 });
+
+// Users management (list and update) for admins
+function svntex2_api_can_manage_users(){ return current_user_can('edit_users'); }
+function svntex2_format_user_for_admin($u){
+    return [
+        'id' => (int)$u->ID,
+        'username' => $u->user_login,
+        'email' => $u->user_email,
+        'first_name' => get_user_meta($u->ID,'first_name', true),
+        'last_name' => get_user_meta($u->ID,'last_name', true),
+        'display_name' => $u->display_name,
+        'roles' => $u->roles,
+        'registered' => $u->user_registered,
+        'meta' => [
+            'customer_id' => get_user_meta($u->ID,'customer_id', true),
+            'mobile' => get_user_meta($u->ID,'mobile', true),
+            'gender' => get_user_meta($u->ID,'gender', true),
+            'dob' => get_user_meta($u->ID,'dob', true),
+            'age' => (int) get_user_meta($u->ID,'age', true),
+            'employee_id' => get_user_meta($u->ID,'employee_id', true),
+            'referral_source' => get_user_meta($u->ID,'referral_source', true),
+        ]
+    ];
+}
+
+add_action('rest_api_init', function(){
+    register_rest_route('svntex2/v1','/users', [
+        [
+            'methods' => 'GET',
+            'permission_callback' => 'svntex2_api_can_manage_users',
+            'callback' => function( WP_REST_Request $r ){
+                $args = [ 'number' => (int) ($r->get_param('per_page') ?: 20), 'paged' => (int) ($r->get_param('page') ?: 1), 'orderby'=>'registered', 'order'=>'DESC' ];
+                $search = (string) $r->get_param('search'); if($search){ $args['search'] = '*'.esc_attr($search).'*'; $args['search_columns']=['user_login','user_email','user_nicename']; }
+                $q = new WP_User_Query($args);
+                $items = array_map('svntex2_format_user_for_admin', $q->get_results());
+                return [ 'items'=>$items, 'total' => (int)$q->get_total() ];
+            }
+        ],
+    ]);
+    register_rest_route('svntex2/v1','/users/(?P<id>\d+)', [
+        [
+            'methods' => 'GET',
+            'permission_callback' => 'svntex2_api_can_manage_users',
+            'callback' => function( WP_REST_Request $r ){
+                $u = get_user_by('id', (int)$r['id']); if(!$u) return new WP_REST_Response(['error'=>'Not found'],404);
+                return svntex2_format_user_for_admin($u);
+            }
+        ],
+        [
+            'methods' => 'POST',
+            'permission_callback' => 'svntex2_api_can_manage_users',
+            'callback' => function( WP_REST_Request $r ){
+                $id = (int) $r['id']; $u = get_user_by('id',$id); if(!$u) return new WP_REST_Response(['error'=>'Not found'],404);
+                $payload = [];
+                if( null !== $r->get_param('first_name') ) $payload['first_name'] = sanitize_text_field($r->get_param('first_name'));
+                if( null !== $r->get_param('last_name') ) $payload['last_name'] = sanitize_text_field($r->get_param('last_name'));
+                if( null !== $r->get_param('display_name') ) $payload['display_name'] = sanitize_text_field($r->get_param('display_name'));
+                if( null !== $r->get_param('email') ){
+                    $email = sanitize_email($r->get_param('email')); if($email && $email !== $u->user_email && email_exists($email)) return new WP_REST_Response(['error'=>'Email already in use'],400); $payload['user_email']=$email;
+                }
+                if($payload){ $payload['ID']=$id; $res = wp_update_user($payload); if(is_wp_error($res)) return new WP_REST_Response(['error'=>$res->get_error_message()],500); }
+                // Update metas (cannot change customer_id by request)
+                $meta_keys = ['mobile','gender','dob','age','employee_id','referral_source'];
+                foreach($meta_keys as $mk){ if( null !== $r->get_param($mk) ) update_user_meta($id,$mk, sanitize_text_field($r->get_param($mk)) ); }
+                return svntex2_format_user_for_admin( get_user_by('id',$id) );
+            }
+        ],
+    ]);
+});
 ?>

@@ -8,16 +8,48 @@
     <style>body{font-family:system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, sans-serif;padding:20px} .grid{display:grid;gap:14px} table{border-collapse:collapse;width:100%} th,td{border:1px solid #e5e7eb;padding:8px}</style>
   </head>
   <body>
-    <header style="display:flex;justify-content:space-between;align-items:center">
-      <h1>SVNTeX Admin</h1>
-      <nav>
-        <a href="#users">Users</a> · <a href="#products">Products</a> · <a href="#wallet">Wallet</a> · <a href="#referrals">Referrals</a> · <a href="#kyc">KYC</a>
-        · <a href="#logout" id="logout">Logout</a>
-      </nav>
-    </header>
-    <main class="grid">
-      <section id="users"><h2>Users</h2><div id="usersBox">Loading...</div></section>
-      <section id="products"><h2>Products</h2>
+    <div id="layout" style="display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start">
+      <aside id="sidebar" style="border-right:1px solid #e5e7eb;padding-right:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>SVNTeX Admin</strong>
+          <button id="btnToggle" aria-label="Toggle menu" title="Toggle menu">☰</button>
+        </div>
+        <nav style="display:grid;gap:8px;margin-top:12px">
+          <a href="#users">Users</a>
+          <a href="#products">Products</a>
+          <a href="#wallet">Wallet</a>
+          <a href="#referrals">Referrals</a>
+          <a href="#kyc">KYC</a>
+          <a href="#logout" id="logout">Logout</a>
+        </nav>
+      </aside>
+      <main class="grid" style="padding-left:8px">
+        <section id="users"><h2>Users</h2>
+          <div id="usersBox">Loading...</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+            <div>
+              <input id="userSearch" placeholder="Search users (email/username)" style="width:100%" />
+              <div id="userList" style="margin-top:8px"></div>
+            </div>
+            <form id="userForm" class="grid" style="grid-template-columns:1fr;gap:8px">
+              <h3>Edit User</h3>
+              <input type="hidden" name="id" />
+              <label>Customer ID <input name="customer_id" disabled /></label>
+              <label>Email <input name="email" required /></label>
+              <label>First name <input name="first_name" /></label>
+              <label>Last name <input name="last_name" /></label>
+              <label>Display name <input name="display_name" /></label>
+              <label>Mobile <input name="mobile" /></label>
+              <label>Gender <input name="gender" /></label>
+              <label>DOB <input name="dob" placeholder="YYYY-MM-DD" /></label>
+              <label>Employee ID <input name="employee_id" /></label>
+              <label>Referral Source <input name="referral_source" /></label>
+              <div><button type="submit">Save Changes</button></div>
+              <div id="userMsg" class="muted"></div>
+            </form>
+          </div>
+        </section>
+        <section id="products"><h2>Products</h2>
         <form id="prodForm" class="grid" style="grid-template-columns:1fr;max-width:640px">
           <input type="hidden" name="id" />
           <label>Title<input name="title" required placeholder="Product title"></label>
@@ -30,8 +62,9 @@
           <div id="prodMsg" class="muted"></div>
         </form>
         <div id="prodList">Loading...</div>
-      </section>
-    </main>
+        </section>
+      </main>
+    </div>
     <script>
     (async function(){
       async function getRestNonce(){
@@ -50,6 +83,50 @@
       const users = ures.ok ? await ures.json() : [];
       const box = document.getElementById('usersBox');
       box.innerHTML = users.map(u=>`<div>#${u.id} — ${u.name} (${u.email||'-'})</div>`).join('') || 'No users.';
+
+      // Sidebar collapse
+      const layout = document.getElementById('layout');
+      document.getElementById('btnToggle').addEventListener('click', ()=>{
+        const hidden = layout.style.gridTemplateColumns === '0px 1fr';
+        layout.style.gridTemplateColumns = hidden ? '260px 1fr' : '0px 1fr';
+      });
+
+      // Users management
+      const userList = document.getElementById('userList');
+      const userForm = document.getElementById('userForm');
+      const userMsg = document.getElementById('userMsg');
+      function um(t){ userMsg.textContent=t; }
+      async function loadUsers(q=''){
+        userList.textContent='Loading...';
+        const r = await fetch('/wp-json/svntex2/v1/users?per_page=20&search='+encodeURIComponent(q), { credentials:'include', headers });
+        const j = await r.json();
+        const items = (j && j.items) || [];
+        userList.innerHTML = items.map(u=>`<div><a href="#" data-uid="${u.id}">#${u.id}</a> ${u.username} · ${u.email} · ${u.meta.customer_id||''}</div>`).join('') || 'No users.';
+      }
+      await loadUsers('');
+      document.getElementById('userSearch').addEventListener('input', (e)=>{ loadUsers(e.target.value); });
+      userList.addEventListener('click', async (e)=>{
+        const id = e.target.getAttribute('data-uid'); if(!id) return; e.preventDefault(); um('');
+        const r = await fetch('/wp-json/svntex2/v1/users/'+id, { credentials:'include', headers });
+        const u = await r.json();
+        userForm.id.value = u.id;
+        userForm.customer_id.value = u.meta.customer_id || '';
+        userForm.email.value = u.email || '';
+        userForm.first_name.value = u.first_name || '';
+        userForm.last_name.value = u.last_name || '';
+        userForm.display_name.value = u.display_name || '';
+        userForm.mobile.value = u.meta.mobile || '';
+        userForm.gender.value = u.meta.gender || '';
+        userForm.dob.value = u.meta.dob || '';
+        userForm.employee_id.value = u.meta.employee_id || '';
+        userForm.referral_source.value = u.meta.referral_source || '';
+      });
+      userForm.addEventListener('submit', async (e)=>{
+        e.preventDefault(); um('Saving...');
+        const data = Object.fromEntries(new FormData(userForm).entries()); const id = data.id; delete data.id; delete data.customer_id;
+        const r = await fetch('/wp-json/svntex2/v1/users/'+id, { method:'POST', credentials:'include', headers:{ ...headers, 'Content-Type':'application/json' }, body: JSON.stringify(data) });
+        const j = await r.json(); if(j && j.id){ um('Saved'); } else { um(j.error || 'Save failed'); }
+      });
 
       // Products UI
       const prodList = document.getElementById('prodList');
