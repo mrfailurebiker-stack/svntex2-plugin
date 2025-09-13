@@ -17,7 +17,7 @@ class SVNTEX2_Auth {
         if (is_singular()) {
             global $post; if ($post && has_shortcode($post->post_content, 'svntex_registration')) {
                 wp_enqueue_style('svntex2-style');
-                wp_enqueue_script('svntex2-auth', SVNTEX2_PLUGIN_URL+'assets/js/auth.js', ['jquery'], SVNTEX2_VERSION, true);
+                wp_enqueue_script('svntex2-auth', SVNTEX2_PLUGIN_URL . 'assets/js/auth.js', ['jquery'], SVNTEX2_VERSION, true);
                 // Provide ajax settings; also flag to disable legacy handler for styled template
                 wp_localize_script('svntex2-auth','SVNTEX2Auth', [
                     'ajax_url' => admin_url('admin-ajax.php'),
