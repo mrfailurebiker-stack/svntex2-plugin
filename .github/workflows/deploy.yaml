@@ -13,7 +13,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy via FTPS
+      - name: Deploy plugin via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
           server: 145.79.211.169
@@ -34,3 +34,18 @@ jobs:
             **/*.log
             dev/**
             docs/**
+
+      - name: Deploy static landing to domain root
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: 145.79.211.169
+          username: u271371274
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: /domains/svntex.com/public_html/
+          protocol: ftps
+          port: 21
+          local-dir: ./custom-landing/
+          state-name: .ftp-deploy-sync-state-landing.json
+          exclude: |
+            **/.git*
+            **/.DS_Store

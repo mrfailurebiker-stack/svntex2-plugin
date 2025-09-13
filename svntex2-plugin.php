@@ -18,6 +18,7 @@ define( 'SVNTEX_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 if ( ! defined('SVNTEX2_VERSION') ) define('SVNTEX2_VERSION', SVNTEX_VERSION);
 if ( ! defined('SVNTEX2_PLUGIN_DIR') ) define('SVNTEX2_PLUGIN_DIR', SVNTEX_PLUGIN_DIR);
 if ( ! defined('SVNTEX2_PLUGIN_URL') ) define('SVNTEX2_PLUGIN_URL', SVNTEX_PLUGIN_URL);
+if ( ! defined('SVNTEX2_PLUGIN_FILE') ) define('SVNTEX2_PLUGIN_FILE', __FILE__);
 // Public page slugs used throughout the plugin
 if ( ! defined('SVNTEX2_LOGIN_SLUG') ) define('SVNTEX2_LOGIN_SLUG', 'customer-login');
 if ( ! defined('SVNTEX2_REGISTER_SLUG') ) define('SVNTEX2_REGISTER_SLUG', 'customer-registration');
@@ -90,6 +91,22 @@ function svntex_activate(){
     }
 }
 register_activation_hook(__FILE__, 'svntex_activate');
+
+// Ensure front page points to landing once, if still on blog posts
+function svntex_maybe_setup_front_page(){
+    if ( get_option('svntex2_frontpage_set') ) return; // already applied once
+    $show = get_option('show_on_front');
+    $front = (int) get_option('page_on_front');
+    if ( $show !== 'page' || ! $front ){
+        $home_id = svntex2_ensure_page( 'home', 'Home', '[svntex_landing]' );
+        if ( $home_id ){
+            update_option('show_on_front','page');
+            update_option('page_on_front', $home_id);
+            update_option('svntex2_frontpage_set', current_time('mysql'));
+        }
+    }
+}
+add_action('admin_init','svntex_maybe_setup_front_page');
 
 /** Create or update a page by slug with provided content */
 function svntex2_ensure_page( $slug, $title, $content ){
