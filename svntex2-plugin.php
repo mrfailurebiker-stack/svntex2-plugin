@@ -82,6 +82,12 @@ function svntex_activate(){
     svntex2_ensure_page( SVNTEX2_LOGIN_SLUG, 'Customer Login', '[svntex_login]' );
     svntex2_ensure_page( SVNTEX2_REGISTER_SLUG, 'Customer Registration', '[svntex_registration]' );
     svntex2_ensure_page( SVNTEX2_DASHBOARD_SLUG, 'Dashboard', '[svntex_dashboard]' );
+    // Create landing home page and set as static front page if not set
+    $home_id = svntex2_ensure_page( 'home', 'Home', '[svntex_landing]' );
+    if ( $home_id ) {
+        update_option('show_on_front','page');
+        update_option('page_on_front', $home_id);
+    }
 }
 register_activation_hook(__FILE__, 'svntex_activate');
 
@@ -92,9 +98,9 @@ function svntex2_ensure_page( $slug, $title, $content ){
         if ( strpos( (string) $page->post_content, $content ) === false ) {
             wp_update_post([ 'ID'=>$page->ID, 'post_content'=>$content, 'post_status'=>'publish' ]);
         }
-        return;
+        return (int)$page->ID;
     }
-    wp_insert_post([
+    return (int) wp_insert_post([
         'post_title'   => $title,
         'post_name'    => $slug,
         'post_content' => $content,

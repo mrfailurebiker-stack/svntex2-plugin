@@ -9,5 +9,6 @@ function svntex2_register_assets(){
 	// Scripts
 	wp_register_script('svntex2-core', SVNTEX2_PLUGIN_URL . 'assets/js/core.js', ['jquery'], SVNTEX2_VERSION, true);
 	wp_register_script('svntex2-dashboard', SVNTEX2_PLUGIN_URL . 'assets/js/dashboard.js', ['jquery'], SVNTEX2_VERSION, true);
+	wp_register_script('svntex2-brand-init', SVNTEX2_PLUGIN_URL . 'assets/js/brand-init.js', [], SVNTEX2_VERSION, true);
 }
 add_action('wp_enqueue_scripts','svntex2_register_assets');

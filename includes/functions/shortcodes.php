@@ -33,6 +33,16 @@ add_shortcode('svntex_login', function(){
   return '<p>Login view missing.</p>';
 });
 
+// Landing page shortcode (custom UI)
+add_shortcode('svntex_landing', function(){
+  wp_enqueue_style('svntex2-landing');
+  wp_enqueue_style('svntex2-style');
+  wp_enqueue_script('svntex2-brand-init');
+  $file = SVNTEX2_PLUGIN_DIR . 'views/landing.php';
+  if ( file_exists( $file ) ) { ob_start(); include $file; return ob_get_clean(); }
+  return '<p>Landing view missing.</p>';
+});
+
 // Dashboard shortcode
 add_shortcode('svntex_dashboard', function(){
   if ( ! is_user_logged_in() ) { wp_safe_redirect( home_url('/'.SVNTEX2_LOGIN_SLUG.'/') ); exit; }
