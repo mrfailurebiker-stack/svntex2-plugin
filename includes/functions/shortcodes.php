@@ -32,3 +32,37 @@ add_shortcode('svntex_login', function(){
   if ( file_exists( $file ) ) { ob_start(); include $file; return ob_get_clean(); }
   return '<p>Login view missing.</p>';
 });
+
+// Dashboard shortcode
+add_shortcode('svntex_dashboard', function(){
+  if ( ! is_user_logged_in() ) { wp_safe_redirect( home_url('/'.SVNTEX2_LOGIN_SLUG.'/') ); exit; }
+  // enqueue assets
+  wp_enqueue_style('svntex2-style');
+  wp_enqueue_script('svntex2-dashboard');
+  $file = SVNTEX2_PLUGIN_DIR . 'views/dashboard.php';
+  if ( file_exists( $file ) ) { ob_start(); include $file; return ob_get_clean(); }
+  return '<p>Dashboard view missing.</p>';
+});
+
+// AJAX login handler
+add_action('wp_ajax_nopriv_svntex2_do_login', 'svntex2_do_login');
+function svntex2_do_login(){
+  check_ajax_referer('svntex2_login','svntex2_login_nonce');
+  $login = sanitize_text_field($_POST['login_id'] ?? '');
+  $pass  = (string)($_POST['password'] ?? '');
+  $remember = !empty($_POST['remember']);
+  if(!$login || !$pass){ wp_send_json_error(['message'=>'Missing credentials']); }
+  // resolve user by email, login or customer_id meta
+  $user = null;
+  if ( is_email($login) ) { $user = get_user_by('email', $login); }
+  if ( ! $user ) { $user = get_user_by('login', $login); }
+  if ( ! $user ) {
+    $ids = get_users([ 'meta_key'=>'customer_id', 'meta_value'=> $login, 'fields'=>'ids', 'number'=>1 ]);
+    if($ids){ $user = get_user_by('id', $ids[0]); }
+  }
+  if( ! $user ) { wp_send_json_error(['message'=>'User not found']); }
+  $auth = wp_signon([ 'user_login'=>$user->user_login, 'user_password'=>$pass, 'remember'=>$remember ], is_ssl());
+  if ( is_wp_error($auth) ) { wp_send_json_error(['message'=>'Invalid credentials']); }
+  wp_set_current_user($auth->ID);
+  wp_send_json_success(['redirect'=> home_url('/'.SVNTEX2_DASHBOARD_SLUG.'/') ]);
+}

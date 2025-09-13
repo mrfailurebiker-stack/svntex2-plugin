@@ -18,6 +18,10 @@ define( 'SVNTEX_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 if ( ! defined('SVNTEX2_VERSION') ) define('SVNTEX2_VERSION', SVNTEX_VERSION);
 if ( ! defined('SVNTEX2_PLUGIN_DIR') ) define('SVNTEX2_PLUGIN_DIR', SVNTEX_PLUGIN_DIR);
 if ( ! defined('SVNTEX2_PLUGIN_URL') ) define('SVNTEX2_PLUGIN_URL', SVNTEX_PLUGIN_URL);
+// Public page slugs used throughout the plugin
+if ( ! defined('SVNTEX2_LOGIN_SLUG') ) define('SVNTEX2_LOGIN_SLUG', 'customer-login');
+if ( ! defined('SVNTEX2_REGISTER_SLUG') ) define('SVNTEX2_REGISTER_SLUG', 'customer-registration');
+if ( ! defined('SVNTEX2_DASHBOARD_SLUG') ) define('SVNTEX2_DASHBOARD_SLUG', 'dashboard');
 
 /**
  * Include necessary files.
@@ -28,6 +32,8 @@ function svntex_include_files() {
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/enqueue.php';
     $vendors = SVNTEX_PLUGIN_DIR . 'includes/functions/vendors.php';
     if ( file_exists($vendors) ) require_once $vendors;
+    $shortcodes = SVNTEX_PLUGIN_DIR . 'includes/functions/shortcodes.php';
+    if ( file_exists($shortcodes) ) require_once $shortcodes;
 
     // Classes
     $auth = SVNTEX_PLUGIN_DIR . 'includes/classes/auth.php';
@@ -72,8 +78,30 @@ function svntex_activate(){
     ) $charset;";
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
     dbDelta($sql);
+    // Create essential pages if missing
+    svntex2_ensure_page( SVNTEX2_LOGIN_SLUG, 'Customer Login', '[svntex_login]' );
+    svntex2_ensure_page( SVNTEX2_REGISTER_SLUG, 'Customer Registration', '[svntex_registration]' );
+    svntex2_ensure_page( SVNTEX2_DASHBOARD_SLUG, 'Dashboard', '[svntex_dashboard]' );
 }
 register_activation_hook(__FILE__, 'svntex_activate');
+
+/** Create or update a page by slug with provided content */
+function svntex2_ensure_page( $slug, $title, $content ){
+    $page = get_page_by_path( $slug );
+    if ( $page ) {
+        if ( strpos( (string) $page->post_content, $content ) === false ) {
+            wp_update_post([ 'ID'=>$page->ID, 'post_content'=>$content, 'post_status'=>'publish' ]);
+        }
+        return;
+    }
+    wp_insert_post([
+        'post_title'   => $title,
+        'post_name'    => $slug,
+        'post_content' => $content,
+        'post_type'    => 'page',
+        'post_status'  => 'publish'
+    ]);
+}
 
 
 /**
