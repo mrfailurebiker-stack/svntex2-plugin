@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SVNTeX Admin Panel</title>
+    <link rel="stylesheet" href="/assets/css/style.css" />
+    <style>body{font-family:system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, sans-serif;padding:20px} .grid{display:grid;gap:14px} table{border-collapse:collapse;width:100%} th,td{border:1px solid #e5e7eb;padding:8px}</style>
+  </head>
+  <body>
+    <header style="display:flex;justify-content:space-between;align-items:center">
+      <h1>SVNTeX Admin</h1>
+      <nav>
+        <a href="#users">Users</a> · <a href="#wallet">Wallet</a> · <a href="#referrals">Referrals</a> · <a href="#kyc">KYC</a>
+        · <a href="#logout" id="logout">Logout</a>
+      </nav>
+    </header>
+    <main class="grid">
+      <section id="users"><h2>Users</h2><div id="usersBox">Loading...</div></section>
+    </main>
+    <script>
+    (async function(){
+      // Basic gate: check logged-in cookie from WP
+      const res = await fetch('/wp-json/wp/v2/users/me', { credentials: 'include' });
+      if(!res.ok){ location.href='/admin/'; return; }
+      const me = await res.json();
+      // Load users via WP REST (admins only)
+      const ures = await fetch('/wp-json/wp/v2/users?per_page=10&orderby=registered&order=desc',{ credentials:'include' });
+      const users = ures.ok ? await ures.json() : [];
+      const box = document.getElementById('usersBox');
+      box.innerHTML = users.map(u=>`<div>#${u.id} — ${u.name} (${u.email||'-'})</div>`).join('') || 'No users.';
+      document.getElementById('logout').addEventListener('click', async (e)=>{ e.preventDefault(); await fetch('/wp-login.php?action=logout',{credentials:'include'}); location.href='/admin/'; });
+    })();
+    </script>
+  </body>
+</html>

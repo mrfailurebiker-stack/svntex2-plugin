@@ -49,3 +49,18 @@ jobs:
           exclude: |
             **/.git*
             **/.DS_Store
+
+      - name: Deploy custom admin portal
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: 145.79.211.169
+          username: u271371274
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: /domains/svntex.com/public_html/admin/
+          protocol: ftps
+          port: 21
+          local-dir: ./custom-admin/
+          state-name: .ftp-deploy-sync-state-admin.json
+          exclude: |
+            **/.git*
+            **/.DS_Store

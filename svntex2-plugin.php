@@ -31,6 +31,8 @@ function svntex_include_files() {
     // Functions
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/helpers.php';
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/enqueue.php';
+    require_once SVNTEX_PLUGIN_DIR . 'includes/functions/products.php';
+    require_once SVNTEX_PLUGIN_DIR . 'includes/functions/rest.php';
     $vendors = SVNTEX_PLUGIN_DIR . 'includes/functions/vendors.php';
     if ( file_exists($vendors) ) require_once $vendors;
     $shortcodes = SVNTEX_PLUGIN_DIR . 'includes/functions/shortcodes.php';
