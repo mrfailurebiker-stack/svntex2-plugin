@@ -17,11 +17,13 @@ class SVNTEX2_Auth {
         if (is_singular()) {
             global $post; if ($post && has_shortcode($post->post_content, 'svntex_registration')) {
                 wp_enqueue_style('svntex2-style');
-                wp_enqueue_script('svntex2-auth', SVNTEX2_PLUGIN_URL.'assets/js/auth.js', ['jquery'], SVNTEX2_VERSION, true);
+                wp_enqueue_script('svntex2-auth', SVNTEX2_PLUGIN_URL+'assets/js/auth.js', ['jquery'], SVNTEX2_VERSION, true);
+                // Provide ajax settings; also flag to disable legacy handler for styled template
                 wp_localize_script('svntex2-auth','SVNTEX2Auth', [
                     'ajax_url' => admin_url('admin-ajax.php'),
                     'nonce' => wp_create_nonce('svntex2_auth'),
                 ]);
+                wp_add_inline_script('svntex2-auth','window.SVNTEX2_DISABLE_LEGACY_REG = true;', 'before');
             }
         }
     }
@@ -55,7 +57,21 @@ class SVNTEX2_Auth {
         $first   = sanitize_text_field($_POST['first_name'] ?? '');
         $last    = sanitize_text_field($_POST['last_name'] ?? '');
         $email   = sanitize_email($_POST['email'] ?? '');
-        $dob     = sanitize_text_field($_POST['dob'] ?? ''); // YYYY-MM-DD
+        $dob_raw = trim((string)($_POST['dob'] ?? ''));
+        // Normalize DOB to YYYY-MM-DD; accept YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY
+        $dob = '';
+        if ($dob_raw) {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dob_raw)) {
+                $dob = $dob_raw;
+            } elseif (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $dob_raw, $m)) {
+                // Assume DD/MM/YYYY if day>12 else could be MM/DD; try both and pick one that yields >=18 if possible
+                $d = (int)$m[1]; $mo=(int)$m[2]; $y=(int)$m[3];
+                $cand1 = sprintf('%04d-%02d-%02d', $y, $mo, $d); // MM/DD -> YYYY-MM-DD if originally MM/DD
+                $cand2 = sprintf('%04d-%02d-%02d', $y, $d, $mo); // DD/MM -> YYYY-MM-DD
+                // Prefer cand2 when day>12 (more likely DD/MM)
+                $dob = ($d > 12) ? $cand2 : $cand1;
+            }
+        }
         $gender  = sanitize_text_field($_POST['gender'] ?? '');
         $mobile  = preg_replace('/\D/','', $_POST['mobile'] ?? '');
         $ref     = sanitize_text_field($_POST['referral'] ?? '');
@@ -69,7 +85,7 @@ class SVNTEX2_Auth {
         if (!$email || !is_email($email)) $errors[] = 'Valid email required';
         // Validate DOB and 18+
         $computed_age = 0;
-        if ($dob && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dob)) {
+    if ($dob && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dob)) {
             $dob_ts = strtotime($dob . ' 00:00:00');
             if ($dob_ts === false) {
                 $errors[] = 'Valid date of birth required';
@@ -91,7 +107,13 @@ class SVNTEX2_Auth {
         if ($email && email_exists($email)) $errors[] = 'Email already registered';
         if ($errors) wp_send_json_error(['errors' => $errors]);
 
+        // Ensure unique customer login
         $customer_id = svntex2_generate_customer_id(); // SVNXXXXXX
+        $attempts = 0;
+        while ( username_exists($customer_id) && $attempts < 5 ) { $customer_id = svntex2_generate_customer_id(); $attempts++; }
+        if ( username_exists($customer_id) ) {
+            wp_send_json_error(['errors'=>['Temporary error creating account (ID conflict). Please try again.']]);
+        }
         $display_name = trim($first);
         $user_id = wp_insert_user([
             'user_login' => $customer_id,
@@ -101,7 +123,10 @@ class SVNTEX2_Auth {
             'last_name'  => $last,
             'display_name' => $display_name
         ]);
-        if (is_wp_error($user_id)) wp_send_json_error(['errors' => ['Registration failed']]);
+        if (is_wp_error($user_id)) {
+            $msg = $user_id->get_error_message() ?: 'Registration failed';
+            wp_send_json_error(['errors' => [$msg]]);
+        }
         update_user_meta($user_id,'mobile',$mobile);
         update_user_meta($user_id,'customer_id',$customer_id);
         // Store DOB and also maintain computed age for backward compatibility

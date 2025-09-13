@@ -1,5 +1,7 @@
 // Registration + OTP Frontend Logic
 (function($){
+  // Allow disabling this script on styled registration when needed
+  if (window.SVNTEX2_DISABLE_LEGACY_REG) { return; }
   const form = $('#svntex2RegForm');
   const msg = form.find('.form-messages');
   const sendBtn = $('#svntex2SendOtp');
