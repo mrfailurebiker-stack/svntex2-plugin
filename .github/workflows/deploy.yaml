@@ -19,7 +19,7 @@ jobs:
           server: 145.79.211.169
           username: u271371274
           password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: /public_html/wp-content/plugins/svntex2-plugin/
+          server-dir: /wp-content/plugins/svntex2-plugin/
           protocol: ftps
           port: 21
           local-dir: ./
