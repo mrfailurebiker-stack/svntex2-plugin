@@ -7,6 +7,15 @@
     <link rel="stylesheet" href="/custom-admin/admin.css" />
   </head>
   <body>
+    <script>
+      // Enforce canonical host to ensure cookies/REST work (www)
+      (function(){
+        var h = location.hostname.replace(/^www\./,'');
+        if(h === 'svntex.com' && location.protocol.indexOf('http')===0){
+          location.replace('https://www.svntex.com/admin/');
+        }
+      })();
+    </script>
     <div class="login-wrap">
       <div class="login-card">
         <h1>SVNTeX Admin</h1>
@@ -42,8 +51,13 @@
           let j; const ct=r.headers.get('content-type')||'';
           if(ct.includes('application/json')){ j = await r.json(); }
           else { const t=await r.text(); try{ j=JSON.parse(t); }catch{ throw new Error('bad_response:'+t.slice(0,120)); } }
-          if(j.success){ location.href='/admin/panel.html'; }
-          else { msg.textContent = (j.data && j.data.message) || 'Login failed'; }
+          if(j.success){
+            // Send to canonical host
+            const dest = (location.hostname.replace(/^www\./,'')==='svntex.com') ? 'https://www.svntex.com/admin/panel.html' : '/admin/panel.html';
+            location.href = dest;
+          } else {
+            msg.textContent = (j.data && (j.data.message||j.data.error)) || 'Login failed';
+          }
         } catch(e){ msg.textContent='Network error'; }
       });
     })();

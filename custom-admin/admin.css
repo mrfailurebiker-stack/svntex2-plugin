@@ -21,6 +21,8 @@ body{margin:0;background:linear-gradient(180deg,var(--bg),#0b132a 60%);color:var
 .admin-shell.collapsed{grid-template-columns:0 1fr}
 .admin-shell.collapsed .sidebar{display:none}
 .sidebar{background:rgba(255,255,255,0.02);border-right:1px solid var(--border);padding:16px;position:sticky;top:0;align-self:start;height:100vh;z-index:20}
+/* Floating global menu button sits above */
+button#globalMenuBtn{z-index:9999}
 .sidebar .brand{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .sidebar .brand .burger{appearance:none;background:transparent;border:1px solid var(--border);color:var(--text);border-radius:10px;padding:6px 8px;cursor:pointer}
 .sidebar nav{display:grid;gap:8px}

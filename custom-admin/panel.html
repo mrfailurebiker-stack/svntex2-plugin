@@ -7,6 +7,15 @@
   <link rel="stylesheet" href="admin.css" />
   </head>
   <body>
+    <script>
+      // Force canonical host to www for consistent cookies/REST
+      (function(){
+        var bare = location.hostname.replace(/^www\./,'');
+        if(bare==='svntex.com' && location.protocol.indexOf('http')===0){
+          location.replace('https://www.svntex.com/admin/panel.html'+location.hash);
+        }
+      })();
+    </script>
     <div id="layout" class="admin-shell">
       <aside id="sidebar" class="sidebar">
         <div class="brand"><strong>SVNTeX Admin</strong><button id="btnToggle" class="burger" aria-label="Toggle menu" title="Toggle menu">☰</button></div>
@@ -213,6 +222,7 @@
         </section>
       </main>
     </div>
+    <button id="globalMenuBtn" title="Menu" aria-label="Menu" style="position:fixed;left:12px;top:12px;z-index:9999;display:none;background:#0f172a;border:1px solid #23304d;color:#e5e7eb;border-radius:10px;padding:10px 12px;cursor:pointer">☰</button>
     <script>
     (async function(){
       async function getRestNonce(){
@@ -232,13 +242,20 @@
       const box = document.getElementById('usersBox');
       box.innerHTML = users.map(u=>`<div>#${u.id} — ${u.name} (${u.email||'-'})</div>`).join('') || 'No users.';
 
-      // Sidebar collapse
+      // Sidebar collapse -> enhanced with global button
       const layout = document.getElementById('layout');
       const sidebar = document.getElementById('sidebar');
-      document.getElementById('btnToggle').addEventListener('click', ()=>{
+      const btnLocal = document.getElementById('btnToggle');
+      const globalBtn = document.getElementById('globalMenuBtn');
+      function applyMenuBtn(){ globalBtn.style.display = window.matchMedia('(max-width:900px)').matches ? 'block' : 'none'; }
+      applyMenuBtn();
+      window.addEventListener('resize', applyMenuBtn);
+      function toggleSidebar(){
         if(window.matchMedia('(max-width:900px)').matches){ sidebar.classList.toggle('open'); }
         else { layout.classList.toggle('collapsed'); }
-      });
+      }
+      btnLocal.addEventListener('click', toggleSidebar);
+      globalBtn.addEventListener('click', toggleSidebar);
 
       function toast(t){
         let el=document.querySelector('.toast'); if(!el){ el=document.createElement('div'); el.className='toast'; document.body.appendChild(el); }
@@ -362,10 +379,10 @@
           if(!el) return;
           if(id===name) el.classList.remove('hidden'); else el.classList.add('hidden');
         });
-        // nav active
         document.querySelectorAll('.sidebar nav a').forEach(a=>{
           if(a.getAttribute('href') === '#'+name) a.classList.add('active'); else a.classList.remove('active');
         });
+        if(window.matchMedia('(max-width:900px)').matches){ sidebar.classList.remove('open'); }
       }
       function route(){
         const hash = window.location.hash || '#dashboard';
@@ -570,7 +587,7 @@
   if(j.id){ pm('Saved'); toast('Saved'); prodForm.reset(); await loadProducts(); }
   else { pm(j.error || 'Save failed'); toast('Save failed'); }
       });
-      document.getElementById('logout').addEventListener('click', async (e)=>{ e.preventDefault(); await fetch('/wp-login.php?action=logout',{credentials:'include'}); location.href='/admin/'; });
+      document.getElementById('logout').addEventListener('click', async (e)=>{ e.preventDefault(); try{ await fetch('/wp-admin/admin-post.php?action=svntex2_logout',{credentials:'include'});}catch(e){} const dest=(location.hostname.replace(/^www\./,'')==='svntex.com')?'https://www.svntex.com/admin/':'/admin/'; location.href=dest; });
 
       // Wallet section
       const wUserId = document.getElementById('wUserId');
