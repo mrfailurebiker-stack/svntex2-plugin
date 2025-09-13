@@ -53,6 +53,17 @@ button.danger{background:var(--danger)}
 .success{color:#22c55e}
 .error{color:#fca5a5}
 
+/* Cards */
+.cards{display:grid;grid-template-columns:repeat(5,minmax(140px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:transform .08s ease, border-color .2s ease}
+.card:hover{transform:translateY(-2px);border-color:#334d7a}
+.card .title{font-weight:600;margin-bottom:6px}
+.card .kpi{font-size:22px;font-weight:700}
+.card .desc{color:var(--muted);font-size:12px}
+
+/* Utils */
+.hidden{display:none !important}
+
 /* Toast */
 .toast{position:fixed;right:16px;bottom:16px;background:var(--card);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,0.4);opacity:0;transform:translateY(8px);transition:opacity .2s ease,transform .2s ease}
 .toast.show{opacity:1;transform:translateY(0)}
@@ -68,4 +79,5 @@ button.danger{background:var(--danger)}
   .admin-shell{grid-template-columns:0 1fr}
   .sidebar{position:fixed;left:12px;top:12px;width:220px;height:auto;border-radius:12px;display:none}
   .sidebar.open{display:block}
+  .cards{grid-template-columns:repeat(2,minmax(120px,1fr))}
 }

@@ -11,6 +11,7 @@
       <aside id="sidebar" class="sidebar">
         <div class="brand"><strong>SVNTeX Admin</strong><button id="btnToggle" class="burger" aria-label="Toggle menu" title="Toggle menu">☰</button></div>
         <nav>
+          <a href="#dashboard" class="active">Dashboard</a>
           <a href="#users">Users</a>
           <a href="#products">Products</a>
           <a href="#wallet">Wallet</a>
@@ -20,7 +21,37 @@
         </nav>
       </aside>
       <main class="content grid">
-        <section id="users" class="section"><h2>Users</h2>
+        <section id="dashboard" class="section">
+          <h2>Dashboard</h2>
+          <div class="cards" style="margin-top:10px">
+            <div class="card" data-goto="#users">
+              <div class="title">Users</div>
+              <div class="kpi" id="kpiUsers">--</div>
+              <div class="desc">Total registered</div>
+            </div>
+            <div class="card" data-goto="#products">
+              <div class="title">Products</div>
+              <div class="kpi" id="kpiProducts">--</div>
+              <div class="desc">Total products</div>
+            </div>
+            <div class="card" data-goto="#wallet">
+              <div class="title">Wallet</div>
+              <div class="kpi" id="kpiWallet">--</div>
+              <div class="desc">Recent transactions</div>
+            </div>
+            <div class="card" data-goto="#referrals">
+              <div class="title">Referrals</div>
+              <div class="kpi" id="kpiReferrals">--</div>
+              <div class="desc">Linked entries</div>
+            </div>
+            <div class="card" data-goto="#kyc">
+              <div class="title">KYC</div>
+              <div class="kpi" id="kpiKyc">--</div>
+              <div class="desc">Pending/Total</div>
+            </div>
+          </div>
+        </section>
+        <section id="users" class="section hidden"><h2>Users</h2>
           <div id="usersBox" class="muted">Loading...</div>
           <div class="grid columns-2" style="margin-top:12px">
             <div>
@@ -45,7 +76,7 @@
             </form>
           </div>
         </section>
-        <section id="products" class="section"><h2>Products</h2>
+  <section id="products" class="section hidden"><h2>Products</h2>
           <form id="prodForm" class="grid" style="max-width:640px">
           <input type="hidden" name="id" />
             <input type="hidden" name="featured_media" />
@@ -87,7 +118,7 @@
         </form>
           <div id="prodList" class="list">Loading...</div>
         </section>
-        <section id="wallet" class="section"><h2>Wallet</h2>
+  <section id="wallet" class="section hidden"><h2>Wallet</h2>
           <div class="grid columns-3" style="max-width:840px">
             <label>User ID (optional)<input id="wUserId" type="number" min="1" placeholder="Filter by user ID"></label>
             <div class="grid" style="grid-auto-flow:column;align-items:end"><button id="wLoad">Load</button></div>
@@ -95,7 +126,7 @@
           <div id="wList" class="list" style="margin-top:10px">No data.</div>
         </section>
 
-        <section id="referrals" class="section"><h2>Referrals</h2>
+  <section id="referrals" class="section hidden"><h2>Referrals</h2>
           <div class="grid columns-3" style="max-width:840px">
             <label>Referrer ID<input id="refReferrer" type="number" min="1"></label>
             <label>Referee ID<input id="refReferee" type="number" min="1"></label>
@@ -112,7 +143,7 @@
           <div id="refList" class="list" style="margin-top:10px">No referrals.</div>
         </section>
 
-        <section id="kyc" class="section"><h2>KYC</h2>
+  <section id="kyc" class="section hidden"><h2>KYC</h2>
           <div class="grid" style="max-width:860px">
             <div class="grid" style="grid-auto-flow:column;justify-content:start">
               <button id="kycLoad">Load Submissions</button>
@@ -135,7 +166,7 @@
       const res = await fetch('/wp-json/wp/v2/users/me', { credentials: 'include', headers });
       if(!res.ok){ location.href='/admin/'; return; }
       const me = await res.json();
-      // Load users via WP REST (admins only)
+  // Load users via WP REST (admins only)
       const ures = await fetch('/wp-json/wp/v2/users?per_page=10&orderby=registered&order=desc',{ credentials:'include', headers });
       const users = ures.ok ? await ures.json() : [];
       const box = document.getElementById('usersBox');
@@ -229,6 +260,47 @@
         sel.innerHTML = '<option value="">— None —</option>' + items.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
       }
       await loadVendors();
+      // KPI loads (dashboard)
+      async function loadKpis(){
+        try{
+          const [u, p, w, r, k] = await Promise.all([
+            fetch('/wp-json/svntex2/v1/users?per_page=1', { credentials:'include', headers }).then(r=>r.json()).catch(()=>({total:0})),
+            fetch('/wp-json/svntex2/v1/products?per_page=1', { credentials:'include', headers }).then(r=>r.json()).catch(()=>({total:0})),
+            fetch('/wp-json/svntex2/v1/wallet/transactions?per_page=10', { credentials:'include', headers }).then(r=>r.json()).catch(()=>({items:[]})),
+            fetch('/wp-json/svntex2/v1/referrals', { credentials:'include', headers }).then(r=>r.json()).catch(()=>({items:[]})),
+            fetch('/wp-json/svntex2/v1/kyc', { credentials:'include', headers }).then(r=>r.json()).catch(()=>({items:[]})),
+          ]);
+          document.getElementById('kpiUsers').textContent = (u && typeof u.total==='number') ? u.total : '--';
+          document.getElementById('kpiProducts').textContent = (p && typeof p.total==='number') ? p.total : '--';
+          document.getElementById('kpiWallet').textContent = (w && w.items) ? w.items.length : '--';
+          const refItems = (r && r.items) || []; document.getElementById('kpiReferrals').textContent = refItems.length;
+          const kitems = (k && k.items) || []; const pend = kitems.filter(x=>x.status==='pending').length; document.getElementById('kpiKyc').textContent = `${pend}/${kitems.length}`;
+        }catch(e){ /* silent */ }
+      }
+      await loadKpis();
+
+      // Routing: show only selected section
+      const sections = ['dashboard','users','products','wallet','referrals','kyc'];
+      function showSection(name){
+        sections.forEach(id=>{
+          const el = document.getElementById(id);
+          if(!el) return;
+          if(id===name) el.classList.remove('hidden'); else el.classList.add('hidden');
+        });
+        // nav active
+        document.querySelectorAll('.sidebar nav a').forEach(a=>{
+          if(a.getAttribute('href') === '#'+name) a.classList.add('active'); else a.classList.remove('active');
+        });
+      }
+      function route(){
+        const hash = window.location.hash || '#dashboard';
+        const name = hash.replace('#','');
+        showSection(sections.includes(name) ? name : 'dashboard');
+      }
+      window.addEventListener('hashchange', route);
+      route();
+      // card clicks -> navigate
+      document.querySelectorAll('.card[data-goto]').forEach(c=>{ c.addEventListener('click', ()=>{ const t=c.getAttribute('data-goto'); if(t) window.location.hash=t; }); });
       prodList.addEventListener('click', async (e)=>{
         const id = e.target.getAttribute('data-edit');
         if(id){ e.preventDefault();
