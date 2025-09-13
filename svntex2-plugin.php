@@ -35,6 +35,12 @@ function svntex_include_files() {
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/rest.php';
     $vendors = SVNTEX_PLUGIN_DIR . 'includes/functions/vendors.php';
     if ( file_exists($vendors) ) require_once $vendors;
+    $referrals = SVNTEX_PLUGIN_DIR . 'includes/functions/referrals.php';
+    if ( file_exists($referrals) ) require_once $referrals;
+    $kyc = SVNTEX_PLUGIN_DIR . 'includes/functions/kyc.php';
+    if ( file_exists($kyc) ) require_once $kyc;
+    $cron = SVNTEX_PLUGIN_DIR . 'includes/functions/cron.php';
+    if ( file_exists($cron) ) require_once $cron;
     $shortcodes = SVNTEX_PLUGIN_DIR . 'includes/functions/shortcodes.php';
     if ( file_exists($shortcodes) ) require_once $shortcodes;
 

@@ -90,6 +90,71 @@ add_action('rest_api_init', function(){
             ];
         }
     ]);
+    // Wallet transactions list (admin) and user summary
+    register_rest_route('svntex2/v1','/wallet/transactions', [
+        'methods' => 'GET',
+        'permission_callback' => 'svntex2_api_can_manage',
+        'callback' => function( WP_REST_Request $r ){
+            global $wpdb; $t = $wpdb->prefix.'svntex_wallet_transactions';
+            $uid = (int) $r->get_param('user_id');
+            $limit = min( (int) ($r->get_param('per_page') ?: 50), 200 );
+            $rows = $uid ? $wpdb->get_results( $wpdb->prepare("SELECT * FROM $t WHERE user_id=%d ORDER BY id DESC LIMIT %d", $uid, $limit), ARRAY_A )
+                         : $wpdb->get_results( $wpdb->prepare("SELECT * FROM $t ORDER BY id DESC LIMIT %d", $limit), ARRAY_A );
+            return [ 'items' => $rows ?: [] ];
+        }
+    ]);
+    // Referrals admin endpoints
+    register_rest_route('svntex2/v1','/referrals', [
+        'methods' => 'GET',
+        'permission_callback' => 'svntex2_api_can_manage',
+        'callback' => function( WP_REST_Request $r ){
+            global $wpdb; $t = $wpdb->prefix.'svntex_referrals';
+            $uid = (int) $r->get_param('referrer_id');
+            $rows = $uid ? $wpdb->get_results( $wpdb->prepare("SELECT * FROM $t WHERE referrer_id=%d ORDER BY id DESC", $uid), ARRAY_A )
+                         : $wpdb->get_results( "SELECT * FROM $t ORDER BY id DESC LIMIT 200", ARRAY_A );
+            return [ 'items' => $rows ?: [] ];
+        }
+    ]);
+    register_rest_route('svntex2/v1','/referrals/link', [
+        'methods' => 'POST',
+        'permission_callback' => 'svntex2_api_can_manage',
+        'callback' => function( WP_REST_Request $r ){
+            $ref = (int) $r->get_param('referrer_id'); $ree = (int) $r->get_param('referee_id');
+            if(!$ref || !$ree) return new WP_REST_Response(['error'=>'referrer_id and referee_id required'],400);
+            $ok = svntex2_referrals_link($ref,$ree);
+            return [ 'ok' => (bool)$ok ];
+        }
+    ]);
+    register_rest_route('svntex2/v1','/referrals/qualify', [
+        'methods' => 'POST',
+        'permission_callback' => 'svntex2_api_can_manage',
+        'callback' => function( WP_REST_Request $r ){
+            $ref = (int) $r->get_param('referrer_id'); $ree = (int) $r->get_param('referee_id'); $amt = (float) $r->get_param('amount');
+            if(!$ref || !$ree) return new WP_REST_Response(['error'=>'referrer_id and referee_id required'],400);
+            svntex2_referrals_mark_qualified($ref,$ree,$amt);
+            return [ 'ok' => true ];
+        }
+    ]);
+    // KYC endpoints (admin)
+    register_rest_route('svntex2/v1','/kyc', [
+        'methods' => 'GET',
+        'permission_callback' => 'svntex2_api_can_manage',
+        'callback' => function( WP_REST_Request $r ){
+            global $wpdb; $t=$wpdb->prefix.'svntex_kyc_submissions';
+            $rows = $wpdb->get_results("SELECT id,user_id,status,created_at,updated_at FROM $t ORDER BY id DESC LIMIT 200", ARRAY_A);
+            return [ 'items' => $rows ?: [] ];
+        }
+    ]);
+    register_rest_route('svntex2/v1','/kyc/(?P<user_id>\d+)', [
+        'methods' => 'POST',
+        'permission_callback' => 'svntex2_api_can_manage',
+        'callback' => function( WP_REST_Request $r ){
+            $uid = (int) $r['user_id']; $status = sanitize_key($r->get_param('status'));
+            if(!$uid || !in_array($status,['pending','approved','rejected'], true)) return new WP_REST_Response(['error'=>'Invalid'],400);
+            svntex2_kyc_set_status($uid, $status);
+            return [ 'user_id' => $uid, 'status' => $status ];
+        }
+    ]);
 });
 
 // Simple capability gate for management actions
@@ -109,12 +174,24 @@ add_action('rest_api_init', function(){
                     's' => (string) $r->get_param('search'),
                 ]);
                 $items = [];
-                while($q->have_posts()){ $q->the_post(); $p = get_post();
+        while($q->have_posts()){ $q->the_post(); $p = get_post();
+                    $cats = wp_get_object_terms($p->ID, 'svntex_category', [ 'fields' => 'ids' ]);
+                    $thumb_id = (int) get_post_thumbnail_id($p->ID);
+                    $thumb_url = $thumb_id ? wp_get_attachment_image_url($thumb_id, 'thumbnail') : '';
                     $items[] = [
                         'id' => $p->ID,
                         'title' => get_the_title($p),
                         'link' => get_permalink($p),
                         'vendor_id' => (int) get_post_meta($p->ID,'vendor_id', true),
+                        'featured_media' => $thumb_id,
+                        'thumbnail_url' => $thumb_url,
+                        'categories' => array_map('intval', is_wp_error($cats)?[]:$cats),
+            'mrp' => (float) get_post_meta($p->ID,'mrp', true),
+            'tax_percent' => (float) get_post_meta($p->ID,'tax_percent', true),
+            'company_profit' => (float) get_post_meta($p->ID,'company_profit', true),
+            'sku' => (string) get_post_meta($p->ID,'sku', true),
+            'video_media' => (int) get_post_meta($p->ID,'video_media', true),
+            'video_url' => (string) get_post_meta($p->ID,'video_url', true),
                     ];
                 }
                 wp_reset_postdata();
@@ -136,6 +213,19 @@ add_action('rest_api_init', function(){
                 ]);
                 if(is_wp_error($pid)) return new WP_REST_Response(['error'=>$pid->get_error_message()],500);
                 $vendor_id = (int) $r->get_param('vendor_id'); if($vendor_id) update_post_meta($pid,'vendor_id',$vendor_id);
+                // Categories
+                $cats = $r->get_param('categories'); if(null !== $cats){
+                    $cat_ids = array_map('intval', (array)$cats);
+                    wp_set_object_terms($pid, $cat_ids, 'svntex_category', false);
+                }
+                // Featured image
+                $fm = (int) $r->get_param('featured_media'); if($fm>0) set_post_thumbnail($pid, $fm);
+                // Custom fields
+                $nums = [ 'mrp','tax_percent','company_profit' ];
+                foreach($nums as $k){ if(null !== $r->get_param($k)){ update_post_meta($pid,$k, (float) $r->get_param($k)); } }
+                if(null !== $r->get_param('sku')) update_post_meta($pid,'sku', sanitize_text_field($r->get_param('sku')) );
+                if(null !== $r->get_param('video_media')) update_post_meta($pid,'video_media', (int) $r->get_param('video_media') );
+                if(null !== $r->get_param('video_url')) update_post_meta($pid,'video_url', esc_url_raw($r->get_param('video_url')) );
                 return [ 'id' => (int)$pid ];
             }
         ],
@@ -153,6 +243,22 @@ add_action('rest_api_init', function(){
                 if( null !== $r->get_param('vendor_id') ){
                     $vid = (int) $r->get_param('vendor_id'); if($vid) update_post_meta($id,'vendor_id',$vid); else delete_post_meta($id,'vendor_id');
                 }
+                // Categories
+                if( null !== $r->get_param('categories') ){
+                    $cat_ids = array_map('intval', (array) $r->get_param('categories'));
+                    wp_set_object_terms($id, $cat_ids, 'svntex_category', false);
+                }
+                // Featured image
+                if( null !== $r->get_param('featured_media') ){
+                    $fm = (int) $r->get_param('featured_media');
+                    if($fm>0) set_post_thumbnail($id, $fm); else delete_post_thumbnail($id);
+                }
+                // Custom fields
+                $nums = [ 'mrp','tax_percent','company_profit' ];
+                foreach($nums as $k){ if(null !== $r->get_param($k)){ $val = (float) $r->get_param($k); if($val>0) update_post_meta($id,$k,$val); else delete_post_meta($id,$k); } }
+                if(null !== $r->get_param('sku')){ $sku = sanitize_text_field($r->get_param('sku')); if($sku!=='') update_post_meta($id,'sku',$sku); else delete_post_meta($id,'sku'); }
+                if(null !== $r->get_param('video_media')){ $vm=(int)$r->get_param('video_media'); if($vm>0) update_post_meta($id,'video_media',$vm); else delete_post_meta($id,'video_media'); }
+                if(null !== $r->get_param('video_url')){ $vu = esc_url_raw($r->get_param('video_url')); if($vu!=='') update_post_meta($id,'video_url',$vu); else delete_post_meta($id,'video_url'); }
                 return [ 'id' => $id ];
             }
         ],

@@ -15,10 +15,11 @@ add_action('init', function(){
 		],
 		'public' => true,
 		'show_in_rest' => true,
+		'show_ui' => false, // hide WP admin UI; managed via custom admin
 		'has_archive' => true,
 		'rewrite' => [ 'slug' => 'products' ],
 		'menu_icon' => 'dashicons-products',
-		'supports' => ['title','editor','excerpt','thumbnail','custom-fields'],
+		'supports' => ['title','editor','thumbnail'],
 	]);
 	// Taxonomy
 	register_taxonomy('svntex_category', 'svntex_product', [
@@ -29,12 +30,36 @@ add_action('init', function(){
 		'rewrite' => [ 'slug' => 'product-category' ],
 	]);
 
-	// Expose vendor_id meta in REST so admin panel can set it
+	// Expose product meta in REST so admin panel can set it
 	if ( function_exists('register_post_meta') ) {
 		register_post_meta('svntex_product','vendor_id', [
 			'type' => 'integer',
 			'single' => true,
 			'show_in_rest' => true,
+			'auth_callback' => function(){ return current_user_can('edit_posts'); }
+		]);
+		register_post_meta('svntex_product','mrp', [
+			'type' => 'number','single' => true,'show_in_rest' => true,
+			'auth_callback' => function(){ return current_user_can('edit_posts'); }
+		]);
+		register_post_meta('svntex_product','tax_percent', [
+			'type' => 'number','single' => true,'show_in_rest' => true,
+			'auth_callback' => function(){ return current_user_can('edit_posts'); }
+		]);
+		register_post_meta('svntex_product','company_profit', [
+			'type' => 'number','single' => true,'show_in_rest' => true,
+			'auth_callback' => function(){ return current_user_can('edit_posts'); }
+		]);
+		register_post_meta('svntex_product','sku', [
+			'type' => 'string','single' => true,'show_in_rest' => true,
+			'auth_callback' => function(){ return current_user_can('edit_posts'); }
+		]);
+		register_post_meta('svntex_product','video_media', [
+			'type' => 'integer','single' => true,'show_in_rest' => true,
+			'auth_callback' => function(){ return current_user_can('edit_posts'); }
+		]);
+		register_post_meta('svntex_product','video_url', [
+			'type' => 'string','single' => true,'show_in_rest' => true,
 			'auth_callback' => function(){ return current_user_can('edit_posts'); }
 		]);
 	}

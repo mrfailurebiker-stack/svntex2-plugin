@@ -4,6 +4,28 @@
  */
 if (!defined('ABSPATH')) exit;
 
+// Ensure referrals table exists
+add_action('plugins_loaded', function(){
+    global $wpdb; $table = $wpdb->prefix.'svntex_referrals';
+    $exists = $wpdb->get_var( $wpdb->prepare("SHOW TABLES LIKE %s", $table) );
+    if($exists !== $table){
+        require_once ABSPATH.'wp-admin/includes/upgrade.php';
+        $charset = $wpdb->get_charset_collate();
+        $sql = "CREATE TABLE $table (\n".
+               " id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n".
+               " referrer_id BIGINT UNSIGNED NOT NULL,\n".
+               " referee_id BIGINT UNSIGNED NOT NULL,\n".
+               " qualified TINYINT(1) NOT NULL DEFAULT 0,\n".
+               " first_purchase_amount DECIMAL(12,2) NULL,\n".
+               " created_at DATETIME NOT NULL,\n".
+               " UNIQUE KEY uniq_pair (referrer_id, referee_id),\n".
+               " KEY referrer (referrer_id),\n".
+               " KEY referee (referee_id)\n".
+               ") $charset";
+        dbDelta($sql);
+    }
+}, 20);
+
 /**
  * Record a referral relationship (referrer -> referee) if not exists.
  */

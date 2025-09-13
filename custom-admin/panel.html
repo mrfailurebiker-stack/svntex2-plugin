@@ -4,17 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SVNTeX Admin Panel</title>
-    <link rel="stylesheet" href="/assets/css/style.css" />
-    <style>body{font-family:system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, sans-serif;padding:20px} .grid{display:grid;gap:14px} table{border-collapse:collapse;width:100%} th,td{border:1px solid #e5e7eb;padding:8px}</style>
+  <link rel="stylesheet" href="admin.css" />
   </head>
   <body>
-    <div id="layout" style="display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start">
-      <aside id="sidebar" style="border-right:1px solid #e5e7eb;padding-right:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <strong>SVNTeX Admin</strong>
-          <button id="btnToggle" aria-label="Toggle menu" title="Toggle menu">☰</button>
-        </div>
-        <nav style="display:grid;gap:8px;margin-top:12px">
+    <div id="layout" class="admin-shell">
+      <aside id="sidebar" class="sidebar">
+        <div class="brand"><strong>SVNTeX Admin</strong><button id="btnToggle" class="burger" aria-label="Toggle menu" title="Toggle menu">☰</button></div>
+        <nav>
           <a href="#users">Users</a>
           <a href="#products">Products</a>
           <a href="#wallet">Wallet</a>
@@ -23,15 +19,15 @@
           <a href="#logout" id="logout">Logout</a>
         </nav>
       </aside>
-      <main class="grid" style="padding-left:8px">
-        <section id="users"><h2>Users</h2>
-          <div id="usersBox">Loading...</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+      <main class="content grid">
+        <section id="users" class="section"><h2>Users</h2>
+          <div id="usersBox" class="muted">Loading...</div>
+          <div class="grid columns-2" style="margin-top:12px">
             <div>
-              <input id="userSearch" placeholder="Search users (email/username)" style="width:100%" />
-              <div id="userList" style="margin-top:8px"></div>
+              <input id="userSearch" placeholder="Search users (email/username)" />
+              <div id="userList" class="list" style="margin-top:8px"></div>
             </div>
-            <form id="userForm" class="grid" style="grid-template-columns:1fr;gap:8px">
+            <form id="userForm" class="grid">
               <h3>Edit User</h3>
               <input type="hidden" name="id" />
               <label>Customer ID <input name="customer_id" disabled /></label>
@@ -49,19 +45,80 @@
             </form>
           </div>
         </section>
-        <section id="products"><h2>Products</h2>
-        <form id="prodForm" class="grid" style="grid-template-columns:1fr;max-width:640px">
+        <section id="products" class="section"><h2>Products</h2>
+          <form id="prodForm" class="grid" style="max-width:640px">
           <input type="hidden" name="id" />
+            <input type="hidden" name="featured_media" />
+            <input type="hidden" name="video_media" />
           <label>Title<input name="title" required placeholder="Product title"></label>
-          <label>Vendor ID (optional)<input name="vendor_id" type="number" min="0" placeholder="Vendor ID"></label>
+            <div class="grid columns-3">
+              <label>MRP<input name="mrp" id="pMrp" type="number" step="0.01" min="0" placeholder="0.00"></label>
+              <label>Tax %<input name="tax_percent" id="pTax" type="number" step="0.01" min="0" placeholder="0"></label>
+              <label>Company Profit<input name="company_profit" id="pProfit" type="number" step="0.01" min="0" placeholder="0.00"></label>
+            </div>
+            <div class="grid columns-2">
+              <label>SKU<input name="sku" placeholder="SKU"></label>
+              <label>Vendor<select name="vendor_id" id="vendorSelect"><option value="">— None —</option></select></label>
+            </div>
           <label>Description<textarea name="content" rows="4" placeholder="Short description"></textarea></label>
-          <div>
-            <button type="submit">Save Product</button>
-            <button type="button" id="prodReset">New</button>
-          </div>
+            <div class="grid columns-2">
+              <label>Categories<select name="categories" id="prodCats" multiple size="5"></select></label>
+              <div>
+                <label>Featured Image
+                  <input type="file" id="prodImage" accept="image/*" />
+                </label>
+                <div id="imgPreview" class="muted" style="margin-top:8px"></div>
+              </div>
+            </div>
+            <div class="grid columns-2">
+              <div>
+                <label>Short Video (upload)
+                  <input type="file" id="prodVideo" accept="video/*" />
+                </label>
+                <div id="vidPreview" class="muted" style="margin-top:8px"></div>
+              </div>
+              <label>Or Video URL<input name="video_url" placeholder="https://..."></label>
+            </div>
+            <div class="grid" style="grid-auto-flow:column;justify-content:start">
+              <button type="submit">Save Product</button>
+              <button type="button" id="prodReset" class="secondary">New</button>
+            </div>
           <div id="prodMsg" class="muted"></div>
         </form>
-        <div id="prodList">Loading...</div>
+          <div id="prodList" class="list">Loading...</div>
+        </section>
+        <section id="wallet" class="section"><h2>Wallet</h2>
+          <div class="grid columns-3" style="max-width:840px">
+            <label>User ID (optional)<input id="wUserId" type="number" min="1" placeholder="Filter by user ID"></label>
+            <div class="grid" style="grid-auto-flow:column;align-items:end"><button id="wLoad">Load</button></div>
+          </div>
+          <div id="wList" class="list" style="margin-top:10px">No data.</div>
+        </section>
+
+        <section id="referrals" class="section"><h2>Referrals</h2>
+          <div class="grid columns-3" style="max-width:840px">
+            <label>Referrer ID<input id="refReferrer" type="number" min="1"></label>
+            <label>Referee ID<input id="refReferee" type="number" min="1"></label>
+            <div class="grid" style="grid-auto-flow:column;align-items:end"><button id="refLink">Link</button></div>
+          </div>
+          <div class="grid columns-3" style="max-width:840px;margin-top:10px">
+            <label>Qualify Amount<input id="refAmount" type="number" step="0.01" min="0"></label>
+            <div class="grid" style="grid-auto-flow:column;align-items:end"><button id="refQualify">Mark Qualified</button></div>
+          </div>
+          <div class="grid columns-2" style="max-width:840px;margin-top:10px">
+            <label>List by Referrer ID<input id="refListReferrer" type="number" min="1"></label>
+            <div class="grid" style="grid-auto-flow:column;align-items:end"><button id="refLoad">Load</button></div>
+          </div>
+          <div id="refList" class="list" style="margin-top:10px">No referrals.</div>
+        </section>
+
+        <section id="kyc" class="section"><h2>KYC</h2>
+          <div class="grid" style="max-width:860px">
+            <div class="grid" style="grid-auto-flow:column;justify-content:start">
+              <button id="kycLoad">Load Submissions</button>
+            </div>
+            <div id="kycList" class="list">No submissions.</div>
+          </div>
         </section>
       </main>
     </div>
@@ -86,10 +143,17 @@
 
       // Sidebar collapse
       const layout = document.getElementById('layout');
+      const sidebar = document.getElementById('sidebar');
       document.getElementById('btnToggle').addEventListener('click', ()=>{
-        const hidden = layout.style.gridTemplateColumns === '0px 1fr';
-        layout.style.gridTemplateColumns = hidden ? '260px 1fr' : '0px 1fr';
+        const hidden = getComputedStyle(sidebar).display === 'none';
+        if(window.matchMedia('(max-width:900px)').matches){ sidebar.classList.toggle('open'); }
+        else { layout.style.gridTemplateColumns = layout.style.gridTemplateColumns === '0px 1fr' ? '260px 1fr' : '0px 1fr'; }
       });
+
+      function toast(t){
+        let el=document.querySelector('.toast'); if(!el){ el=document.createElement('div'); el.className='toast'; document.body.appendChild(el); }
+        el.textContent=t; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2000);
+      }
 
       // Users management
       const userList = document.getElementById('userList');
@@ -138,46 +202,193 @@
         const r = await fetch('/wp-json/svntex2/v1/products', { credentials:'include', headers });
         const j = await r.json();
         const items = (j && j.items) || [];
-        prodList.innerHTML = items.map(p=>`<div>
-          <strong>#${p.id}</strong> ${p.title} ${p.vendor_id?`· vendor ${p.vendor_id}`:''}
-          <a href="#" data-edit="${p.id}">Edit</a>
-          <a href="#" data-del="${p.id}">Delete</a>
-        </div>`).join('') || 'No products yet.';
+        prodList.innerHTML = items.map(p=>`<div class="list-item">
+          <div style="display:flex;gap:10px;align-items:center">
+            ${p.thumbnail_url?`<img src="${p.thumbnail_url}" alt="thumb" style="width:48px;height:48px;object-fit:cover;border-radius:6px">`:''}
+            <div><strong>#${p.id}</strong> ${p.title} <div class="meta">${p.vendor_id?`vendor ${p.vendor_id} · `:''}MRP: ${p.mrp||'-'} | Tax: ${p.tax_percent||0}% | Profit: ${p.company_profit||'-'}</div></div>
+          </div>
+          <div>
+            <a href="#" data-edit="${p.id}">Edit</a>
+            <a href="#" data-del="${p.id}">Delete</a>
+          </div>
+        </div>`).join('') || '<div class="muted">No products yet.</div>';
       }
       await loadProducts();
+      // Load categories for select
+      async function loadCategories(){
+        const r = await fetch('/wp-json/wp/v2/svntex_category?per_page=100', { credentials:'include', headers });
+        const cats = r.ok ? await r.json() : [];
+        const sel = document.getElementById('prodCats'); sel.innerHTML = cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+      }
+      await loadCategories();
+      // Load vendors for dropdown
+      async function loadVendors(){
+        const r = await fetch('/wp-json/svntex2/v1/vendors', { credentials:'include', headers });
+        const j = await r.json(); const items = (j && j.items) || [];
+        const sel = document.getElementById('vendorSelect');
+        sel.innerHTML = '<option value="">— None —</option>' + items.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+      }
+      await loadVendors();
       prodList.addEventListener('click', async (e)=>{
         const id = e.target.getAttribute('data-edit');
         if(id){ e.preventDefault();
           const rp = await fetch(`/wp-json/wp/v2/svntex_product/${id}?context=edit`, { credentials:'include', headers });
-          if(!rp.ok){ pm('Load failed'); return; }
+          if(!rp.ok){ pm('Load failed'); toast('Load failed'); return; }
           const p = await rp.json();
           prodForm.id.value = p.id; prodForm.title.value = (p.title && p.title.raw) || p.title || '';
           prodForm.content.value = (p.content && p.content.raw) || '';
           const v = p.meta && p.meta.vendor_id ? p.meta.vendor_id : '';
-          prodForm.vendor_id.value = v;
-          pm('Loaded product for editing');
+          document.getElementById('vendorSelect').value = String(v||'');
+          // meta fields
+          prodForm.mrp.value = p.meta?.mrp ?? p.mrp ?? '';
+          prodForm.tax_percent.value = p.meta?.tax_percent ?? p.tax_percent ?? '';
+          prodForm.company_profit.value = p.meta?.company_profit ?? p.company_profit ?? '';
+          prodForm.sku.value = p.meta?.sku ?? p.sku ?? '';
+          prodForm.video_url.value = p.meta?.video_url ?? p.video_url ?? '';
+          // categories (fetch direct terms for accuracy)
+          try{
+            const tr = await fetch(`/wp-json/wp/v2/svntex_category?post=${id}`, { credentials:'include', headers });
+            const tjs = tr.ok ? await tr.json() : [];
+            const sel = document.getElementById('prodCats');
+            const ids = new Set((tjs||[]).map(t=>String(t.id)));
+            Array.from(sel.options).forEach(o=>{ o.selected = ids.has(o.value); });
+          }catch(e){}
+          // featured image preview
+          try{
+            const fm = p.featured_media || 0; prodForm.featured_media.value = fm || '';
+            if(fm){ const mr = await fetch(`/wp-json/wp/v2/media/${fm}`, { credentials:'include', headers }); if(mr.ok){ const m = await mr.json(); const url = (m.media_details && m.media_details.sizes && m.media_details.sizes.thumbnail && m.media_details.sizes.thumbnail.source_url) || m.source_url; document.getElementById('imgPreview').innerHTML = `<img src="${url}" alt="thumb" style="max-width:120px;border-radius:6px">`; }}
+            else { document.getElementById('imgPreview').textContent='No image'; }
+          }catch(e){ document.getElementById('imgPreview').textContent='No image'; }
+          // video preview
+          try{
+            const vm = p.meta?.video_media ?? p.video_media ?? 0; prodForm.video_media.value = vm || '';
+            if(vm){ const vr = await fetch(`/wp-json/wp/v2/media/${vm}`, { credentials:'include', headers }); if(vr.ok){ const vj = await vr.json(); document.getElementById('vidPreview').innerHTML = `<video src="${vj.source_url}" controls style="max-width:220px;border-radius:6px"></video>`; } }
+            else { document.getElementById('vidPreview').textContent='No video'; }
+          }catch(e){ document.getElementById('vidPreview').textContent='No video'; }
+          pm('Loaded product for editing'); toast('Product loaded');
         }
         const delId = e.target.getAttribute('data-del');
         if(delId){ e.preventDefault(); if(!confirm('Delete product #'+delId+'?')) return;
           const r = await fetch(`/wp-json/svntex2/v1/products/${delId}`, { method:'DELETE', credentials:'include', headers });
-          const j = await r.json(); if(j.deleted){ pm('Deleted'); loadProducts(); } else { pm(j.error||'Delete failed'); }
+          const j = await r.json(); if(j.deleted){ pm('Deleted'); toast('Deleted'); loadProducts(); } else { pm(j.error||'Delete failed'); toast('Delete failed'); }
         }
       });
-      document.getElementById('prodReset').addEventListener('click', (e)=>{ e.preventDefault(); prodForm.reset(); prodForm.id.value=''; pm(''); });
+  document.getElementById('prodReset').addEventListener('click', (e)=>{ e.preventDefault(); prodForm.reset(); prodForm.id.value=''; document.getElementById('imgPreview').textContent=''; document.getElementById('vidPreview').textContent=''; pm(''); });
+      // Upload image to Media and set hidden featured_media
+  const imgInput = document.getElementById('prodImage');
+      imgInput.addEventListener('change', async (e)=>{
+        const file = e.target.files && e.target.files[0]; if(!file){ return; }
+        const fd = new FormData(); fd.append('file', file, file.name);
+        const r = await fetch('/wp-json/wp/v2/media', { method:'POST', credentials:'include', headers: { ...headers }, body: fd });
+        if(!r.ok){ toast('Upload failed'); return; }
+        const m = await r.json(); prodForm.featured_media.value = m.id; document.getElementById('imgPreview').innerHTML = `<img src="${m.media_details?.sizes?.thumbnail?.source_url || m.source_url}" style="max-width:120px;border-radius:6px">`;
+        toast('Image uploaded');
+      });
+      const vidInput = document.getElementById('prodVideo');
+      vidInput.addEventListener('change', async (e)=>{
+        const file = e.target.files && e.target.files[0]; if(!file){ return; }
+        const fd = new FormData(); fd.append('file', file, file.name);
+        fd.append('post', prodForm.id.value || 0);
+        const r = await fetch('/wp-json/wp/v2/media', { method:'POST', credentials:'include', headers: { ...headers }, body: fd });
+        if(!r.ok){ toast('Video upload failed'); return; }
+        const m = await r.json(); prodForm.video_media.value = m.id; document.getElementById('vidPreview').innerHTML = `<video src="${m.source_url}" controls style="max-width:220px;border-radius:6px"></video>`;
+        toast('Video uploaded');
+      });
       prodForm.addEventListener('submit', async (e)=>{
         e.preventDefault(); pm('Saving...');
         const data = new FormData(prodForm);
         const id = data.get('id'); data.delete('id');
-        const payload = Object.fromEntries(data.entries());
-        if(payload.vendor_id) payload.vendor_id = parseInt(payload.vendor_id,10)||0;
+  const payload = Object.fromEntries(data.entries());
+  if(payload.vendor_id) payload.vendor_id = parseInt(payload.vendor_id,10)||0; else delete payload.vendor_id;
+  // categories multi-select
+  const catSel = document.getElementById('prodCats');
+  const selCats = Array.from(catSel.selectedOptions).map(o=>parseInt(o.value,10)).filter(Boolean);
+  if(selCats.length) payload.categories = selCats; else payload.categories = [];
+  // numeric fields
+  ['mrp','tax_percent','company_profit'].forEach(k=>{ if(payload[k]!==undefined && payload[k]!=='' ) payload[k] = parseFloat(payload[k]); });
         const url = id ? `/wp-json/svntex2/v1/products/${id}` : '/wp-json/svntex2/v1/products';
         const method = 'POST';
         const r = await fetch(url, { method, credentials:'include', headers: { ...headers, 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
+      // Auto-calc company profit when MRP or Tax changes (simple example):
+      // Profit = MRP - (MRP * Tax%)
+      const pMrp = document.getElementById('pMrp');
+      const pTax = document.getElementById('pTax');
+      const pProfit = document.getElementById('pProfit');
+      function recalcProfit(){
+        const mrp = parseFloat(pMrp.value||'0');
+        const tax = parseFloat(pTax.value||'0');
+        if(mrp>=0 && tax>=0){ const profit = Math.max(0, mrp - (mrp * (tax/100))); pProfit.value = profit.toFixed(2); }
+      }
+      pMrp.addEventListener('input', recalcProfit);
+      pTax.addEventListener('input', recalcProfit);
         const j = await r.json();
-        if(j.id){ pm('Saved'); prodForm.reset(); await loadProducts(); }
-        else { pm(j.error || 'Save failed'); }
+  if(j.id){ pm('Saved'); toast('Saved'); prodForm.reset(); await loadProducts(); }
+  else { pm(j.error || 'Save failed'); toast('Save failed'); }
       });
       document.getElementById('logout').addEventListener('click', async (e)=>{ e.preventDefault(); await fetch('/wp-login.php?action=logout',{credentials:'include'}); location.href='/admin/'; });
+
+      // Wallet section
+      const wUserId = document.getElementById('wUserId');
+      const wList = document.getElementById('wList');
+      async function loadWallet(){
+        const q = wUserId.value ? ('?user_id='+encodeURIComponent(wUserId.value)) : '';
+        const r = await fetch('/wp-json/svntex2/v1/wallet/transactions'+q, { credentials:'include', headers });
+        const j = await r.json(); const items = j.items || [];
+        wList.innerHTML = items.map(x=>`<div class="list-item">
+          <div>#${x.id} · u${x.user_id} · ${x.type} · ${x.category} · ${x.amount}</div>
+          <div class="meta">${x.created_at}</div>
+        </div>`).join('') || '<div class="muted">No transactions.</div>';
+      }
+      document.getElementById('wLoad').addEventListener('click', (e)=>{ e.preventDefault(); loadWallet(); });
+
+      // Referrals section
+      const refList = document.getElementById('refList');
+      async function loadReferrals(){
+        const v = document.getElementById('refListReferrer').value;
+        const q = v ? ('?referrer_id='+encodeURIComponent(v)) : '';
+        const r = await fetch('/wp-json/svntex2/v1/referrals'+q, { credentials:'include', headers });
+        const j = await r.json(); const items = j.items || [];
+        refList.innerHTML = items.map(x=>`<div class="list-item"><div>#${x.id} · ${x.referrer_id} → ${x.referee_id} ${x.qualified? '· qualified':''}</div><div class="meta">${x.created_at||''}</div></div>`).join('') || '<div class="muted">No referrals.</div>';
+      }
+      document.getElementById('refLoad').addEventListener('click', (e)=>{ e.preventDefault(); loadReferrals(); });
+      document.getElementById('refLink').addEventListener('click', async (e)=>{
+        e.preventDefault();
+        const ref = parseInt(document.getElementById('refReferrer').value,10)||0;
+        const ree = parseInt(document.getElementById('refReferee').value,10)||0;
+        if(!ref||!ree){ toast('IDs required'); return; }
+        const r = await fetch('/wp-json/svntex2/v1/referrals/link', { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ referrer_id:ref, referee_id:ree }) });
+        const j = await r.json(); toast(j.ok?'Linked':'Not linked'); loadReferrals();
+      });
+      document.getElementById('refQualify').addEventListener('click', async (e)=>{
+        e.preventDefault();
+        const ref = parseInt(document.getElementById('refReferrer').value,10)||0;
+        const ree = parseInt(document.getElementById('refReferee').value,10)||0;
+        const amt = parseFloat(document.getElementById('refAmount').value||'0')||0;
+        if(!ref||!ree){ toast('IDs required'); return; }
+        const r = await fetch('/wp-json/svntex2/v1/referrals/qualify', { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ referrer_id:ref, referee_id:ree, amount:amt }) });
+        const j = await r.json(); toast(j.ok?'Qualified':'Failed'); loadReferrals();
+      });
+
+      // KYC section
+      const kycList = document.getElementById('kycList');
+      async function loadKyc(){
+        const r = await fetch('/wp-json/svntex2/v1/kyc', { credentials:'include', headers });
+        const j = await r.json(); const items = j.items || [];
+        kycList.innerHTML = items.map(x=>`<div class="list-item">
+          <div>User ${x.user_id} · ${x.status}</div>
+          <div>
+            <a href="#" data-kyc-user="${x.user_id}" data-kyc-status="approved">Approve</a>
+            <a href="#" data-kyc-user="${x.user_id}" data-kyc-status="rejected">Reject</a>
+          </div>
+        </div>`).join('') || '<div class="muted">No submissions.</div>';
+      }
+      document.getElementById('kycLoad').addEventListener('click', (e)=>{ e.preventDefault(); loadKyc(); });
+      kycList.addEventListener('click', async (e)=>{
+        const uid = e.target.getAttribute('data-kyc-user'); const st = e.target.getAttribute('data-kyc-status');
+        if(!uid||!st) return; e.preventDefault();
+        const r = await fetch(`/wp-json/svntex2/v1/kyc/${uid}`, { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ status:st }) });
+        const j = await r.json(); if(j && j.user_id){ toast('KYC '+st); loadKyc(); } else { toast('Failed'); }
+      });
     })();
     </script>
   </body>
