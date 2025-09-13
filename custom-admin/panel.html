@@ -11,12 +11,26 @@
     <header style="display:flex;justify-content:space-between;align-items:center">
       <h1>SVNTeX Admin</h1>
       <nav>
-        <a href="#users">Users</a> · <a href="#wallet">Wallet</a> · <a href="#referrals">Referrals</a> · <a href="#kyc">KYC</a>
+        <a href="#users">Users</a> · <a href="#products">Products</a> · <a href="#wallet">Wallet</a> · <a href="#referrals">Referrals</a> · <a href="#kyc">KYC</a>
         · <a href="#logout" id="logout">Logout</a>
       </nav>
     </header>
     <main class="grid">
       <section id="users"><h2>Users</h2><div id="usersBox">Loading...</div></section>
+      <section id="products"><h2>Products</h2>
+        <form id="prodForm" class="grid" style="grid-template-columns:1fr;max-width:640px">
+          <input type="hidden" name="id" />
+          <label>Title<input name="title" required placeholder="Product title"></label>
+          <label>Vendor ID (optional)<input name="vendor_id" type="number" min="0" placeholder="Vendor ID"></label>
+          <label>Description<textarea name="content" rows="4" placeholder="Short description"></textarea></label>
+          <div>
+            <button type="submit">Save Product</button>
+            <button type="button" id="prodReset">New</button>
+          </div>
+          <div id="prodMsg" class="muted"></div>
+        </form>
+        <div id="prodList">Loading...</div>
+      </section>
     </main>
     <script>
     (async function(){
@@ -36,6 +50,56 @@
       const users = ures.ok ? await ures.json() : [];
       const box = document.getElementById('usersBox');
       box.innerHTML = users.map(u=>`<div>#${u.id} — ${u.name} (${u.email||'-'})</div>`).join('') || 'No users.';
+
+      // Products UI
+      const prodList = document.getElementById('prodList');
+      const prodForm = document.getElementById('prodForm');
+      const prodMsg = document.getElementById('prodMsg');
+      function pm(t){ prodMsg.textContent=t; }
+      async function loadProducts(){
+        pm(''); prodList.textContent = 'Loading...';
+        const r = await fetch('/wp-json/svntex2/v1/products', { credentials:'include', headers });
+        const j = await r.json();
+        const items = (j && j.items) || [];
+        prodList.innerHTML = items.map(p=>`<div>
+          <strong>#${p.id}</strong> ${p.title} ${p.vendor_id?`· vendor ${p.vendor_id}`:''}
+          <a href="#" data-edit="${p.id}">Edit</a>
+          <a href="#" data-del="${p.id}">Delete</a>
+        </div>`).join('') || 'No products yet.';
+      }
+      await loadProducts();
+      prodList.addEventListener('click', async (e)=>{
+        const id = e.target.getAttribute('data-edit');
+        if(id){ e.preventDefault();
+          const rp = await fetch(`/wp-json/wp/v2/svntex_product/${id}?context=edit`, { credentials:'include', headers });
+          if(!rp.ok){ pm('Load failed'); return; }
+          const p = await rp.json();
+          prodForm.id.value = p.id; prodForm.title.value = (p.title && p.title.raw) || p.title || '';
+          prodForm.content.value = (p.content && p.content.raw) || '';
+          const v = p.meta && p.meta.vendor_id ? p.meta.vendor_id : '';
+          prodForm.vendor_id.value = v;
+          pm('Loaded product for editing');
+        }
+        const delId = e.target.getAttribute('data-del');
+        if(delId){ e.preventDefault(); if(!confirm('Delete product #'+delId+'?')) return;
+          const r = await fetch(`/wp-json/svntex2/v1/products/${delId}`, { method:'DELETE', credentials:'include', headers });
+          const j = await r.json(); if(j.deleted){ pm('Deleted'); loadProducts(); } else { pm(j.error||'Delete failed'); }
+        }
+      });
+      document.getElementById('prodReset').addEventListener('click', (e)=>{ e.preventDefault(); prodForm.reset(); prodForm.id.value=''; pm(''); });
+      prodForm.addEventListener('submit', async (e)=>{
+        e.preventDefault(); pm('Saving...');
+        const data = new FormData(prodForm);
+        const id = data.get('id'); data.delete('id');
+        const payload = Object.fromEntries(data.entries());
+        if(payload.vendor_id) payload.vendor_id = parseInt(payload.vendor_id,10)||0;
+        const url = id ? `/wp-json/svntex2/v1/products/${id}` : '/wp-json/svntex2/v1/products';
+        const method = 'POST';
+        const r = await fetch(url, { method, credentials:'include', headers: { ...headers, 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
+        const j = await r.json();
+        if(j.id){ pm('Saved'); prodForm.reset(); await loadProducts(); }
+        else { pm(j.error || 'Save failed'); }
+      });
       document.getElementById('logout').addEventListener('click', async (e)=>{ e.preventDefault(); await fetch('/wp-login.php?action=logout',{credentials:'include'}); location.href='/admin/'; });
     })();
     </script>

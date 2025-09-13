@@ -28,6 +28,16 @@ add_action('init', function(){
 		'show_in_rest' => true,
 		'rewrite' => [ 'slug' => 'product-category' ],
 	]);
+
+	// Expose vendor_id meta in REST so admin panel can set it
+	if ( function_exists('register_post_meta') ) {
+		register_post_meta('svntex_product','vendor_id', [
+			'type' => 'integer',
+			'single' => true,
+			'show_in_rest' => true,
+			'auth_callback' => function(){ return current_user_can('edit_posts'); }
+		]);
+	}
 });
 
 // Intentionally no closing PHP tag.

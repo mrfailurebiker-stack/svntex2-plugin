@@ -91,4 +91,80 @@ add_action('rest_api_init', function(){
         }
     ]);
 });
+
+// Simple capability gate for management actions
+function svntex2_api_can_manage(){ return current_user_can('edit_posts'); }
+
+// Product CRUD for svntex_product (admin only)
+add_action('rest_api_init', function(){
+    register_rest_route('svntex2/v1','/products',[
+        [
+            'methods' => 'GET',
+            'permission_callback' => 'svntex2_api_can_manage',
+            'callback' => function( WP_REST_Request $r ){
+                $q = new WP_Query([
+                    'post_type' => 'svntex_product',
+                    'posts_per_page' => (int) ($r->get_param('per_page') ?: 20),
+                    'paged' => (int) ($r->get_param('page') ?: 1),
+                    's' => (string) $r->get_param('search'),
+                ]);
+                $items = [];
+                while($q->have_posts()){ $q->the_post(); $p = get_post();
+                    $items[] = [
+                        'id' => $p->ID,
+                        'title' => get_the_title($p),
+                        'link' => get_permalink($p),
+                        'vendor_id' => (int) get_post_meta($p->ID,'vendor_id', true),
+                    ];
+                }
+                wp_reset_postdata();
+                return [ 'items' => $items, 'total' => (int)$q->found_posts ];
+            }
+        ],
+        [
+            'methods' => 'POST',
+            'permission_callback' => 'svntex2_api_can_manage',
+            'callback' => function( WP_REST_Request $r ){
+                $title = sanitize_text_field($r->get_param('title'));
+                if(!$title) return new WP_REST_Response(['error'=>'Title required'],400);
+                $content = wp_kses_post($r->get_param('content'));
+                $pid = wp_insert_post([
+                    'post_type' => 'svntex_product',
+                    'post_title' => $title,
+                    'post_content' => $content,
+                    'post_status' => 'publish',
+                ]);
+                if(is_wp_error($pid)) return new WP_REST_Response(['error'=>$pid->get_error_message()],500);
+                $vendor_id = (int) $r->get_param('vendor_id'); if($vendor_id) update_post_meta($pid,'vendor_id',$vendor_id);
+                return [ 'id' => (int)$pid ];
+            }
+        ],
+    ]);
+    register_rest_route('svntex2/v1','/products/(?P<id>\d+)',[
+        [
+            'methods' => 'POST',
+            'permission_callback' => 'svntex2_api_can_manage',
+            'callback' => function( WP_REST_Request $r ){
+                $id = (int) $r['id']; if(!$id) return new WP_REST_Response(['error'=>'Invalid id'],400);
+                $payload = [];
+                if( null !== $r->get_param('title') ) $payload['post_title'] = sanitize_text_field($r->get_param('title'));
+                if( null !== $r->get_param('content') ) $payload['post_content'] = wp_kses_post($r->get_param('content'));
+                if($payload){ $payload['ID']=$id; $res = wp_update_post($payload,true); if(is_wp_error($res)) return new WP_REST_Response(['error'=>$res->get_error_message()],500); }
+                if( null !== $r->get_param('vendor_id') ){
+                    $vid = (int) $r->get_param('vendor_id'); if($vid) update_post_meta($id,'vendor_id',$vid); else delete_post_meta($id,'vendor_id');
+                }
+                return [ 'id' => $id ];
+            }
+        ],
+        [
+            'methods' => 'DELETE',
+            'permission_callback' => 'svntex2_api_can_manage',
+            'callback' => function( WP_REST_Request $r ){
+                $id = (int) $r['id']; if(!$id) return new WP_REST_Response(['error'=>'Invalid id'],400);
+                $res = wp_delete_post($id, true);
+                return [ 'deleted' => (bool)$res ];
+            }
+        ],
+    ]);
+});
 ?>
