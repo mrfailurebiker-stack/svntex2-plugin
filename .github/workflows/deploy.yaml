@@ -19,6 +19,8 @@ jobs:
           server: 145.79.211.169
           username: u271371274
           password: ${{ secrets.FTP_PASSWORD }}
+          # Remote directory relative to your FTP root. If your FTP root is public_html,
+          # this path deploys into WordPress' plugin folder.
           server-dir: /wp-content/plugins/svntex2-plugin/
           protocol: ftps
           port: 21

@@ -20,12 +20,15 @@ $referral_count = get_user_meta($current_user->ID,'referral_count', true);
 $referral_count = ($referral_count === '') ? 0 : intval($referral_count);
 $wallet_balance = svntex2_wallet_get_balance($current_user->ID); // live ledger helper
 
-$orders = wc_get_orders([
-    'customer_id' => $current_user->ID,
-    'limit' => 5,
-    'orderby' => 'date',
-    'order' => 'DESC'
-]);
+$orders = [];
+if ( function_exists('wc_get_orders') ) {
+    $orders = wc_get_orders([
+        'customer_id' => $current_user->ID,
+        'limit' => 5,
+        'orderby' => 'date',
+        'order' => 'DESC'
+    ]);
+}
 
 $logout_url = esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
 ?>
@@ -43,7 +46,7 @@ $logout_url = esc_url( admin_url( 'admin-post.php?action=svntex2_logout' ) );
 <div class="svntex-dash-top">
     <nav class="dash-actions" aria-label="Quick actions">
     <a class="mini" href="#kyc">KYC</a>
-    <a class="mini" href="<?php echo esc_url( wc_get_page_permalink('shop') ); ?>">Products</a>
+    <a class="mini" href="<?php echo esc_url( function_exists('wc_get_page_permalink') ? wc_get_page_permalink('shop') : home_url('/products/') ); ?>">Products</a>
     <a class="mini" href="<?php echo esc_url( function_exists('wc_get_cart_url') ? wc_get_cart_url() : home_url('/cart/') ); ?>">Cart</a>
         <a class="mini" href="#wallet">Wallet <span class="mini-badge"><?php echo function_exists('wc_price') ? wp_strip_all_tags( wc_price($wallet_balance) ) : esc_html(number_format($wallet_balance,2)); ?></span></a>
         <a class="mini" href="<?php echo $logout_url; ?>">Logout</a>

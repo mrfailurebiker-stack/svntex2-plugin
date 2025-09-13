@@ -1,6 +1,11 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
+/** Generate a customer id of the form SVNXXXXXX */
+function svntex2_generate_customer_id(){
+    return 'SVN' . str_pad((string) wp_rand(0, 999999), 6, '0', STR_PAD_LEFT);
+}
+
 function svntex2_wallet_add_transaction($user_id, $type, $amount, $reference_id = null, $meta = [], $category = 'general') {
     global $wpdb; $table = $wpdb->prefix.'svntex_wallet_transactions';
     $amount = (float)$amount;
