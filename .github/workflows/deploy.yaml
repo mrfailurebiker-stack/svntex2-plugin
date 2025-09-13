@@ -22,7 +22,7 @@ jobs:
           server-dir: /public_html/wp-content/plugins/svntex2-plugin/
           protocol: ftps
           port: 21
-          local-dir: .
+          local-dir: ./
           state-name: .ftp-deploy-sync-state.json
           exclude: |
             **/.git*
