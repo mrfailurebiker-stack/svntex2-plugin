@@ -94,22 +94,59 @@ add_action('rest_api_init', function(){
     register_rest_route('svntex2/v1','/wallet/transactions', [
         'methods' => 'GET',
         'permission_callback' => 'svntex2_api_can_manage',
+                                    $brands = wp_get_object_terms($p->ID, 'svntex_brand', [ 'fields' => 'ids' ]);
+                                    $tags = wp_get_object_terms($p->ID, 'svntex_tag', [ 'fields' => 'ids' ]);
+                                    $ship_cls = wp_get_object_terms($p->ID, 'svntex_shipping_class', [ 'fields' => 'ids' ]);
         'callback' => function( WP_REST_Request $r ){
             global $wpdb; $t = $wpdb->prefix.'svntex_wallet_transactions';
             $uid = (int) $r->get_param('user_id');
             $limit = min( (int) ($r->get_param('per_page') ?: 50), 200 );
             $rows = $uid ? $wpdb->get_results( $wpdb->prepare("SELECT * FROM $t WHERE user_id=%d ORDER BY id DESC LIMIT %d", $uid, $limit), ARRAY_A )
+                                        'slug' => $p->post_name,
+                                        'status' => $p->post_status,
                          : $wpdb->get_results( $wpdb->prepare("SELECT * FROM $t ORDER BY id DESC LIMIT %d", $limit), ARRAY_A );
             return [ 'items' => $rows ?: [] ];
         }
     ]);
     // Referrals admin endpoints
+                                        'brands' => array_map('intval', is_wp_error($brands)?[]:$brands),
+                                        'tags' => array_map('intval', is_wp_error($tags)?[]:$tags),
+                                        'shipping_class' => array_map('intval', is_wp_error($ship_cls)?[]:$ship_cls),
+                                        // Pricing
+                                        'base_price' => (float) get_post_meta($p->ID,'base_price', true),
+                                        'discount_price' => (float) get_post_meta($p->ID,'discount_price', true),
     register_rest_route('svntex2/v1','/referrals', [
         'methods' => 'GET',
         'permission_callback' => 'svntex2_api_can_manage',
         'callback' => function( WP_REST_Request $r ){
+                                        // Stock
+                                        'stock_qty' => (int) get_post_meta($p->ID,'stock_qty', true),
+                                        'stock_status' => (string) get_post_meta($p->ID,'stock_status', true),
+                                        'low_stock_threshold' => (int) get_post_meta($p->ID,'low_stock_threshold', true),
+                                        // Media
             global $wpdb; $t = $wpdb->prefix.'svntex_referrals';
             $uid = (int) $r->get_param('referrer_id');
+                                        'gallery' => (array) get_post_meta($p->ID,'gallery', true),
+                                        // Shipping
+                                        'weight' => (float) get_post_meta($p->ID,'weight', true),
+                                        'length' => (float) get_post_meta($p->ID,'length', true),
+                                        'width' => (float) get_post_meta($p->ID,'width', true),
+                                        'height' => (float) get_post_meta($p->ID,'height', true),
+                                        // SEO & marketing
+                                        'meta_title' => (string) get_post_meta($p->ID,'meta_title', true),
+                                        'meta_description' => (string) get_post_meta($p->ID,'meta_description', true),
+                                        'is_featured' => (bool) get_post_meta($p->ID,'is_featured', true),
+                                        // Visibility & approval
+                                        'visibility' => (string) get_post_meta($p->ID,'visibility', true),
+                                        'archived' => (bool) get_post_meta($p->ID,'archived', true),
+                                        'approved' => (bool) get_post_meta($p->ID,'approved', true),
+                                        // Attributes & variations
+                                        'attributes' => (array) get_post_meta($p->ID,'attributes', true),
+                                        'variations' => (array) get_post_meta($p->ID,'variations', true),
+                                        // Analytics
+                                        'view_count' => (int) get_post_meta($p->ID,'view_count', true),
+                                        'sales_count' => (int) get_post_meta($p->ID,'sales_count', true),
+                                        'returns_count' => (int) get_post_meta($p->ID,'returns_count', true),
             $rows = $uid ? $wpdb->get_results( $wpdb->prepare("SELECT * FROM $t WHERE referrer_id=%d ORDER BY id DESC", $uid), ARRAY_A )
                          : $wpdb->get_results( "SELECT * FROM $t ORDER BY id DESC LIMIT 200", ARRAY_A );
             return [ 'items' => $rows ?: [] ];
@@ -123,11 +160,15 @@ add_action('rest_api_init', function(){
             if(!$ref || !$ree) return new WP_REST_Response(['error'=>'referrer_id and referee_id required'],400);
             $ok = svntex2_referrals_link($ref,$ree);
             return [ 'ok' => (bool)$ok ];
-        }
+                                $status = $r->get_param('status');
+                                $post_status = ($status==='draft') ? 'draft' : 'publish';
+                                $slug = sanitize_title($r->get_param('slug'));
+                                $pid = wp_insert_post([
     ]);
     register_rest_route('svntex2/v1','/referrals/qualify', [
         'methods' => 'POST',
-        'permission_callback' => 'svntex2_api_can_manage',
+                                    'post_status' => $post_status,
+                                    'post_name' => $slug ?: null,
         'callback' => function( WP_REST_Request $r ){
             $ref = (int) $r->get_param('referrer_id'); $ree = (int) $r->get_param('referee_id'); $amt = (float) $r->get_param('amount');
             if(!$ref || !$ree) return new WP_REST_Response(['error'=>'referrer_id and referee_id required'],400);
@@ -136,14 +177,28 @@ add_action('rest_api_init', function(){
         }
     ]);
     // KYC endpoints (admin)
+                                // Brands, tags, shipping class
+                                $brands = $r->get_param('brands'); if(null !== $brands){ wp_set_object_terms($pid, array_map('intval',(array)$brands), 'svntex_brand', false); }
+                                $tags = $r->get_param('tags'); if(null !== $tags){ wp_set_object_terms($pid, array_map('intval',(array)$tags), 'svntex_tag', false); }
+                                $ship = $r->get_param('shipping_class'); if(null !== $ship){ wp_set_object_terms($pid, array_map('intval',(array)$ship), 'svntex_shipping_class', false); }
     register_rest_route('svntex2/v1','/kyc', [
         'methods' => 'GET',
         'permission_callback' => 'svntex2_api_can_manage',
-        'callback' => function( WP_REST_Request $r ){
+                                $nums = [ 'base_price','discount_price','mrp','tax_percent','company_profit','stock_qty','low_stock_threshold','weight','length','width','height' ];
             global $wpdb; $t=$wpdb->prefix.'svntex_kyc_submissions';
+                                if(null !== $r->get_param('stock_status')) update_post_meta($pid,'stock_status', sanitize_text_field($r->get_param('stock_status')) );
             $rows = $wpdb->get_results("SELECT id,user_id,status,created_at,updated_at FROM $t ORDER BY id DESC LIMIT 200", ARRAY_A);
             return [ 'items' => $rows ?: [] ];
         }
+                                if(null !== $r->get_param('gallery')) update_post_meta($pid,'gallery', array_map('intval', (array)$r->get_param('gallery')) );
+                                if(null !== $r->get_param('meta_title')) update_post_meta($pid,'meta_title', sanitize_text_field($r->get_param('meta_title')) );
+                                if(null !== $r->get_param('meta_description')) update_post_meta($pid,'meta_description', sanitize_textarea_field($r->get_param('meta_description')) );
+                                if(null !== $r->get_param('is_featured')) update_post_meta($pid,'is_featured', (bool)$r->get_param('is_featured') ? 1 : 0 );
+                                if(null !== $r->get_param('visibility')) update_post_meta($pid,'visibility', sanitize_text_field($r->get_param('visibility')) );
+                                if(null !== $r->get_param('archived')) update_post_meta($pid,'archived', (bool)$r->get_param('archived') ? 1 : 0 );
+                                if(null !== $r->get_param('approved')) update_post_meta($pid,'approved', (bool)$r->get_param('approved') ? 1 : 0 );
+                                if(null !== $r->get_param('attributes')) update_post_meta($pid,'attributes', (array)$r->get_param('attributes') );
+                                if(null !== $r->get_param('variations')) update_post_meta($pid,'variations', (array)$r->get_param('variations') );
     ]);
     register_rest_route('svntex2/v1','/kyc/(?P<user_id>\d+)', [
         'methods' => 'POST',
@@ -157,6 +212,11 @@ add_action('rest_api_init', function(){
     ]);
 });
 
+                                if( null !== $r->get_param('slug') ) $payload['post_name'] = sanitize_title($r->get_param('slug'));
+                                if( null !== $r->get_param('status') ){
+                                    $st = $r->get_param('status');
+                                    $payload['post_status'] = ($st==='draft') ? 'draft' : 'publish';
+                                }
 // Simple capability gate for management actions
 function svntex2_api_can_manage(){ return current_user_can('edit_posts'); }
 
@@ -166,17 +226,30 @@ add_action('rest_api_init', function(){
         [
             'methods' => 'GET',
             'permission_callback' => 'svntex2_api_can_manage',
+                                if( null !== $r->get_param('brands') ) wp_set_object_terms($id, array_map('intval',(array)$r->get_param('brands')), 'svntex_brand', false);
+                                if( null !== $r->get_param('tags') ) wp_set_object_terms($id, array_map('intval',(array)$r->get_param('tags')), 'svntex_tag', false);
+                                if( null !== $r->get_param('shipping_class') ) wp_set_object_terms($id, array_map('intval',(array)$r->get_param('shipping_class')), 'svntex_shipping_class', false);
             'callback' => function( WP_REST_Request $r ){
                 $q = new WP_Query([
                     'post_type' => 'svntex_product',
                     'posts_per_page' => (int) ($r->get_param('per_page') ?: 20),
                     'paged' => (int) ($r->get_param('page') ?: 1),
                     's' => (string) $r->get_param('search'),
-                ]);
+                                $nums = [ 'base_price','discount_price','mrp','tax_percent','company_profit','stock_qty','low_stock_threshold','weight','length','width','height' ];
                 $items = [];
+                                if(null !== $r->get_param('stock_status')){ $v = sanitize_text_field($r->get_param('stock_status')); if($v!=='') update_post_meta($id,'stock_status',$v); else delete_post_meta($id,'stock_status'); }
         while($q->have_posts()){ $q->the_post(); $p = get_post();
                     $cats = wp_get_object_terms($p->ID, 'svntex_category', [ 'fields' => 'ids' ]);
                     $thumb_id = (int) get_post_thumbnail_id($p->ID);
+                                if(null !== $r->get_param('gallery')){ $g = array_map('intval',(array)$r->get_param('gallery')); update_post_meta($id,'gallery', $g ); }
+                                if(null !== $r->get_param('meta_title')){ $v=sanitize_text_field($r->get_param('meta_title')); if($v!=='') update_post_meta($id,'meta_title',$v); else delete_post_meta($id,'meta_title'); }
+                                if(null !== $r->get_param('meta_description')){ $v=sanitize_textarea_field($r->get_param('meta_description')); if($v!=='') update_post_meta($id,'meta_description',$v); else delete_post_meta($id,'meta_description'); }
+                                if(null !== $r->get_param('is_featured')) update_post_meta($id,'is_featured', (bool)$r->get_param('is_featured') ? 1 : 0 );
+                                if(null !== $r->get_param('visibility')){ $v=sanitize_text_field($r->get_param('visibility')); update_post_meta($id,'visibility',$v); }
+                                if(null !== $r->get_param('archived')) update_post_meta($id,'archived', (bool)$r->get_param('archived') ? 1 : 0 );
+                                if(null !== $r->get_param('approved')) update_post_meta($id,'approved', (bool)$r->get_param('approved') ? 1 : 0 );
+                                if(null !== $r->get_param('attributes')) update_post_meta($id,'attributes', (array)$r->get_param('attributes') );
+                                if(null !== $r->get_param('variations')) update_post_meta($id,'variations', (array)$r->get_param('variations') );
                     $thumb_url = $thumb_id ? wp_get_attachment_image_url($thumb_id, 'thumbnail') : '';
                     $items[] = [
                         'id' => $p->ID,
@@ -190,6 +263,106 @@ add_action('rest_api_init', function(){
             'tax_percent' => (float) get_post_meta($p->ID,'tax_percent', true),
             'company_profit' => (float) get_post_meta($p->ID,'company_profit', true),
             'sku' => (string) get_post_meta($p->ID,'sku', true),
+
+                    // Reviews moderation for a product
+                    register_rest_route('svntex2/v1','/products/(?P<id>\d+)/reviews', [
+                        [
+                            'methods'=>'GET','permission_callback'=>'svntex2_api_can_manage',
+                            'callback'=>function(WP_REST_Request $r){
+                                $pid=(int)$r['id'];
+                                $args=[ 'post_id'=>$pid, 'status'=>'all', 'number'=>100 ];
+                                $comments = get_comments($args); $items=[];
+                                foreach($comments as $c){ $items[]=[ 'id'=>$c->comment_ID, 'author'=>$c->comment_author, 'content'=>$c->comment_content, 'status'=>$c->comment_approved, 'rating'=>get_comment_meta($c->comment_ID,'rating',true), 'featured'=>(bool)get_comment_meta($c->comment_ID,'featured',true), 'date'=>$c->comment_date ]; }
+                                return [ 'items'=>$items ];
+                            }
+                        ],
+                        [
+                            'methods'=>'POST','permission_callback'=>'svntex2_api_can_manage',
+                            'callback'=>function(WP_REST_Request $r){
+                                $pid=(int)$r['id']; $cid=(int)$r->get_param('comment_id'); $action=sanitize_key($r->get_param('action'));
+                                if(!$cid||!$action) return new WP_REST_Response(['error'=>'comment_id and action required'],400);
+                                if($action==='approve') wp_set_comment_status($cid, 'approve');
+                                elseif($action==='hold') wp_set_comment_status($cid, 'hold');
+                                elseif($action==='trash') wp_trash_comment($cid);
+                                elseif($action==='feature'){ update_comment_meta($cid,'featured',1); }
+                                elseif($action==='unfeature'){ delete_comment_meta($cid,'featured'); }
+                                else return new WP_REST_Response(['error'=>'invalid action'],400);
+                                return [ 'ok'=>true ];
+                            }
+                        ]
+                    ]);
+
+                    // Bulk tools
+                    register_rest_route('svntex2/v1','/products/export', [
+                        'methods'=>'GET','permission_callback'=>'svntex2_api_can_manage',
+                        'callback'=>function(){
+                            $q = new WP_Query([ 'post_type'=>'svntex_product','posts_per_page'=>-1 ]);
+                            $out = [ 'id,title,sku,base_price,discount_price,tax_percent,stock_qty,stock_status,status' ];
+                            while($q->have_posts()){ $q->the_post(); $p=get_post();
+                                $row = [
+                                    $p->ID,
+                                    '"'.str_replace('"','""',$p->post_title).'"',
+                                    get_post_meta($p->ID,'sku',true),
+                                    get_post_meta($p->ID,'base_price',true),
+                                    get_post_meta($p->ID,'discount_price',true),
+                                    get_post_meta($p->ID,'tax_percent',true),
+                                    get_post_meta($p->ID,'stock_qty',true),
+                                    get_post_meta($p->ID,'stock_status',true),
+                                    $p->post_status,
+                                ];
+                                $out[] = implode(',', array_map(function($v){ return is_numeric($v)?$v:(''.str_replace(["\n","\r"],' ',$v)); }, $row));
+                            }
+                            wp_reset_postdata();
+                            return new WP_REST_Response( implode("\n", $out ), 200, [ 'Content-Type'=>'text/csv' ] );
+                        }
+                    ]);
+                    register_rest_route('svntex2/v1','/products/import', [
+                        'methods'=>'POST','permission_callback'=>'svntex2_api_can_manage',
+                        'callback'=>function(WP_REST_Request $r){
+                            $csv = (string) $r->get_param('csv'); if(!$csv) return new WP_REST_Response(['error'=>'csv required'],400);
+                            $lines = preg_split('/\r?\n/',$csv); array_shift($lines);
+                            $imported=0; foreach($lines as $line){ if(!trim($line)) continue; $cols = str_getcsv($line);
+                                list($id,$title,$sku,$base,$disc,$tax,$qty,$sstatus,$status) = array_pad($cols,9,null);
+                                $title = trim($title,'"');
+                                if($id){ wp_update_post([ 'ID'=>(int)$id, 'post_title'=>$title, 'post_status'=> $status?:'publish' ]); }
+                                else { $id = wp_insert_post([ 'post_type'=>'svntex_product','post_title'=>$title,'post_status'=>$status?:'publish' ]); }
+                                update_post_meta($id,'sku', sanitize_text_field($sku));
+                                update_post_meta($id,'base_price', (float)$base);
+                                update_post_meta($id,'discount_price', (float)$disc);
+                                update_post_meta($id,'tax_percent', (float)$tax);
+                                update_post_meta($id,'stock_qty', (int)$qty);
+                                update_post_meta($id,'stock_status', sanitize_text_field($sstatus));
+                                $imported++;
+                            }
+                            return [ 'imported'=>$imported ];
+                        }
+                    ]);
+                    register_rest_route('svntex2/v1','/products/bulk-update', [
+                        'methods'=>'POST','permission_callback'=>'svntex2_api_can_manage',
+                        'callback'=>function(WP_REST_Request $r){
+                            $ids = array_map('intval', (array)$r->get_param('ids'));
+                            $updates = (array)$r->get_param('updates'); if(empty($ids) || empty($updates)) return new WP_REST_Response(['error'=>'ids and updates required'],400);
+                            foreach($ids as $id){
+                                if(isset($updates['status'])){ wp_update_post([ 'ID'=>$id, 'post_status'=> $updates['status']=='draft'?'draft':'publish' ]); }
+                                foreach(['base_price','discount_price','tax_percent','stock_qty'] as $k){ if(isset($updates[$k])) update_post_meta($id,$k, $k==='stock_qty' ? (int)$updates[$k] : (float)$updates[$k]); }
+                                if(isset($updates['stock_status'])) update_post_meta($id,'stock_status', sanitize_text_field($updates['stock_status']));
+                            }
+                            return [ 'updated'=>count($ids) ];
+                        }
+                    ]);
+
+                    // Analytics per product
+                    register_rest_route('svntex2/v1','/products/(?P<id>\d+)/analytics', [
+                        'methods'=>'GET','permission_callback'=>'svntex2_api_can_manage',
+                        'callback'=>function(WP_REST_Request $r){
+                            $id=(int)$r['id'];
+                            $views = (int) get_post_meta($id,'view_count', true);
+                            $sales = (int) get_post_meta($id,'sales_count', true);
+                            $returns = (int) get_post_meta($id,'returns_count', true);
+                            $conv = $views>0 ? round(($sales/$views)*100,2) : 0.0;
+                            return [ 'views'=>$views,'sales'=>$sales,'returns'=>$returns,'conversion_rate'=>$conv ];
+                        }
+                    ]);
             'video_media' => (int) get_post_meta($p->ID,'video_media', true),
             'video_url' => (string) get_post_meta($p->ID,'video_url', true),
                     ];
