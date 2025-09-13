@@ -2,6 +2,13 @@
 if (!defined('ABSPATH')) exit;
 
 add_action('rest_api_init', function(){
+    // Health check
+    register_rest_route('svntex2/v1','/health', [
+        'methods' => 'GET',
+        'permission_callback' => '__return_true',
+        'callback' => function(){ return [ 'ok'=>true, 'ts'=>time(), 'version'=> defined('SVNTEX2_VERSION')?SVNTEX2_VERSION:null ]; }
+    ]);
+
     register_rest_route('svntex2/v1','/wallet/balance', [
         'methods' => 'GET',
         'permission_callback' => function(){ return is_user_logged_in(); },
