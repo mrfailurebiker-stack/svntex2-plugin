@@ -35,22 +35,9 @@ jobs:
             dev/**
             docs/**
 
-      - name: Deploy static landing to domain root
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
-        with:
-          server: 145.79.211.169
-          username: u271371274
-          password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: /domains/svntex.com/public_html/
-          protocol: ftps
-          port: 21
-          local-dir: ./custom-landing/
-          state-name: .ftp-deploy-sync-state-landing.json
-          exclude: |
-            **/.git*
-            **/.DS_Store
+      # Static landing deploy removed to let WP render the styled landing as the homepage
 
-      - name: Deploy custom admin portal
+      - name: Deploy custom admin portal (outside WP)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
           server: 145.79.211.169

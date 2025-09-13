@@ -25,11 +25,15 @@ add_shortcode('svntex_debug', function(){
   return '<pre style="font-size:12px; background:#111; color:#0f0; padding:10px;">USER: '+$uid+'\nBAL:'+number_format($bal,2)+'\nQUALIFIED:'+ $qualified +'</pre>';
 });
 
-// Login shortcode
+// Login shortcode (styled)
 add_shortcode('svntex_login', function(){
   if ( is_user_logged_in() ) return '<p>You are logged in.</p>';
-  $file = SVNTEX2_PLUGIN_DIR . 'views/login.php';
+  wp_enqueue_style('svntex2-style');
+  $file = SVNTEX2_PLUGIN_DIR . 'views/customer-login.php';
   if ( file_exists( $file ) ) { ob_start(); include $file; return ob_get_clean(); }
+  // Fallback to simple form
+  $fallback = SVNTEX2_PLUGIN_DIR . 'views/login.php';
+  if ( file_exists( $fallback ) ) { ob_start(); include $fallback; return ob_get_clean(); }
   return '<p>Login view missing.</p>';
 });
 

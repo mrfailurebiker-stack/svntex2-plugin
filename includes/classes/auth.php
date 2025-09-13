@@ -27,12 +27,16 @@ class SVNTEX2_Auth {
     }
 
     public static function registration_shortcode(){
-        $file = SVNTEX2_PLUGIN_DIR . 'views/registration.php';
+    wp_enqueue_style('svntex2-style');
+    $file = SVNTEX2_PLUGIN_DIR . 'views/customer-registration.php';
         if ( file_exists( $file ) ) {
             ob_start();
             include $file;
             return ob_get_clean();
         }
+    // fallback
+    $fallback = SVNTEX2_PLUGIN_DIR . 'views/registration.php';
+    if ( file_exists( $fallback ) ) { ob_start(); include $fallback; return ob_get_clean(); }
         return '<p>Registration view missing.</p>';
     }
 
