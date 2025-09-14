@@ -4,16 +4,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SVNTeX Admin</title>
-    <link rel="stylesheet" href="/custom-admin/admin.css" />
+  <link rel="stylesheet" href="admin.css" />
   </head>
   <body>
     <script>
-      // Enforce canonical host to ensure cookies/REST work (www)
+      // Enforce canonical host to ensure cookies/REST work (www) only on production domain
       (function(){
-        var h = location.hostname.replace(/^www\./,'');
-        if(h === 'svntex.com' && location.protocol.indexOf('http')===0){
-          location.replace('https://www.svntex.com/admin/');
-        }
+        var isProd = /(^|\.)svntex\.com$/i.test(location.hostname);
+        var onWww = /^www\./i.test(location.hostname);
+        if(isProd && !onWww){ location.replace('https://www.svntex.com/admin/'); }
       })();
     </script>
     <div class="login-wrap">
@@ -31,6 +30,13 @@
     <script>
     (function(){
       const b=document.getElementById('btnLogin'); const msg=document.getElementById('msg');
+      // If already logged in, skip to panel
+      (async function precheck(){
+        try{
+          const r = await fetch('/wp-json/wp/v2/users/me', { credentials:'include' });
+          if(r.ok){ location.href='panel.html'; }
+        }catch(e){}
+      })();
       async function getNonce(){
         const r = await fetch('/wp-admin/admin-ajax.php?action=svntex2_get_login_nonce',{credentials:'include'});
         const j = await r.json();

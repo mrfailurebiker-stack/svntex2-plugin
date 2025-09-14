@@ -8,12 +8,11 @@
   </head>
   <body>
     <script>
-      // Force canonical host to www for consistent cookies/REST
+      // Force canonical host to www for consistent cookies/REST (production only)
       (function(){
-        var bare = location.hostname.replace(/^www\./,'');
-        if(bare==='svntex.com' && location.protocol.indexOf('http')===0){
-          location.replace('https://www.svntex.com/admin/panel.html'+location.hash);
-        }
+        var isProd = /(^|\.)svntex\.com$/i.test(location.hostname);
+        var onWww = /^www\./i.test(location.hostname);
+        if(isProd && !onWww){ location.replace('https://www.svntex.com/admin/panel.html'+location.hash); }
       })();
     </script>
     <div id="layout" class="admin-shell">
@@ -234,7 +233,11 @@
       const headers = nonce ? { 'X-WP-Nonce': nonce } : {};
       // Basic gate: check logged-in cookie from WP
       const res = await fetch('/wp-json/wp/v2/users/me', { credentials: 'include', headers });
-      if(!res.ok){ location.href='/admin/'; return; }
+      if(!res.ok){
+        alert('Your session has expired. Please sign in again.');
+        location.href='/admin/';
+        return;
+      }
       const me = await res.json();
   // Load users via WP REST (admins only)
       const ures = await fetch('/wp-json/wp/v2/users?per_page=10&orderby=registered&order=desc',{ credentials:'include', headers });
