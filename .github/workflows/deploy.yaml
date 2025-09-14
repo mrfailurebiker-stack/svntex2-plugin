@@ -27,7 +27,10 @@ jobs:
           local-dir: ./
           state-name: .ftp-deploy-sync-state.json
           exclude: |
+            .git
+            .git/**
             **/.git*
+            **/.git*/**
             **/.github/**
             **/node_modules/**
             **/.DS_Store
