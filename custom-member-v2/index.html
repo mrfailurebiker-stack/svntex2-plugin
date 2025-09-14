@@ -34,7 +34,14 @@
         f.addEventListener('submit', async (e)=>{
           e.preventDefault(); msg.textContent='Signing in...';
           const fd = new FormData(f);
-          fd.append('action','svntex2_login');
+          fd.append('action','svntex2_do_login');
+          // fetch a login nonce first
+          try{
+            const nr = await fetch('/wp-admin/admin-ajax.php?action=svntex2_get_login_nonce',{credentials:'include'});
+            const nj = await nr.json(); if(nj && nj.success){ fd.append('svntex2_login_nonce', nj.data.nonce); }
+          }catch(err){}
+          // map fields to expected names
+          fd.append('login_id', fd.get('username')); fd.delete('username');
           try{
             const r = await fetch('/wp-admin/admin-ajax.php', { method:'POST', credentials:'include', body: fd });
             const j = await r.json();

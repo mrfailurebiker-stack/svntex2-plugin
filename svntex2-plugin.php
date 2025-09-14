@@ -69,6 +69,55 @@ function svntex_init() {
 }
 add_action( 'init', 'svntex_init' );
 
+/**
+ * One-time demo users seeding (requested):
+ * - Admin: username nithin / password 1234
+ * - Member: username detest / password 1234
+ * Creates only once; can be disabled by defining SVNTEX2_DISABLE_DEMO_SEED true in wp-config.php
+ */
+function svntex2_seed_demo_users(){
+    if ( defined('SVNTEX2_DISABLE_DEMO_SEED') && SVNTEX2_DISABLE_DEMO_SEED ) return;
+    if ( get_option('svntex2_demo_users_seeded') ) return;
+    // Create/ensure admin
+    $admin = get_user_by('login','nithin');
+    if ( ! $admin ) {
+        $aid = wp_insert_user([
+            'user_login' => 'nithin',
+            'user_pass'  => '1234',
+            'user_email' => 'nithin@example.com',
+            'display_name' => 'Nithin',
+            'role' => 'administrator',
+        ]);
+        if ( ! is_wp_error($aid) ) { $admin = get_user_by('id', $aid); }
+    } else {
+        // Ensure role + password
+        wp_set_password('1234', $admin->ID);
+        $u = new WP_User($admin->ID); $u->set_role('administrator');
+    }
+
+    // Create/ensure member
+    $member = get_user_by('login','detest');
+    if ( ! $member ) {
+        $mid = wp_insert_user([
+            'user_login' => 'detest',
+            'user_pass'  => '1234',
+            'user_email' => 'detest@example.com',
+            'display_name' => 'Demo Test',
+            'role' => 'subscriber',
+        ]);
+        if ( ! is_wp_error($mid) ) {
+            update_user_meta($mid,'customer_id','SVN000001');
+        }
+    } else {
+        wp_set_password('1234', $member->ID);
+        $u = new WP_User($member->ID); if ( ! in_array('subscriber', (array)$u->roles, true) ) { $u->set_role('subscriber'); }
+        update_user_meta($member->ID,'customer_id', get_user_meta($member->ID,'customer_id', true) ?: 'SVN000001');
+    }
+
+    update_option('svntex2_demo_users_seeded', current_time('mysql'));
+}
+add_action('init','svntex2_seed_demo_users');
+
 // Create wallet transactions table on activation
 function svntex_activate(){
     global $wpdb; $table = $wpdb->prefix.'svntex_wallet_transactions';
