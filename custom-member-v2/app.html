@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SVNTeX Member v2</title>
+    <link rel="stylesheet" href="member.css" />
+  </head>
+  <body>
+    <script>
+      (function(){
+        var isProd = /(^|\.)svntex\.com$/i.test(location.hostname); var onWww = /^www\./i.test(location.hostname);
+        if(isProd && !onWww){ location.replace('https://www.svntex.com/member-v2/app.html'+location.hash); }
+      })();
+    </script>
+    <div class="member-shell">
+      <header class="topbar">
+        <div class="brand">SVNTeX Member</div>
+        <nav>
+          <a href="#home" class="active">Home</a>
+          <a href="#wallet">Wallet</a>
+          <a href="#referrals">Referrals</a>
+          <a href="#kyc">KYC</a>
+          <a href="#profile">Profile</a>
+          <a id="logout" href="#logout">Logout</a>
+        </nav>
+      </header>
+      <main class="content">
+        <section id="home" class="section">
+          <h2>Welcome</h2>
+          <div id="hello" class="muted">Loading...</div>
+        </section>
+        <section id="wallet" class="section hidden">
+          <h2>Wallet</h2>
+          <div id="wBalance" class="kpi">--</div>
+          <div id="wTx" class="list" style="margin-top:10px">No transactions.</div>
+        </section>
+        <section id="referrals" class="section hidden">
+          <h2>Referrals</h2>
+          <div id="refCode" class="muted">Loading...</div>
+          <div id="refList" class="list" style="margin-top:6px">No referrals yet.</div>
+        </section>
+        <section id="kyc" class="section hidden">
+          <h2>KYC</h2>
+          <form id="kycForm" class="grid" style="max-width:540px">
+            <label>Full Name<input name="full_name" required></label>
+            <label>Address<textarea name="address" rows="2"></textarea></label>
+            <label>Aadhaar / ID<input name="doc_number"></label>
+            <label>Document (image/pdf)<input type="file" id="kycDoc" accept="image/*,application/pdf"></label>
+            <button type="submit">Submit KYC</button>
+            <div id="kycMsg" class="muted"></div>
+          </form>
+          <div style="margin-top:12px" id="kycStatus" class="muted">Status: --</div>
+        </section>
+        <section id="profile" class="section hidden">
+          <h2>Profile</h2>
+          <form id="profileForm" class="grid" style="max-width:540px">
+            <label>Email<input name="email" required></label>
+            <label>First name<input name="first_name"></label>
+            <label>Last name<input name="last_name"></label>
+            <label>Mobile<input name="mobile"></label>
+            <div><button type="submit">Save</button></div>
+            <div id="pMsg" class="muted"></div>
+          </form>
+        </section>
+      </main>
+    </div>
+    <script>
+    (async function(){
+      async function getNonce(){ try{ const r=await fetch('/wp-admin/admin-ajax.php?action=svntex2_get_rest_nonce',{credentials:'include'}); const j=await r.json(); if(j.success) return j.data.nonce; }catch(e){} return null; }
+      const nonce = await getNonce(); const headers = nonce?{'X-WP-Nonce':nonce}:{ };
+      const meRes = await fetch('/wp-json/wp/v2/users/me',{credentials:'include',headers});
+      if(!meRes.ok){ location.href='/member-v2/'; return; }
+      const me = await meRes.json();
+      document.getElementById('hello').textContent = 'Hello, '+(me.name||me.username||'member');
+
+      const sections=['home','wallet','referrals','kyc','profile'];
+      function show(name){ sections.forEach(id=>{ const el=document.getElementById(id); if(!el) return; if(id===name) el.classList.remove('hidden'); else el.classList.add('hidden'); });
+        document.querySelectorAll('.topbar nav a').forEach(a=>{ if(a.getAttribute('href')==='#'+name) a.classList.add('active'); else a.classList.remove('active'); }); }
+      function route(){ const hash=location.hash||'#home'; const name=hash.replace('#',''); show(sections.includes(name)?name:'home'); }
+      window.addEventListener('hashchange', route); route();
+
+      // Wallet
+      async function loadWallet(){
+        try{
+          const [bal, tx] = await Promise.all([
+            fetch('/wp-json/svntex2/v1/wallet/balance',{credentials:'include',headers}).then(r=>r.json()),
+            fetch('/wp-json/svntex2/v1/wallet/transactions?per_page=20',{credentials:'include',headers}).then(r=>r.json())
+          ]);
+          document.getElementById('wBalance').textContent = (bal && (bal.balance||bal.amount||0));
+          const items=(tx && tx.items)||[]; document.getElementById('wTx').innerHTML = items.map(x=>`<div class="list-item"><div>${x.type} · ${x.category} · ${x.amount}</div><div class="meta">${x.created_at}</div></div>`).join('') || 'No transactions.';
+        }catch(e){ document.getElementById('wTx').textContent='Failed to load'; }
+      }
+      // Referrals
+      async function loadRef(){
+        try{
+          const r = await fetch('/wp-json/svntex2/v1/referrals/mine',{credentials:'include',headers});
+          const j = await r.json();
+          document.getElementById('refCode').textContent = 'Your referral code: '+(j.code||j.ref_code||me.id);
+          const items = j.items || []; document.getElementById('refList').innerHTML = items.map(x=>`<div class="list-item"><div>${x.referee_id} ${x.qualified?'· qualified':''}</div><div class="meta">${x.created_at||''}</div></div>`).join('') || 'No referrals yet.';
+        }catch(e){ document.getElementById('refList').textContent='Failed to load'; }
+      }
+      // KYC
+      const kycMsg=document.getElementById('kycMsg');
+      async function loadKyc(){ try{ const r=await fetch('/wp-json/svntex2/v1/kyc/me',{credentials:'include',headers}); const j=await r.json(); document.getElementById('kycStatus').textContent='Status: '+(j.status||'--'); }catch(e){}}
+      document.getElementById('kycForm').addEventListener('submit', async (e)=>{
+        e.preventDefault(); kycMsg.textContent='Submitting...';
+        const fd = new FormData(e.target);
+        const doc = document.getElementById('kycDoc').files[0]; if(doc) fd.append('document', doc, doc.name);
+        const r = await fetch('/wp-json/svntex2/v1/kyc/submit',{method:'POST',credentials:'include',headers,body:fd});
+        try{ const j=await r.json(); kycMsg.textContent = j.error?('Error: '+j.error):'Submitted'; }catch(err){ kycMsg.textContent='Done'; }
+        loadKyc();
+      });
+      // Profile
+      const pf=document.getElementById('profileForm'); const pm=document.getElementById('pMsg');
+      pf.email.value = me.email||''; pf.first_name.value = me.first_name||''; pf.last_name.value = me.last_name||''; pf.mobile.value = (me.meta&&me.meta.mobile)||'';
+      pf.addEventListener('submit', async (e)=>{
+        e.preventDefault(); pm.textContent='Saving...';
+        const data = Object.fromEntries(new FormData(pf).entries());
+        const r = await fetch('/wp-json/svntex2/v1/me', { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify(data) });
+        const j = await r.json(); pm.textContent = j && j.id ? 'Saved' : (j.error || 'Failed');
+      });
+      // Logout
+      document.getElementById('logout').addEventListener('click', async (e)=>{ e.preventDefault(); try{ await fetch('/wp-admin/admin-post.php?action=svntex2_logout',{credentials:'include'});}catch(e){} const dest=(location.hostname.replace(/^www\./,'')==='svntex.com')?'https://www.svntex.com/member-v2/':'/member-v2/'; location.href=dest; });
+
+      // Initial lazy loads
+      await Promise.allSettled([loadWallet(), loadRef(), loadKyc()]);
+    })();
+    </script>
+  </body>
+</html>

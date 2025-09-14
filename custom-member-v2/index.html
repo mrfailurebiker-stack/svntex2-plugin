@@ -1,33 +1,51 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SVNTeX Member v2 (Preview)</title>
-    <style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu; background:#0b1220; color:#e5e7eb; margin:0}
-    .wrap{display:grid; place-items:center; min-height:100vh}
-    .card{background:#0f172a; border:1px solid #24324d; padding:24px; border-radius:12px; max-width:560px}
-    .muted{color:#9aa4b2}
-    .grid{display:grid; gap:12px}
-    input,button{padding:10px 12px; border-radius:8px; border:1px solid #24324d; background:#0b1220; color:#e5e7eb}
-    button{background:#1e293b; cursor:pointer}
-    a{color:#9bdcff}
-    </style>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SVNTeX Member v2</title>
+    <link rel="stylesheet" href="member.css">
   </head>
   <body>
-    <script>(function(){var isProd=/(^|\.)svntex\.com$/i.test(location.hostname),onWww=/^www\./i.test(location.hostname);if(isProd&&!onWww){location.replace('https://www.svntex.com/member-v2/');}})();</script>
-    <div class="wrap">
-      <div class="card">
-        <h1 style="margin:0 0 6px">SVNTeX Member v2 (Preview)</h1>
-        <p class="muted" style="margin:0 0 14px">Exact-copy build per your Member Tour video. Live member flows stay unchanged.</p>
-        <div class="grid" style="margin-top:10px">
-          <label>Member ID <input type="text" placeholder="ID" disabled></label>
-          <label>Password <input type="password" placeholder="••••••••" disabled></label>
-          <button disabled>Login (coming next)</button>
-          <div class="muted">We’ll wire this to WP REST/session or your existing member API per the video.</div>
-        </div>
-        <div style="margin-top:12px" class="muted">Preview path: /member-v2/</div>
+    <script>
+      (function(){
+        var isProd=/(^|\.)svntex\.com$/i.test(location.hostname), onWww=/^www\./i.test(location.hostname);
+        if(isProd && !onWww){ location.replace('https://www.svntex.com/member-v2/'); }
+      })();
+    </script>
+    <div class="content" style="min-height:100vh;display:grid;place-items:center">
+      <div class="card" style="max-width:420px;width:100%;padding:24px;background:rgba(17,24,39,.5);border:1px solid rgba(35,48,77,.6);border-radius:14px">
+        <h1>Member Login</h1>
+        <form id="loginForm" class="grid" autocomplete="on">
+          <label>Member ID or Email<input name="username" autocomplete="username" placeholder="member id / email" required></label>
+          <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
+          <button type="submit">Login</button>
+          <div id="msg" class="muted"></div>
+        </form>
       </div>
+    </div>
+    <script>
+      (async function(){
+        async function getNonce(){ try{ const r=await fetch('/wp-admin/admin-ajax.php?action=svntex2_get_rest_nonce',{credentials:'include'}); const j=await r.json(); if(j.success) return j.data.nonce; }catch(e){} return null; }
+        const nonce = await getNonce(); const headers = nonce?{'X-WP-Nonce':nonce}:{ };
+        // pre-check existing session
+        try{ const r=await fetch('/wp-json/wp/v2/users/me',{credentials:'include',headers}); if(r.ok){ location.href='/member-v2/app.html'; return; } }catch(e){}
+        const f=document.getElementById('loginForm'); const msg=document.getElementById('msg');
+        f.addEventListener('submit', async (e)=>{
+          e.preventDefault(); msg.textContent='Signing in...';
+          const fd = new FormData(f);
+          fd.append('action','svntex2_login');
+          try{
+            const r = await fetch('/wp-admin/admin-ajax.php', { method:'POST', credentials:'include', body: fd });
+            const j = await r.json();
+            if(j.success){ msg.textContent='Success'; location.href='/member-v2/app.html'; }
+            else{ msg.textContent=j.data?.message||'Login failed'; }
+          }catch(err){ msg.textContent='Network error'; }
+        });
+      })();
+    </script>
+  </body>
+</html>
     </div>
   </body>
 </html>

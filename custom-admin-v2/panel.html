@@ -8,8 +8,10 @@
   </head>
   <body>
     <script>
+      // Canonical to www and admin-v2 path
       (function(){
-        var isProd=/(^|\.)svntex\.com$/i.test(location.hostname), onWww=/^www\./i.test(location.hostname);
+        var isProd = /(^|\.)svntex\.com$/i.test(location.hostname);
+        var onWww = /^www\./i.test(location.hostname);
         if(isProd && !onWww){ location.replace('https://www.svntex.com/admin-v2/panel.html'+location.hash); }
       })();
     </script>
@@ -27,37 +29,507 @@
         </nav>
       </aside>
       <main class="content grid">
-        <section id="dashboard" class="section"><h2>Dashboard</h2><div class="cards" style="margin-top:10px">
-          <div class="card" data-goto="#users"><div class="title">Users</div><div class="kpi" id="kpiUsers">--</div><div class="desc">Total registered</div></div>
-          <div class="card" data-goto="#products"><div class="title">Products</div><div class="kpi" id="kpiProducts">--</div><div class="desc">Total products</div></div>
-          <div class="card" data-goto="#wallet"><div class="title">Wallet</div><div class="kpi" id="kpiWallet">--</div><div class="desc">Recent transactions</div></div>
-          <div class="card" data-goto="#referrals"><div class="title">Referrals</div><div class="kpi" id="kpiReferrals">--</div><div class="desc">Linked entries</div></div>
-          <div class="card" data-goto="#kyc"><div class="title">KYC</div><div class="kpi" id="kpiKyc">--</div><div class="desc">Pending/Total</div></div>
-        </div></section>
-        <!-- Users, Products, Wallet, Referrals, KYC sections copied from v1 (same markup/IDs) -->
-        <!-- For brevity, we reuse the same panel logic by importing the same JS below. -->
+        <section id="dashboard" class="section">
+          <h2>Dashboard</h2>
+          <div class="cards" style="margin-top:10px">
+            <div class="card" data-goto="#users">
+              <div class="title">Users</div>
+              <div class="kpi" id="kpiUsers">--</div>
+              <div class="desc">Total registered</div>
+            </div>
+            <div class="card" data-goto="#products">
+              <div class="title">Products</div>
+              <div class="kpi" id="kpiProducts">--</div>
+              <div class="desc">Total products</div>
+            </div>
+            <div class="card" data-goto="#wallet">
+              <div class="title">Wallet</div>
+              <div class="kpi" id="kpiWallet">--</div>
+              <div class="desc">Recent transactions</div>
+            </div>
+            <div class="card" data-goto="#referrals">
+              <div class="title">Referrals</div>
+              <div class="kpi" id="kpiReferrals">--</div>
+              <div class="desc">Linked entries</div>
+            </div>
+            <div class="card" data-goto="#kyc">
+              <div class="title">KYC</div>
+              <div class="kpi" id="kpiKyc">--</div>
+              <div class="desc">Pending/Total</div>
+            </div>
+          </div>
+        </section>
+        <section id="users" class="section hidden"><h2>Users</h2>
+          <div id="usersBox" class="muted">Loading...</div>
+          <div class="grid columns-2" style="margin-top:12px">
+            <div>
+              <input id="userSearch" placeholder="Search users (email/username)" />
+              <div id="userList" class="list" style="margin-top:8px"></div>
+            </div>
+            <form id="userForm" class="grid">
+              <h3>Edit User</h3>
+              <input type="hidden" name="id" />
+              <label>Customer ID <input name="customer_id" disabled /></label>
+              <label>Email <input name="email" required /></label>
+              <label>First name <input name="first_name" /></label>
+              <label>Last name <input name="last_name" /></label>
+              <label>Display name <input name="display_name" /></label>
+              <label>Mobile <input name="mobile" /></label>
+              <label>Gender <input name="gender" /></label>
+              <label>DOB <input name="dob" placeholder="YYYY-MM-DD" /></label>
+              <label>Employee ID <input name="employee_id" /></label>
+              <label>Referral Source <input name="referral_source" /></label>
+              <div><button type="submit">Save Changes</button></div>
+              <div id="userMsg" class="muted"></div>
+            </form>
+          </div>
+        </section>
+        <section id="products" class="section hidden"><h2>Products</h2>
+          <form id="prodForm" class="grid" style="max-width:640px">
+            <input type="hidden" name="id" />
+            <input type="hidden" name="featured_media" />
+            <input type="hidden" name="video_media" />
+            <label>Title<input name="title" required placeholder="Product title"></label>
+            <div class="grid columns-3">
+              <label>MRP<input name="mrp" id="pMrp" type="number" step="0.01" min="0" placeholder="0.00"></label>
+              <label>Tax %<input name="tax_percent" id="pTax" type="number" step="0.01" min="0" placeholder="0"></label>
+              <label>Company Profit<input name="company_profit" id="pProfit" type="number" step="0.01" min="0" placeholder="0.00"></label>
+            </div>
+            <div class="grid columns-2">
+              <label>Base Price<input name="base_price" type="number" step="0.01" min="0" placeholder="0.00"></label>
+              <label>Discount Price<input name="discount_price" type="number" step="0.01" min="0" placeholder="0.00"></label>
+            </div>
+            <div class="grid columns-2">
+              <label>SKU<input name="sku" placeholder="SKU"></label>
+              <label>Vendor<select name="vendor_id" id="vendorSelect"><option value="">— None —</option></select></label>
+            </div>
+            <div class="grid columns-3">
+              <label>Stock Qty<input name="stock_qty" type="number" min="0" placeholder="0"></label>
+              <label>Stock Status
+                <select name="stock_status">
+                  <option value="">— Select —</option>
+                  <option value="instock">In stock</option>
+                  <option value="outofstock">Out of stock</option>
+                  <option value="onbackorder">On backorder</option>
+                </select>
+              </label>
+              <label>Low Stock Threshold<input name="low_stock_threshold" type="number" min="0" placeholder="0"></label>
+            </div>
+            <label>Description<textarea name="content" rows="4" placeholder="Short description"></textarea></label>
+            <div class="grid columns-2">
+              <label>Categories<select name="categories" id="prodCats" multiple size="5"></select></label>
+              <div>
+                <label>Featured Image
+                  <input type="file" id="prodImage" accept="image/png, image/jpeg, image/jpg, image/webp" />
+                </label>
+                <div id="imgPreview" class="muted" style="margin-top:8px"></div>
+              </div>
+            </div>
+            <div class="grid columns-3">
+              <label>Brands<select name="brands" id="brandSelect" multiple size="5"></select></label>
+              <label>Tags<select name="tags" id="tagSelect" multiple size="5"></select></label>
+              <label>Shipping Class<select name="shipping_class" id="shipClassSelect"></select></label>
+            </div>
+            <div class="grid columns-2">
+              <div>
+                <label>Short Video (upload)
+                  <input type="file" id="prodVideo" accept="video/*" />
+                </label>
+                <div id="vidPreview" class="muted" style="margin-top:8px"></div>
+              </div>
+              <label>Or Video URL<input name="video_url" placeholder="https://..."></label>
+            </div>
+            <div>
+              <label>Gallery Images (upload multiple)
+                <input type="file" id="galleryInput" accept="image/png, image/jpeg, image/jpg, image/webp" multiple />
+              </label>
+              <div id="galleryPreview" class="muted" style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;"></div>
+            </div>
+            <div class="grid columns-4">
+              <label>Weight<input name="weight" type="number" step="0.01" min="0" placeholder="0"></label>
+              <label>Length<input name="length" type="number" step="0.01" min="0" placeholder="0"></label>
+              <label>Width<input name="width" type="number" step="0.01" min="0" placeholder="0"></label>
+              <label>Height<input name="height" type="number" step="0.01" min="0" placeholder="0"></label>
+            </div>
+            <div class="grid columns-2">
+              <label>Meta Title<input name="meta_title" placeholder="SEO title"></label>
+              <label>Meta Description<textarea name="meta_description" rows="2" placeholder="SEO description"></textarea></label>
+            </div>
+            <div class="grid columns-2">
+              <label>Status
+                <select name="status" id="statusSelect">
+                  <option value="publish">Publish</option>
+                  <option value="draft">Draft</option>
+                </select>
+              </label>
+              <label>Slug<input name="slug" placeholder="custom-slug"></label>
+            </div>
+            <div class="grid columns-3">
+              <label><input type="checkbox" name="is_featured" value="1"> Featured</label>
+              <label>Visibility
+                <select name="visibility">
+                  <option value="public">Public</option>
+                  <option value="private">Private</option>
+                  <option value="hidden">Hidden</option>
+                </select>
+              </label>
+              <div class="grid" style="grid-auto-flow:column; gap:14px; align-items:center;">
+                <label><input type="checkbox" name="approved" value="1"> Approved</label>
+                <label><input type="checkbox" name="archived" value="1"> Archived</label>
+              </div>
+            </div>
+            <div class="grid" style="grid-auto-flow:column;justify-content:start">
+              <button type="submit">Save Product</button>
+              <button type="button" id="prodReset" class="secondary">New</button>
+            </div>
+            <div id="prodMsg" class="muted"></div>
+          </form>
+          <div id="prodList" class="list">Loading...</div>
+        </section>
+        <section id="wallet" class="section hidden"><h2>Wallet</h2>
+          <div class="grid columns-3" style="max-width:840px">
+            <label>User ID (optional)<input id="wUserId" type="number" min="1" placeholder="Filter by user ID"></label>
+            <div class="grid" style="grid-auto-flow:column;align-items:end"><button id="wLoad">Load</button></div>
+          </div>
+          <div id="wList" class="list" style="margin-top:10px">No data.</div>
+        </section>
+        <section id="referrals" class="section hidden"><h2>Referrals</h2>
+          <div class="grid columns-3" style="max-width:840px">
+            <label>Referrer ID<input id="refReferrer" type="number" min="1"></label>
+            <label>Referee ID<input id="refReferee" type="number" min="1"></label>
+            <div class="grid" style="grid-auto-flow:column;align-items:end"><button id="refLink">Link</button></div>
+          </div>
+          <div class="grid columns-3" style="max-width:840px;margin-top:10px">
+            <label>Qualify Amount<input id="refAmount" type="number" step="0.01" min="0"></label>
+            <div class="grid" style="grid-auto-flow:column;align-items:end"><button id="refQualify">Mark Qualified</button></div>
+          </div>
+          <div class="grid columns-2" style="max-width:840px;margin-top:10px">
+            <label>List by Referrer ID<input id="refListReferrer" type="number" min="1"></label>
+            <div class="grid" style="grid-auto-flow:column;align-items:end"><button id="refLoad">Load</button></div>
+          </div>
+          <div id="refList" class="list" style="margin-top:10px">No referrals.</div>
+        </section>
+        <section id="kyc" class="section hidden"><h2>KYC</h2>
+          <div class="grid" style="max-width:860px">
+            <div class="grid" style="grid-auto-flow:column;justify-content:start">
+              <button id="kycLoad">Load Submissions</button>
+            </div>
+            <div id="kycList" class="list">No submissions.</div>
+          </div>
+        </section>
       </main>
     </div>
     <button id="globalMenuBtn" title="Menu" aria-label="Menu" style="position:fixed;left:12px;top:12px;z-index:9999;display:none;background:#0f172a;border:1px solid #23304d;color:#e5e7eb;border-radius:10px;padding:10px 12px;cursor:pointer">☰</button>
     <script>
-    // Reuse the same inline app script from v1 by fetching it from /admin/panel.html if needed.
-    // For now, inline a minimal boot to gate session and then import from the live admin's JS by URL if present.
     (async function(){
       async function getRestNonce(){
-        try{
-          const r = await fetch('/wp-admin/admin-ajax.php?action=svntex2_get_rest_nonce',{credentials:'include'});
-          const j = await r.json(); if(j.success) return j.data.nonce;
-        }catch(e){}
+        const r = await fetch('/wp-admin/admin-ajax.php?action=svntex2_get_rest_nonce', { credentials:'include' });
+        try { const j = await r.json(); if(j.success) return j.data.nonce; } catch(e){}
         return null;
       }
       const nonce = await getRestNonce();
       const headers = nonce ? { 'X-WP-Nonce': nonce } : {};
-      const res = await fetch('/wp-json/wp/v2/users/me', { credentials:'include', headers });
-      if(!res.ok){ alert('Your session has expired. Please sign in again.'); location.href='/admin-v2/'; return; }
-      // Load the same app behavior by replacing location to the stable v1 panel until v2 UI is fully replicated
-      // This ensures feature parity immediately while we rebuild the exact v2 UI.
-      // Remove this redirect when v2 panel sections are fully wired.
-      if(location.search.indexOf('forceV2=1')===-1){ location.replace('/admin/panel.html'); }
+      const res = await fetch('/wp-json/wp/v2/users/me', { credentials: 'include', headers });
+      if(!res.ok){
+        alert('Your session has expired. Please sign in again.');
+        location.href='/admin-v2/';
+        return;
+      }
+      const me = await res.json();
+      // Users pre-load (for KPI and quick list)
+      const ures = await fetch('/wp-json/wp/v2/users?per_page=10&orderby=registered&order=desc',{ credentials:'include', headers });
+      const users = ures.ok ? await ures.json() : [];
+      const box = document.getElementById('usersBox');
+      box.innerHTML = users.map(u=>`<div>#${u.id} — ${u.name} (${u.email||'-'})</div>`).join('') || 'No users.';
+
+      // Sidebar + menu button
+      const layout = document.getElementById('layout');
+      const sidebar = document.getElementById('sidebar');
+      const btnLocal = document.getElementById('btnToggle');
+      const globalBtn = document.getElementById('globalMenuBtn');
+      function applyMenuBtn(){ globalBtn.style.display = window.matchMedia('(max-width:900px)').matches ? 'block' : 'none'; }
+      applyMenuBtn();
+      window.addEventListener('resize', applyMenuBtn);
+      function toggleSidebar(){
+        if(window.matchMedia('(max-width:900px)').matches){ sidebar.classList.toggle('open'); }
+        else { layout.classList.toggle('collapsed'); }
+      }
+      btnLocal.addEventListener('click', toggleSidebar);
+      globalBtn.addEventListener('click', toggleSidebar);
+
+      function toast(t){ let el=document.querySelector('.toast'); if(!el){ el=document.createElement('div'); el.className='toast'; document.body.appendChild(el); } el.textContent=t; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2000); }
+
+      // Users management
+      const userList = document.getElementById('userList');
+      const userForm = document.getElementById('userForm');
+      const userMsg = document.getElementById('userMsg');
+      function um(t){ userMsg.textContent=t; }
+      async function loadUsers(q=''){
+        userList.textContent='Loading...';
+        const r = await fetch('/wp-json/svntex2/v1/users?per_page=20&search='+encodeURIComponent(q), { credentials:'include', headers });
+        const j = await r.json();
+        const items = (j && j.items) || [];
+        userList.innerHTML = items.map(u=>`<div><a href="#" data-uid="${u.id}">#${u.id}</a> ${u.username} · ${u.email} · ${u.meta.customer_id||''}</div>`).join('') || 'No users.';
+      }
+      await loadUsers('');
+      document.getElementById('userSearch').addEventListener('input', (e)=>{ loadUsers(e.target.value); });
+      userList.addEventListener('click', async (e)=>{
+        const id = e.target.getAttribute('data-uid'); if(!id) return; e.preventDefault(); um('');
+        const r = await fetch('/wp-json/svntex2/v1/users/'+id, { credentials:'include', headers });
+        const u = await r.json();
+        userForm.id.value = u.id;
+        userForm.customer_id.value = u.meta.customer_id || '';
+        userForm.email.value = u.email || '';
+        userForm.first_name.value = u.first_name || '';
+        userForm.last_name.value = u.last_name || '';
+        userForm.display_name.value = u.display_name || '';
+        userForm.mobile.value = u.meta.mobile || '';
+        userForm.gender.value = u.meta.gender || '';
+        userForm.dob.value = u.meta.dob || '';
+        userForm.employee_id.value = u.meta.employee_id || '';
+        userForm.referral_source.value = u.meta.referral_source || '';
+      });
+      userForm.addEventListener('submit', async (e)=>{
+        e.preventDefault(); um('Saving...');
+        const data = Object.fromEntries(new FormData(userForm).entries()); const id = data.id; delete data.id; delete data.customer_id;
+        const r = await fetch('/wp-json/svntex2/v1/users/'+id, { method:'POST', credentials:'include', headers:{ ...headers, 'Content-Type':'application/json' }, body: JSON.stringify(data) });
+        const j = await r.json(); if(j && j.id){ um('Saved'); } else { um(j.error || 'Save failed'); }
+      });
+
+      // Products
+      const prodList = document.getElementById('prodList');
+      const prodForm = document.getElementById('prodForm');
+      const prodMsg = document.getElementById('prodMsg');
+      function pm(t){ prodMsg.textContent=t; }
+      async function loadProducts(){
+        pm(''); prodList.textContent = 'Loading...';
+        const r = await fetch('/wp-json/svntex2/v1/products', { credentials:'include', headers });
+        const j = await r.json(); const items = (j && j.items) || [];
+        prodList.innerHTML = items.map(p=>`<div class="list-item">
+          <div style="display:flex;gap:10px;align-items:center">
+            ${p.thumbnail_url?`<img src="${p.thumbnail_url}" alt="thumb" style="width:48px;height:48px;object-fit:cover;border-radius:6px">`:''}
+            <div><strong>#${p.id}</strong> ${p.title} <div class="meta">${p.vendor_id?`vendor ${p.vendor_id} · `:''}MRP: ${p.mrp||'-'} | Tax: ${p.tax_percent||0}% | Profit: ${p.company_profit||'-'}</div></div>
+          </div>
+          <div>
+            <a href="#" data-edit="${p.id}">Edit</a>
+            <a href="#" data-del="${p.id}">Delete</a>
+          </div>
+        </div>`).join('') || '<div class="muted">No products yet.</div>';
+      }
+      await loadProducts();
+
+      async function loadCategories(){
+        const r = await fetch('/wp-json/wp/v2/svntex_category?per_page=100', { credentials:'include', headers });
+        const cats = r.ok ? await r.json() : [];
+        const sel = document.getElementById('prodCats'); sel.innerHTML = cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+      }
+      await loadCategories();
+      async function loadBrands(){
+        const r = await fetch('/wp-json/wp/v2/svntex_brand?per_page=100', { credentials:'include', headers });
+        const items = r.ok ? await r.json() : [];
+        const sel = document.getElementById('brandSelect'); if(sel) sel.innerHTML = items.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+      }
+      async function loadTags(){
+        const r = await fetch('/wp-json/wp/v2/svntex_tag?per_page=100', { credentials:'include', headers });
+        const items = r.ok ? await r.json() : [];
+        const sel = document.getElementById('tagSelect'); if(sel) sel.innerHTML = items.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+      }
+      async function loadShipClasses(){
+        const r = await fetch('/wp-json/wp/v2/svntex_shipping_class?per_page=100', { credentials:'include', headers });
+        const items = r.ok ? await r.json() : [];
+        const sel = document.getElementById('shipClassSelect'); if(sel) sel.innerHTML = '<option value="">— None —</option>' + items.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+      }
+      await Promise.all([loadBrands(), loadTags(), loadShipClasses()]);
+
+      async function loadVendors(){
+        const r = await fetch('/wp-json/svntex2/v1/vendors', { credentials:'include', headers });
+        const j = await r.json(); const items = (j && j.items) || [];
+        const sel = document.getElementById('vendorSelect');
+        sel.innerHTML = '<option value="">— None —</option>' + items.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+      }
+      await loadVendors();
+
+      async function loadKpis(){
+        try{
+          const [u, p, w, r, k] = await Promise.all([
+            fetch('/wp-json/svntex2/v1/users?per_page=1', { credentials:'include', headers }).then(r=>r.json()).catch(()=>({total:0})),
+            fetch('/wp-json/svntex2/v1/products?per_page=1', { credentials:'include', headers }).then(r=>r.json()).catch(()=>({total:0})),
+            fetch('/wp-json/svntex2/v1/wallet/transactions?per_page=10', { credentials:'include', headers }).then(r=>r.json()).catch(()=>({items:[]})),
+            fetch('/wp-json/svntex2/v1/referrals', { credentials:'include', headers }).then(r=>r.json()).catch(()=>({items:[]})),
+            fetch('/wp-json/svntex2/v1/kyc', { credentials:'include', headers }).then(r=>r.json()).catch(()=>({items:[]})),
+          ]);
+          document.getElementById('kpiUsers').textContent = (u && typeof u.total==='number') ? u.total : '--';
+          document.getElementById('kpiProducts').textContent = (p && typeof p.total==='number') ? p.total : '--';
+          document.getElementById('kpiWallet').textContent = (w && w.items) ? w.items.length : '--';
+          const refItems = (r && r.items) || []; document.getElementById('kpiReferrals').textContent = refItems.length;
+          const kitems = (k && k.items) || []; const pend = kitems.filter(x=>x.status==='pending').length; document.getElementById('kpiKyc').textContent = `${pend}/${kitems.length}`;
+        }catch(e){}
+      }
+      await loadKpis();
+
+      const sections = ['dashboard','users','products','wallet','referrals','kyc'];
+      function showSection(name){
+        sections.forEach(id=>{
+          const el = document.getElementById(id);
+          if(!el) return;
+          if(id===name) el.classList.remove('hidden'); else el.classList.add('hidden');
+        });
+        document.querySelectorAll('.sidebar nav a').forEach(a=>{
+          if(a.getAttribute('href') === '#'+name) a.classList.add('active'); else a.classList.remove('active');
+        });
+        if(window.matchMedia('(max-width:900px)').matches){ sidebar.classList.remove('open'); }
+      }
+      function route(){ const hash = window.location.hash || '#dashboard'; const name = hash.replace('#',''); showSection(sections.includes(name) ? name : 'dashboard'); }
+      window.addEventListener('hashchange', route); route();
+      document.querySelectorAll('.card[data-goto]').forEach(c=>{ c.addEventListener('click', ()=>{ const t=c.getAttribute('data-goto'); if(t) window.location.hash=t; }); });
+
+      // Gallery helpers
+      const galleryInput = document.getElementById('galleryInput');
+      const galleryPreview = document.getElementById('galleryPreview');
+      let galleryIds = [];
+      async function renderGallery(){
+        if(!galleryPreview) return;
+        if(!galleryIds.length){ galleryPreview.textContent = 'No gallery images'; return; }
+        const html = await Promise.all(galleryIds.map(async (id)=>{
+          try{ const r = await fetch(`/wp-json/wp/v2/media/${id}`, { credentials:'include', headers }); if(r.ok){ const m = await r.json(); const url = m.media_details?.sizes?.thumbnail?.source_url || m.source_url; return `<div data-mid="${id}" style="position:relative"><img src="${url}" style="width:64px;height:64px;object-fit:cover;border-radius:6px"><button type="button" data-rem="${id}" style="position:absolute;top:-6px;right:-6px;background:#000;color:#fff;border-radius:50%;border:0;width:20px;height:20px;cursor:pointer">×</button></div>`; }
+          }catch(e){}
+          return '';
+        }));
+        galleryPreview.innerHTML = html.join('');
+      }
+      if(galleryPreview){
+        galleryPreview.addEventListener('click', (e)=>{
+          const rid = e.target.getAttribute('data-rem'); if(!rid) return; e.preventDefault(); const n = parseInt(rid,10); galleryIds = galleryIds.filter(x=>x!==n); renderGallery();
+        });
+      }
+      if(galleryInput){
+        galleryInput.addEventListener('change', async (e)=>{
+          const files = Array.from(e.target.files||[]); if(!files.length) return;
+          const okTypes = ['image/png','image/jpeg','image/jpg','image/webp'];
+          for(const file of files){
+            if(!okTypes.includes(file.type)){ toast('Some files skipped (unsupported type)'); continue; }
+            const fd = new FormData(); fd.append('file', file, file.name);
+            const r = await fetch('/wp-json/wp/v2/media', { method:'POST', credentials:'include', headers: { ...headers }, body: fd });
+            if(!r.ok){ toast('One image failed'); continue; }
+            const m = await r.json(); galleryIds.push(m.id);
+          }
+          await renderGallery(); toast('Gallery updated'); galleryInput.value='';
+        });
+      }
+
+      prodList.addEventListener('click', async (e)=>{
+        const id = e.target.getAttribute('data-edit');
+        if(id){ e.preventDefault();
+          const rp = await fetch(`/wp-json/wp/v2/svntex_product/${id}?context=edit`, { credentials:'include', headers });
+          if(!rp.ok){ pm('Load failed'); toast('Load failed'); return; }
+          const p = await rp.json();
+          prodForm.id.value = p.id; prodForm.title.value = (p.title && p.title.raw) || p.title || '';
+          prodForm.content.value = (p.content && p.content.raw) || '';
+          const v = p.meta && p.meta.vendor_id ? p.meta.vendor_id : '';
+          document.getElementById('vendorSelect').value = String(v||'');
+          // meta
+          prodForm.mrp.value = p.meta?.mrp ?? p.mrp ?? '';
+          prodForm.tax_percent.value = p.meta?.tax_percent ?? p.tax_percent ?? '';
+          prodForm.company_profit.value = p.meta?.company_profit ?? p.company_profit ?? '';
+          prodForm.base_price.value = p.meta?.base_price ?? '';
+          prodForm.discount_price.value = p.meta?.discount_price ?? '';
+          prodForm.sku.value = p.meta?.sku ?? p.sku ?? '';
+          prodForm.video_url.value = p.meta?.video_url ?? p.video_url ?? '';
+          prodForm.stock_qty.value = p.meta?.stock_qty ?? '';
+          prodForm.stock_status.value = p.meta?.stock_status ?? '';
+          prodForm.low_stock_threshold.value = p.meta?.low_stock_threshold ?? '';
+          prodForm.weight.value = p.meta?.weight ?? '';
+          prodForm.length.value = p.meta?.length ?? '';
+          prodForm.width.value = p.meta?.width ?? '';
+          prodForm.height.value = p.meta?.height ?? '';
+          prodForm.meta_title.value = p.meta?.meta_title ?? '';
+          prodForm.meta_description.value = p.meta?.meta_description ?? '';
+          prodForm.visibility.value = p.meta?.visibility ?? 'public';
+          prodForm.slug.value = p.slug || p.slug?.raw || '';
+          document.querySelector('select#statusSelect').value = (p.status==='draft') ? 'draft' : 'publish';
+          prodForm.is_featured.checked = (p.meta?.is_featured ? true : false);
+          prodForm.approved.checked = (p.meta?.approved ? true : false);
+          prodForm.archived.checked = (p.meta?.archived ? true : false);
+          // terms
+          try{ const tr = await fetch(`/wp-json/wp/v2/svntex_category?post=${id}`, { credentials:'include', headers }); const tjs = tr.ok ? await tr.json() : []; const sel = document.getElementById('prodCats'); const ids = new Set((tjs||[]).map(t=>String(t.id))); Array.from(sel.options).forEach(o=>{ o.selected = ids.has(o.value); }); }catch(e){}
+          try{ const br = await fetch(`/wp-json/wp/v2/svntex_brand?post=${id}`, { credentials:'include', headers }); const bj = br.ok ? await br.json() : []; const sel = document.getElementById('brandSelect'); const ids=new Set((bj||[]).map(t=>String(t.id))); Array.from(sel.options).forEach(o=>{ o.selected = ids.has(o.value); }); }catch(e){}
+          try{ const trr = await fetch(`/wp-json/wp/v2/svntex_tag?post=${id}`, { credentials:'include', headers }); const tj = trr.ok ? await trr.json() : []; const sel = document.getElementById('tagSelect'); const ids=new Set((tj||[]).map(t=>String(t.id))); Array.from(sel.options).forEach(o=>{ o.selected = ids.has(o.value); }); }catch(e){}
+          try{ const sr = await fetch(`/wp-json/wp/v2/svntex_shipping_class?post=${id}`, { credentials:'include', headers }); const sj = sr.ok ? await sr.json() : []; const sel = document.getElementById('shipClassSelect'); const first = (sj && sj[0]) ? String(sj[0].id) : ''; if(sel) sel.value = first || ''; }catch(e){}
+          // media
+          try{ const fm = p.featured_media || 0; prodForm.featured_media.value = fm || ''; if(fm){ const mr = await fetch(`/wp-json/wp/v2/media/${fm}`, { credentials:'include', headers }); if(mr.ok){ const m = await mr.json(); const url = (m.media_details && m.media_details.sizes && m.media_details.sizes.thumbnail && m.media_details.sizes.thumbnail.source_url) || m.source_url; document.getElementById('imgPreview').innerHTML = `<img src="${url}" alt="thumb" style="max-width:120px;border-radius:6px">`; }} else { document.getElementById('imgPreview').textContent='No image'; } }catch(e){ document.getElementById('imgPreview').textContent='No image'; }
+          try{ const vm = p.meta?.video_media ?? p.video_media ?? 0; prodForm.video_media.value = vm || ''; if(vm){ const vr = await fetch(`/wp-json/wp/v2/media/${vm}`, { credentials:'include', headers }); if(vr.ok){ const vj = await vr.json(); document.getElementById('vidPreview').innerHTML = `<video src="${vj.source_url}" controls style="max-width:220px;border-radius:6px"></video>`; } } else { document.getElementById('vidPreview').textContent='No video'; } }catch(e){ document.getElementById('vidPreview').textContent='No video'; }
+          try{ galleryIds = Array.isArray(p.meta?.gallery) ? p.meta.gallery.map(x=>parseInt(x,10)).filter(Boolean) : []; await renderGallery(); }catch(e){}
+          pm('Loaded product for editing'); toast('Product loaded');
+        }
+        const delId = e.target.getAttribute('data-del');
+        if(delId){ e.preventDefault(); if(!confirm('Delete product #'+delId+'?')) return; const r = await fetch(`/wp-json/svntex2/v1/products/${delId}`, { method:'DELETE', credentials:'include', headers }); const j = await r.json(); if(j.deleted){ pm('Deleted'); toast('Deleted'); loadProducts(); } else { pm(j.error||'Delete failed'); toast('Delete failed'); } }
+      });
+      document.getElementById('prodReset').addEventListener('click', (e)=>{ e.preventDefault(); prodForm.reset(); prodForm.id.value=''; document.getElementById('imgPreview').textContent=''; document.getElementById('vidPreview').textContent=''; pm(''); });
+
+      const imgInput = document.getElementById('prodImage');
+      imgInput.addEventListener('change', async (e)=>{
+        const file = e.target.files && e.target.files[0]; if(!file){ return; }
+        const okTypes = ['image/png','image/jpeg','image/jpg','image/webp'];
+        if(!okTypes.includes(file.type)){ toast('Unsupported image type'); e.target.value=''; return; }
+        const fd = new FormData(); fd.append('file', file, file.name);
+        const r = await fetch('/wp-json/wp/v2/media', { method:'POST', credentials:'include', headers: { ...headers }, body: fd });
+        if(!r.ok){ toast('Upload failed'); return; }
+        const m = await r.json(); prodForm.featured_media.value = m.id; document.getElementById('imgPreview').innerHTML = `<img src="${m.media_details?.sizes?.thumbnail?.source_url || m.source_url}" style="max-width:120px;border-radius:6px">`;
+        toast('Image uploaded');
+      });
+      const vidInput = document.getElementById('prodVideo');
+      vidInput.addEventListener('change', async (e)=>{
+        const file = e.target.files && e.target.files[0]; if(!file){ return; }
+        const okVideo = ['video/mp4','video/webm','video/ogg'];
+        if(!okVideo.includes(file.type)){ toast('Unsupported video type'); e.target.value=''; return; }
+        const fd = new FormData(); fd.append('file', file, file.name); fd.append('post', prodForm.id.value || 0);
+        const r = await fetch('/wp-json/wp/v2/media', { method:'POST', credentials:'include', headers: { ...headers }, body: fd });
+        if(!r.ok){ toast('Video upload failed'); return; }
+        const m = await r.json(); prodForm.video_media.value = m.id; document.getElementById('vidPreview').innerHTML = `<video src="${m.source_url}" controls style="max-width:220px;border-radius:6px"></video>`; toast('Video uploaded');
+      });
+      prodForm.addEventListener('submit', async (e)=>{
+        e.preventDefault(); pm('Saving...');
+        const data = new FormData(prodForm); const id = data.get('id'); data.delete('id');
+        const payload = Object.fromEntries(data.entries());
+        if(payload.vendor_id) payload.vendor_id = parseInt(payload.vendor_id,10)||0; else delete payload.vendor_id;
+        const catSel = document.getElementById('prodCats'); const selCats = Array.from(catSel.selectedOptions).map(o=>parseInt(o.value,10)).filter(Boolean); payload.categories = selCats.length?selCats:[];
+        const brandSel = document.getElementById('brandSelect'); const selBrands = Array.from(brandSel.selectedOptions).map(o=>parseInt(o.value,10)).filter(Boolean); payload.brands = selBrands.length?selBrands:[];
+        const tagSel = document.getElementById('tagSelect'); const selTags = Array.from(tagSel.selectedOptions).map(o=>parseInt(o.value,10)).filter(Boolean); payload.tags = selTags.length?selTags:[];
+        const scSel = document.getElementById('shipClassSelect'); const sc = parseInt(scSel.value||'0',10)||0; payload.shipping_class = sc ? [sc] : [];
+        ['base_price','discount_price','mrp','tax_percent','company_profit','weight','length','width','height'].forEach(k=>{ if(payload[k]!==undefined && payload[k]!=='' ) payload[k] = parseFloat(payload[k]); });
+        ['stock_qty','low_stock_threshold'].forEach(k=>{ if(payload[k]!==undefined && payload[k]!=='' ) payload[k] = parseInt(payload[k],10); });
+        payload.is_featured = !!data.get('is_featured'); payload.archived = !!data.get('archived'); payload.approved = !!data.get('approved');
+        if(galleryIds && galleryIds.length) payload.gallery = galleryIds.slice(); else payload.gallery = [];
+        const url = id ? `/wp-json/svntex2/v1/products/${id}` : '/wp-json/svntex2/v1/products';
+        const r = await fetch(url, { method:'POST', credentials:'include', headers: { ...headers, 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
+        // Auto-calc Profit
+        const pMrp = document.getElementById('pMrp'); const pTax = document.getElementById('pTax'); const pProfit = document.getElementById('pProfit');
+        function recalcProfit(){ const mrp = parseFloat(pMrp.value||'0'); const tax = parseFloat(pTax.value||'0'); if(mrp>=0 && tax>=0){ const profit = Math.max(0, mrp - (mrp * (tax/100))); pProfit.value = profit.toFixed(2); } }
+        pMrp.addEventListener('input', recalcProfit); pTax.addEventListener('input', recalcProfit);
+        const j = await r.json(); if(j.id){ pm('Saved'); toast('Saved'); prodForm.reset(); await loadProducts(); } else { pm(j.error || 'Save failed'); toast('Save failed'); }
+      });
+
+      // Logout back to admin-v2 login
+      document.getElementById('logout').addEventListener('click', async (e)=>{ e.preventDefault(); try{ await fetch('/wp-admin/admin-post.php?action=svntex2_logout',{credentials:'include'});}catch(e){} const dest=(location.hostname.replace(/^www\./,'')==='svntex.com')?'https://www.svntex.com/admin-v2/':'/admin-v2/'; location.href=dest; });
+
+      // Wallet
+      const wUserId = document.getElementById('wUserId');
+      const wList = document.getElementById('wList');
+      async function loadWallet(){ const q = wUserId.value ? ('?user_id='+encodeURIComponent(wUserId.value)) : ''; const r = await fetch('/wp-json/svntex2/v1/wallet/transactions'+q, { credentials:'include', headers }); const j = await r.json(); const items = j.items || []; wList.innerHTML = items.map(x=>`<div class="list-item"><div>#${x.id} · u${x.user_id} · ${x.type} · ${x.category} · ${x.amount}</div><div class="meta">${x.created_at}</div></div>`).join('') || '<div class="muted">No transactions.</div>'; }
+      document.getElementById('wLoad').addEventListener('click', (e)=>{ e.preventDefault(); loadWallet(); });
+
+      // Referrals
+      const refList = document.getElementById('refList');
+      async function loadReferrals(){ const v = document.getElementById('refListReferrer').value; const q = v ? ('?referrer_id='+encodeURIComponent(v)) : ''; const r = await fetch('/wp-json/svntex2/v1/referrals'+q, { credentials:'include', headers }); const j = await r.json(); const items = j.items || []; refList.innerHTML = items.map(x=>`<div class="list-item"><div>#${x.id} · ${x.referrer_id} → ${x.referee_id} ${x.qualified? '· qualified':''}</div><div class="meta">${x.created_at||''}</div></div>`).join('') || '<div class="muted">No referrals.</div>'; }
+      document.getElementById('refLoad').addEventListener('click', (e)=>{ e.preventDefault(); loadReferrals(); });
+      document.getElementById('refLink').addEventListener('click', async (e)=>{ e.preventDefault(); const ref = parseInt(document.getElementById('refReferrer').value,10)||0; const ree = parseInt(document.getElementById('refReferee').value,10)||0; if(!ref||!ree){ toast('IDs required'); return; } const r = await fetch('/wp-json/svntex2/v1/referrals/link', { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ referrer_id:ref, referee_id:ree }) }); const j = await r.json(); toast(j.ok?'Linked':'Not linked'); loadReferrals(); });
+      document.getElementById('refQualify').addEventListener('click', async (e)=>{ e.preventDefault(); const ref = parseInt(document.getElementById('refReferrer').value,10)||0; const ree = parseInt(document.getElementById('refReferee').value,10)||0; const amt = parseFloat(document.getElementById('refAmount').value||'0')||0; if(!ref||!ree){ toast('IDs required'); return; } const r = await fetch('/wp-json/svntex2/v1/referrals/qualify', { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ referrer_id:ref, referee_id:ree, amount:amt }) }); const j = await r.json(); toast(j.ok?'Qualified':'Failed'); loadReferrals(); });
+
+      // KYC Admin
+      const kycList = document.getElementById('kycList');
+      async function loadKyc(){ const r = await fetch('/wp-json/svntex2/v1/kyc', { credentials:'include', headers }); const j = await r.json(); const items = j.items || []; kycList.innerHTML = items.map(x=>`<div class="list-item"><div>User ${x.user_id} · ${x.status}</div><div><a href="#" data-kyc-user="${x.user_id}" data-kyc-status="approved">Approve</a> <a href="#" data-kyc-user="${x.user_id}" data-kyc-status="rejected">Reject</a></div></div>`).join('') || '<div class="muted">No submissions.</div>'; }
+      document.getElementById('kycLoad').addEventListener('click', (e)=>{ e.preventDefault(); loadKyc(); });
+      kycList.addEventListener('click', async (e)=>{ const uid = e.target.getAttribute('data-kyc-user'); const st = e.target.getAttribute('data-kyc-status'); if(!uid||!st) return; e.preventDefault(); const r = await fetch(`/wp-json/svntex2/v1/kyc/${uid}`, { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ status:st }) }); const j = await r.json(); if(j && j.user_id){ toast('KYC '+st); loadKyc(); } else { toast('Failed'); } });
     })();
     </script>
   </body>
