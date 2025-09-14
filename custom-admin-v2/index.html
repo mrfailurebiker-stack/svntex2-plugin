@@ -3,32 +3,65 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SVNTeX Admin v2 (Preview)</title>
-    <link rel="stylesheet" href="styles.css" />
-    <style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu; background:#0b1220; color:#e5e7eb; margin:0}
-    .wrap{display:grid; place-items:center; min-height:100vh}
-    .card{background:#0f172a; border:1px solid #24324d; padding:24px; border-radius:12px; max-width:560px}
-    .muted{color:#9aa4b2}
-    .grid{display:grid; gap:12px}
-    input,button{padding:10px 12px; border-radius:8px; border:1px solid #24324d; background:#0b1220; color:#e5e7eb}
-    button{background:#1e293b; cursor:pointer}
-    a{color:#9bdcff}
-    </style>
+    <title>SVNTeX Admin v2</title>
+    <link rel="stylesheet" href="admin.css" />
   </head>
   <body>
-    <script>(function(){var isProd=/(^|\.)svntex\.com$/i.test(location.hostname),onWww=/^www\./i.test(location.hostname);if(isProd&&!onWww){location.replace('https://www.svntex.com/admin-v2/');}})();</script>
-    <div class="wrap">
-      <div class="card">
-        <h1 style="margin:0 0 6px">SVNTeX Admin v2 (Preview)</h1>
-        <p class="muted" style="margin:0 0 14px">Exact-copy build per your Admin Tour video. Live flows stay unchanged. This preview URL is safe.</p>
-        <div class="grid" style="margin-top:10px">
-          <label>Username <input type="text" placeholder="admin" disabled></label>
-          <label>Password <input type="password" placeholder="••••••••" disabled></label>
-          <button disabled>Login (coming next)</button>
-          <div class="muted">We’ll wire this to your WP REST/session once UI is replicated.</div>
+    <script>
+      (function(){
+        var isProd=/(^|\.)svntex\.com$/i.test(location.hostname), onWww=/^www\./i.test(location.hostname);
+        if(isProd && !onWww){ location.replace('https://www.svntex.com/admin-v2/'); }
+      })();
+    </script>
+    <div class="login-wrap">
+      <div class="login-card">
+        <h1>SVNTeX Admin v2</h1>
+        <p class="muted">Sign in to manage SVNTeX.</p>
+        <div class="grid">
+          <label>Email or Username <input id="login_id" type="text" placeholder="you@example.com"/></label>
+          <label>Password <input id="password" type="password" placeholder="••••••••"/></label>
+          <button id="btnLogin">Login</button>
+          <div id="msg" class="muted" aria-live="polite"></div>
         </div>
-        <div style="margin-top:12px" class="muted">Preview path: /admin-v2/</div>
       </div>
     </div>
+    <script>
+    (function(){
+      const b=document.getElementById('btnLogin'); const msg=document.getElementById('msg');
+      (async function precheck(){
+        try{
+          const r = await fetch('/wp-json/wp/v2/users/me', { credentials:'include' });
+          if(r.ok){ location.href='panel.html'; }
+        }catch(e){}
+      })();
+      async function getNonce(){
+        const r = await fetch('/wp-admin/admin-ajax.php?action=svntex2_get_login_nonce',{credentials:'include'});
+        const j = await r.json();
+        if(!j.success) throw new Error('nonce');
+        return j.data.nonce;
+      }
+      b.addEventListener('click', async ()=>{
+        msg.textContent='Signing in...';
+        try {
+          const nonce = await getNonce();
+          const fd = new FormData();
+          fd.append('action','svntex2_do_login');
+          fd.append('svntex2_login_nonce', nonce);
+          fd.append('login_id', document.getElementById('login_id').value);
+          fd.append('password', document.getElementById('password').value);
+          const r = await fetch('/wp-admin/admin-ajax.php',{ method:'POST', body: fd, credentials:'include' });
+          let j; const ct=r.headers.get('content-type')||'';
+          if(ct.includes('application/json')){ j = await r.json(); }
+          else { const t=await r.text(); try{ j=JSON.parse(t); }catch{ throw new Error('bad_response:'+t.slice(0,120)); } }
+          if(j.success){
+            const dest = (location.hostname.replace(/^www\./,'')==='svntex.com') ? 'https://www.svntex.com/admin-v2/panel.html' : '/admin-v2/panel.html';
+            location.href = dest;
+          } else {
+            msg.textContent = (j.data && (j.data.message||j.data.error)) || 'Login failed';
+          }
+        } catch(e){ msg.textContent='Network error'; }
+      });
+    })();
+    </script>
   </body>
 </html>
