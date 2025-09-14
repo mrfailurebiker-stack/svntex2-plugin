@@ -236,6 +236,35 @@ add_action('rest_api_init', function(){
         ],
     ]);
 
+    // Public browse (read-only) for member app landing/products
+    register_rest_route('svntex2/v1','/catalog', [
+        'methods' => 'GET', 'permission_callback' => '__return_true',
+        'callback' => function( WP_REST_Request $r ){
+            $q = new WP_Query([
+                'post_type' => 'svntex_product',
+                'posts_per_page' => (int) ($r->get_param('per_page') ?: 12),
+                'paged' => (int) ($r->get_param('page') ?: 1),
+                's' => (string) $r->get_param('search'),
+                'post_status' => 'publish',
+            ]);
+            $items = [];
+            while($q->have_posts()){ $q->the_post(); $p = get_post();
+                $thumb_id = (int) get_post_thumbnail_id($p->ID);
+                $thumb_url = $thumb_id ? wp_get_attachment_image_url($p->ID, 'medium') : '';
+                $items[] = [
+                    'id' => $p->ID,
+                    'title' => get_the_title($p),
+                    'price' => (float) get_post_meta($p->ID,'discount_price', true) ?: (float) get_post_meta($p->ID,'base_price', true),
+                    'mrp' => (float) get_post_meta($p->ID,'mrp', true),
+                    'tax_percent' => (float) get_post_meta($p->ID,'tax_percent', true),
+                    'thumbnail_url' => $thumb_url,
+                ];
+            }
+            wp_reset_postdata();
+            return [ 'items' => $items, 'total' => (int)$q->found_posts ];
+        }
+    ]);
+
     // Product update/delete
     register_rest_route('svntex2/v1','/products/(?P<id>\d+)',[
         [

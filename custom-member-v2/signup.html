@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SVNTeX Sign Up</title>
+    <link rel="stylesheet" href="member.css" />
+  </head>
+  <body>
+    <script>(function(){ var isProd=/(^|\.)svntex\.com$/i.test(location.hostname), onWww=/^www\./i.test(location.hostname); if(isProd && !onWww){ location.replace('https://www.svntex.com/member-v2/signup.html'); } })();</script>
+    <div class="content" style="min-height:100vh;display:grid;place-items:center">
+      <form id="reg" class="grid" style="max-width:520px;width:100%;background:rgba(17,24,39,.5);border:1px solid rgba(35,48,77,.6);border-radius:14px;padding:20px">
+        <h1>Create your account</h1>
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">
+          <label>First name<input name="first_name" required></label>
+          <label>Last name<input name="last_name" required></label>
+        </div>
+        <label>Email<input type="email" name="email" required></label>
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">
+          <label>Gender<select name="gender"><option value="">— Select —</option><option>Male</option><option>Female</option><option>Other</option></select></label>
+          <label>DOB<input name="dob" placeholder="YYYY-MM-DD" required></label>
+        </div>
+        <label>Mobile<input name="mobile" placeholder="10 digits" required></label>
+        <label>Referral Code (optional)<input name="referral"></label>
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">
+          <label>Password<input type="password" name="password" required></label>
+          <label>Confirm<input type="password" name="confirm" required></label>
+        </div>
+        <button type="submit">Sign Up</button>
+        <div id="msg" class="muted"></div>
+        <div class="muted">Have an account? <a href="/member-v2/">Log in</a></div>
+      </form>
+    </div>
+    <script>
+      (async function(){
+        const form=document.getElementById('reg'); const msg=document.getElementById('msg');
+        async function getNonce(){ try{ const r=await fetch('/wp-admin/admin-ajax.php?action=svntex2_get_auth_nonce'); const j=await r.json(); if(j.success) return j.data.nonce; }catch(e){} return null; }
+        const nonce = await getNonce();
+        form.addEventListener('submit', async (e)=>{
+          e.preventDefault(); msg.textContent='Registering...';
+          const fd=new FormData(form); fd.append('action','svntex2_register'); if(nonce) fd.append('nonce',nonce);
+          try{ const r=await fetch('/wp-admin/admin-ajax.php',{method:'POST',credentials:'include',body:fd}); const j=await r.json(); if(j.success){ msg.innerHTML='Registered! Your ID: <strong>'+j.data.customer_id+'</strong>. You can now <a href="/member-v2/">log in</a>.'; form.reset(); } else { const errs=(j.data && j.data.errors)||[j.data?.message||'Registration failed']; msg.innerHTML=errs.join('<br>'); } }
+          catch(err){ msg.textContent='Network error'; }
+        });
+      })();
+    </script>
+  </body>
+</html>

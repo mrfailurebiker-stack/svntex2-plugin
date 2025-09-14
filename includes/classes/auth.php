@@ -11,6 +11,9 @@ class SVNTEX2_Auth {
         add_action('wp_ajax_svntex2_send_otp', [__CLASS__, 'ajax_send_otp']);
         add_action('wp_ajax_nopriv_svntex2_send_otp', [__CLASS__, 'ajax_send_otp']);
         add_action('wp_ajax_nopriv_svntex2_register', [__CLASS__, 'ajax_register']);
+    // Provide a nonce for static v2 signup
+    add_action('wp_ajax_nopriv_svntex2_get_auth_nonce', function(){ wp_send_json_success([ 'nonce' => wp_create_nonce('svntex2_auth') ]); });
+    add_action('wp_ajax_svntex2_get_auth_nonce', function(){ wp_send_json_success([ 'nonce' => wp_create_nonce('svntex2_auth') ]); });
     }
 
     public static function enqueue(){

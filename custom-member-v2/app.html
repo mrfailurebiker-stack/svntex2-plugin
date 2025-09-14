@@ -18,6 +18,7 @@
         <div class="brand">SVNTeX Member</div>
         <nav>
           <a href="#home" class="active">Home</a>
+          <a href="#products">Products</a>
           <a href="#wallet">Wallet</a>
           <a href="#referrals">Referrals</a>
           <a href="#kyc">KYC</a>
@@ -29,6 +30,11 @@
         <section id="home" class="section">
           <h2>Welcome</h2>
           <div id="hello" class="muted">Loading...</div>
+          <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:12px" id="homeGrid"></div>
+        </section>
+        <section id="products" class="section hidden">
+          <h2>Products</h2>
+          <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px" id="prodGrid">Loading...</div>
         </section>
         <section id="wallet" class="section hidden">
           <h2>Wallet</h2>
@@ -74,11 +80,28 @@
       const me = await meRes.json();
       document.getElementById('hello').textContent = 'Hello, '+(me.name||me.username||'member');
 
-      const sections=['home','wallet','referrals','kyc','profile'];
+  const sections=['home','products','wallet','referrals','kyc','profile'];
       function show(name){ sections.forEach(id=>{ const el=document.getElementById(id); if(!el) return; if(id===name) el.classList.remove('hidden'); else el.classList.add('hidden'); });
         document.querySelectorAll('.topbar nav a').forEach(a=>{ if(a.getAttribute('href')==='#'+name) a.classList.add('active'); else a.classList.remove('active'); }); }
       function route(){ const hash=location.hash||'#home'; const name=hash.replace('#',''); show(sections.includes(name)?name:'home'); }
       window.addEventListener('hashchange', route); route();
+
+      // Home Featured + Catalog
+      async function loadHome(){
+        try{
+          const r = await fetch('/wp-json/svntex2/v1/catalog?per_page=8');
+          const j = await r.json(); const items = j.items||[];
+          const grid = document.getElementById('homeGrid');
+          grid.innerHTML = items.map(x=>`<div class="list-item" style="flex-direction:column;align-items:flex-start"><img src="${x.thumbnail_url||''}" alt="" style="width:100%;height:140px;object-fit:cover;border-radius:8px"><div style="margin-top:6px"><strong>${x.title}</strong></div><div class="meta">₹${(x.price||0).toFixed(2)}</div></div>`).join('') || '<div class="muted">No items.</div>';
+        }catch(e){ document.getElementById('homeGrid').textContent='Failed to load'; }
+      }
+      async function loadCatalog(){
+        try{
+          const r = await fetch('/wp-json/svntex2/v1/catalog?per_page=24');
+          const j = await r.json(); const items = j.items||[]; const grid = document.getElementById('prodGrid');
+          grid.innerHTML = items.map(x=>`<div class="list-item" style="flex-direction:column;align-items:flex-start"><img src="${x.thumbnail_url||''}" alt="" style="width:100%;height:160px;object-fit:cover;border-radius:8px"><div style="margin-top:6px"><strong>${x.title}</strong></div><div class="meta">MRP ₹${(x.mrp||0).toFixed(2)} · Price ₹${(x.price||0).toFixed(2)}</div><div class="grid" style="grid-auto-flow:column;gap:8px;margin-top:6px"><button class="secondary" disabled>Add to cart</button></div></div>`).join('') || '<div class="muted">No items.</div>';
+        }catch(e){ document.getElementById('prodGrid').textContent='Failed to load'; }
+      }
 
       // Wallet
       async function loadWallet(){
@@ -124,7 +147,7 @@
       document.getElementById('logout').addEventListener('click', async (e)=>{ e.preventDefault(); try{ await fetch('/wp-admin/admin-post.php?action=svntex2_logout',{credentials:'include'});}catch(e){} const dest=(location.hostname.replace(/^www\./,'')==='svntex.com')?'https://www.svntex.com/member-v2/':'/member-v2/'; location.href=dest; });
 
       // Initial lazy loads
-      await Promise.allSettled([loadWallet(), loadRef(), loadKyc()]);
+  await Promise.allSettled([loadHome(), loadCatalog(), loadWallet(), loadRef(), loadKyc()]);
     })();
     </script>
   </body>
