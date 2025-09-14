@@ -8,20 +8,16 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Deploy plugin via FTPS
-        id: deploy_plugin
-        continue-on-error: true
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
           server: 145.79.211.169
           username: u271371274
           password: ${{ secrets.FTP_PASSWORD }}
-          # Remote directory relative to your FTP root (Hostinger domain mapping)
           # Deploy into the domain's WordPress plugin folder
           server-dir: /domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin/
           protocol: ftps
@@ -40,35 +36,9 @@ jobs:
             dev/**
             docs/**
 
-        - name: Retry deploy plugin via FTPS (if failed)
-          if: ${{ steps.deploy_plugin.outcome == 'failure' }}
-          uses: SamKirkland/FTP-Deploy-Action@v4.3.4
-          with:
-            server: 145.79.211.169
-            username: u271371274
-            password: ${{ secrets.FTP_PASSWORD }}
-            server-dir: /domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin/
-            protocol: ftps
-            port: 21
-            local-dir: ./
-            state-name: .ftp-deploy-sync-state-retry.json
-            exclude: |
-              .git
-              .git/**
-              **/.git*
-              **/.git*/**
-              **/.github/**
-              **/node_modules/**
-              **/.DS_Store
-              **/*.log
-              dev/**
-              docs/**
-
       # Static landing deploy removed to let WP render the styled landing as the homepage
 
       - name: Deploy custom admin portal (outside WP)
-        id: deploy_admin
-        continue-on-error: true
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
           server: 145.79.211.169
@@ -83,25 +53,7 @@ jobs:
             **/.git*
             **/.DS_Store
 
-      - name: Retry deploy custom admin (if failed)
-        if: ${{ steps.deploy_admin.outcome == 'failure' }}
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
-        with:
-          server: 145.79.211.169
-          username: u271371274
-          password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: /domains/svntex.com/public_html/admin/
-          protocol: ftps
-          port: 21
-          local-dir: ./custom-admin/
-          state-name: .ftp-deploy-sync-state-admin-retry.json
-          exclude: |
-            **/.git*
-            **/.DS_Store
-
       - name: Deploy admin-v2 (preview, outside WP)
-        id: deploy_admin_v2
-        continue-on-error: true
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
           server: 145.79.211.169
@@ -116,25 +68,7 @@ jobs:
             **/.git*
             **/.DS_Store
 
-      - name: Retry deploy admin-v2 (if failed)
-        if: ${{ steps.deploy_admin_v2.outcome == 'failure' }}
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
-        with:
-          server: 145.79.211.169
-          username: u271371274
-          password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: /domains/svntex.com/public_html/admin-v2/
-          protocol: ftps
-          port: 21
-          local-dir: ./custom-admin-v2/
-          state-name: .ftp-deploy-sync-state-admin-v2-retry.json
-          exclude: |
-            **/.git*
-            **/.DS_Store
-
       - name: Deploy member-v2 (preview, outside WP)
-        id: deploy_member_v2
-        continue-on-error: true
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
           server: 145.79.211.169
@@ -145,22 +79,6 @@ jobs:
           port: 21
           local-dir: ./custom-member-v2/
           state-name: .ftp-deploy-sync-state-member-v2.json
-          exclude: |
-            **/.git*
-            **/.DS_Store
-
-      - name: Retry deploy member-v2 (if failed)
-        if: ${{ steps.deploy_member_v2.outcome == 'failure' }}
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
-        with:
-          server: 145.79.211.169
-          username: u271371274
-          password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: /domains/svntex.com/public_html/member-v2/
-          protocol: ftps
-          port: 21
-          local-dir: ./custom-member-v2/
-          state-name: .ftp-deploy-sync-state-member-v2-retry.json
           exclude: |
             **/.git*
             **/.DS_Store
