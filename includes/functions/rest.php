@@ -55,16 +55,28 @@ add_action('rest_api_init', function(){
             return [ 'items' => $rows ?: [] ];
         }
     ]);
-    register_rest_route('svntex2/v1','/wallet/topup', [
-        'methods' => 'POST',
-        'permission_callback' => function(){ return is_user_logged_in(); },
-        'callback' => function( WP_REST_Request $req ){
-            $uid = get_current_user_id();
-            $amount = (float) $req->get_param('amount');
-            $min = (float) apply_filters('svntex2_wallet_topup_min', 100 );
-            $max = (float) apply_filters('svntex2_wallet_topup_max', 100000 );
-            if( $amount < $min ) return new WP_REST_Response( [ 'error' => 'Minimum top-up is '.$min ], 400 );
-            if( $amount > $max ) return new WP_REST_Response( [ 'error' => 'Maximum top-up is '.$max ], 400 );
+    register_rest_route('svntex2/v1','/catalog', [
+        'methods' => 'GET', 'permission_callback' => '__return_true',
+        'callback' => function( WP_REST_Request $r ){
+            $per_page = (int) ($r->get_param('per_page') ? $r->get_param('per_page') : 12);
+            $paged = (int) ($r->get_param('page') ? $r->get_param('page') : 1);
+            $search = (string) $r->get_param('search');
+            $cat = (int) $r->get_param('category');
+            $availability = sanitize_key($r->get_param('availability') ?: ''); // instock|outofstock
+            $sort = sanitize_key($r->get_param('sort') ?: 'date'); // price_asc|price_desc|title|date
+            $args = [
+                'post_type' => 'svntex_product',
+                'posts_per_page' => $per_page,
+                'paged' => $paged,
+                's' => $search,
+                'post_status' => 'publish',
+            ];
+            if ($cat) { $args['tax_query'] = [ [ 'taxonomy'=>'svntex_category','field'=>'term_id','terms'=>[$cat] ] ]; }
+            if ($availability) { $args['meta_query'] = [ [ 'key'=>'stock_status', 'value'=>$availability ] ]; }
+            if ($sort === 'title') { $args['orderby']='title'; $args['order']='ASC'; }
+            elseif ($sort === 'date') { $args['orderby']='date'; $args['order']='DESC'; }
+            // price sort needs filtering after query since price is meta or variants; approximate by discount/base price meta
+            $q = new WP_Query($args);
             $rl_key = 'svntex2_topup_rl_'.$uid; $bucket = get_transient($rl_key); if(!is_array($bucket)) $bucket=[];
             $now = time(); $bucket = array_filter($bucket, function($ts) use ($now){ return ($now - $ts) < HOUR_IN_SECONDS; });
             if( count($bucket) >= 10 ) return new WP_REST_Response( [ 'error' => 'Too many top-ups, try later' ], 429 );
@@ -79,6 +91,8 @@ add_action('rest_api_init', function(){
         'methods' => 'GET',
         'permission_callback' => 'svntex2_api_can_manage',
         'callback' => function( WP_REST_Request $r ){
+            if ($sort === 'price_asc') { usort($items, function($a,$b){ return ($a['price']<=>$b['price']); }); }
+            elseif ($sort === 'price_desc') { usort($items, function($a,$b){ return ($b['price']<=>$a['price']); }); }
             global $wpdb; $t = $wpdb->prefix.'svntex_wallet_transactions';
             $uid = (int) $r->get_param('user_id');
             $pp = $r->get_param('per_page'); $limit = min( (int) ($pp ? $pp : 50), 200 );
@@ -227,12 +241,90 @@ add_action('rest_api_init', function(){
         [
             'methods' => 'GET', 'permission_callback' => 'svntex2_api_can_manage',
             'callback' => function( WP_REST_Request $r ){
-                $q = new WP_Query([
+                $per_page = (int) ($r->get_param('per_page') ? $r->get_param('per_page') : 20);
+                $paged = (int) ($r->get_param('page') ? $r->get_param('page') : 1);
+                $search = (string) $r->get_param('search');
+                $sku = (string) $r->get_param('sku');
+                $status = $r->get_param('status'); // publish|draft
+                $stock = $r->get_param('stock_status'); // instock|outofstock|onbackorder
+                $cat = (int) $r->get_param('category');
+                $orderby = sanitize_key( $r->get_param('orderby') ?: 'date' );
+                $order = strtoupper( sanitize_text_field( $r->get_param('order') ?: 'DESC' ) ) === 'ASC' ? 'ASC' : 'DESC';
+
+                // ID short-circuit
+                $id = (int) $r->get_param('id');
+                if ($id) {
+                    $p = get_post($id);
+                    if ($p && $p->post_type==='svntex_product'){
+                        $items = [];
+                        $cats = wp_get_object_terms($p->ID, 'svntex_category', [ 'fields' => 'ids' ]);
+                        $brands = wp_get_object_terms($p->ID, 'svntex_brand', [ 'fields' => 'ids' ]);
+                        $tags = wp_get_object_terms($p->ID, 'svntex_tag', [ 'fields' => 'ids' ]);
+                        $ship_cls = wp_get_object_terms($p->ID, 'svntex_shipping_class', [ 'fields' => 'ids' ]);
+                        $thumb_id = (int) get_post_thumbnail_id($p->ID);
+                        $thumb_url = $thumb_id ? wp_get_attachment_image_url($thumb_id, 'thumbnail') : '';
+                        $items[] = [
+                            'id' => $p->ID,
+                            'title' => get_the_title($p),
+                            'slug' => $p->post_name,
+                            'status' => $p->post_status,
+                            'link' => get_permalink($p),
+                            'vendor_id' => (int) get_post_meta($p->ID,'vendor_id', true),
+                            'featured_media' => $thumb_id,
+                            'thumbnail_url' => $thumb_url,
+                            'categories' => array_map('intval', is_wp_error($cats)?[]:$cats),
+                            'brands' => array_map('intval', is_wp_error($brands)?[]:$brands),
+                            'tags' => array_map('intval', is_wp_error($tags)?[]:$tags),
+                            'shipping_class' => array_map('intval', is_wp_error($ship_cls)?[]:$ship_cls),
+                            'base_price' => (float) get_post_meta($p->ID,'base_price', true),
+                            'discount_price' => (float) get_post_meta($p->ID,'discount_price', true),
+                            'mrp' => (float) get_post_meta($p->ID,'mrp', true),
+                            'tax_percent' => (float) get_post_meta($p->ID,'tax_percent', true),
+                            'company_profit' => (float) get_post_meta($p->ID,'company_profit', true),
+                            'sku' => (string) get_post_meta($p->ID,'sku', true),
+                            'stock_qty' => (int) get_post_meta($p->ID,'stock_qty', true),
+                            'stock_status' => (string) get_post_meta($p->ID,'stock_status', true),
+                            'low_stock_threshold' => (int) get_post_meta($p->ID,'low_stock_threshold', true),
+                            'video_media' => (int) get_post_meta($p->ID,'video_media', true),
+                            'video_url' => (string) get_post_meta($p->ID,'video_url', true),
+                            'gallery' => (array) get_post_meta($p->ID,'gallery', true),
+                            'weight' => (float) get_post_meta($p->ID,'weight', true),
+                            'length' => (float) get_post_meta($p->ID,'length', true),
+                            'width' => (float) get_post_meta($p->ID,'width', true),
+                            'height' => (float) get_post_meta($p->ID,'height', true),
+                            'meta_title' => (string) get_post_meta($p->ID,'meta_title', true),
+                            'meta_description' => (string) get_post_meta($p->ID,'meta_description', true),
+                            'is_featured' => (bool) get_post_meta($p->ID,'is_featured', true),
+                            'visibility' => (string) get_post_meta($p->ID,'visibility', true),
+                            'archived' => (bool) get_post_meta($p->ID,'archived', true),
+                            'approved' => (bool) get_post_meta($p->ID,'approved', true),
+                            'attributes' => (array) get_post_meta($p->ID,'attributes', true),
+                            'variations' => (array) get_post_meta($p->ID,'variations', true),
+                            'view_count' => (int) get_post_meta($p->ID,'view_count', true),
+                            'sales_count' => (int) get_post_meta($p->ID,'sales_count', true),
+                            'returns_count' => (int) get_post_meta($p->ID,'returns_count', true),
+                        ];
+                        return [ 'items' => $items, 'total' => 1 ];
+                    }
+                    return [ 'items' => [], 'total' => 0 ];
+                }
+
+                $args = [
                     'post_type' => 'svntex_product',
-                    'posts_per_page' => (int) ($r->get_param('per_page') ? $r->get_param('per_page') : 20),
-                    'paged' => (int) ($r->get_param('page') ? $r->get_param('page') : 1),
-                    's' => (string) $r->get_param('search'),
-                ]);
+                    'posts_per_page' => $per_page,
+                    'paged' => $paged,
+                    's' => $search,
+                    'post_status' => ['publish','draft'],
+                    'orderby' => in_array($orderby, ['date','title'], true) ? $orderby : 'date',
+                    'order' => $order,
+                ];
+                $meta_query = [];
+                if ($sku) { $meta_query[] = [ 'key'=>'sku', 'value'=>$sku, 'compare'=>'LIKE' ]; }
+                if ($stock) { $meta_query[] = [ 'key'=>'stock_status', 'value'=>sanitize_text_field($stock) ]; }
+                if (!empty($meta_query)) { $args['meta_query'] = [ 'relation'=>'AND', ...$meta_query ]; }
+                if ($status) { $args['post_status'] = ($status==='draft')?['draft']:['publish']; }
+                if ($cat) { $args['tax_query'] = [ [ 'taxonomy'=>'svntex_category','field'=>'term_id','terms'=>[$cat] ] ]; }
+                $q = new WP_Query($args);
                 $items = [];
                 while($q->have_posts()){ $q->the_post(); $p = get_post();
                     $cats = wp_get_object_terms($p->ID, 'svntex_category', [ 'fields' => 'ids' ]);

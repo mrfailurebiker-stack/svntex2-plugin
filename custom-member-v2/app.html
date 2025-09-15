@@ -38,6 +38,13 @@
         </section>
         <section id="products" class="section hidden">
           <h2>Products</h2>
+          <div class="grid columns-4" style="align-items:end;max-width:980px">
+            <label>Search<input id="prodSearch" placeholder="Search products"></label>
+            <label>Category<select id="prodCat"><option value="">All</option></select></label>
+            <label>Availability<select id="prodAvail"><option value="">Any</option><option value="instock">In stock</option><option value="outofstock">Out of stock</option></select></label>
+            <label>Sort<select id="prodSort"><option value="date">Newest</option><option value="title">Alphabetical</option><option value="price_asc">Price: Low to High</option><option value="price_desc">Price: High to Low</option></select></label>
+          </div>
+          <div class="grid" style="grid-auto-flow:column;gap:10px;margin:8px 0"><button id="prodApply">Apply</button></div>
           <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px" id="prodGrid">Loading...</div>
         </section>
         <section id="cart" class="section hidden">
@@ -51,6 +58,7 @@
             <label>State<input name="state" required></label>
             <label>PIN Code<input name="zip" required></label>
             <label>Phone<input name="phone" required></label>
+            <label>Payment<select name="payment_method"><option value="cod">Cash on delivery</option><option value="wallet">Wallet</option></select></label>
             <div><button type="submit">Checkout</button></div>
             <div id="chkMsg" class="muted"></div>
           </form>
@@ -150,11 +158,23 @@
       }
       async function loadCatalog(){
         try{
-          const r = await fetch('/wp-json/svntex2/v1/catalog?per_page=24');
+          const qs = new URLSearchParams();
+          const s=document.getElementById('prodSearch')?.value; if(s) qs.set('search', s);
+          const c=document.getElementById('prodCat')?.value; if(c) qs.set('category', c);
+          const a=document.getElementById('prodAvail')?.value; if(a) qs.set('availability', a);
+          const sort=document.getElementById('prodSort')?.value; if(sort) qs.set('sort', sort);
+          const r = await fetch('/wp-json/svntex2/v1/catalog?per_page=24'+(qs.toString()?('&'+qs.toString()):''));
           const j = await r.json(); const items = j.items||[]; const grid = document.getElementById('prodGrid');
-          grid.innerHTML = items.map(x=>`<div class="list-item" style="flex-direction:column;align-items:flex-start"><a href="/member-v2/product.html?id=${x.id}"><img src="${x.thumbnail_url||''}" alt="" style="width:100%;height:160px;object-fit:cover;border-radius:8px"></a><div style="margin-top:6px"><strong><a href="/member-v2/product.html?id=${x.id}" style="text-decoration:none;color:inherit">${x.title}</a></strong></div><div class="meta">MRP ₹${(x.mrp||0).toFixed(2)} · Price ₹${(x.price||0).toFixed(2)}</div><div class="grid" style="grid-auto-flow:column;gap:8px;margin-top:6px"><a class="secondary" href="/member-v2/product.html?id=${x.id}" style="text-decoration:none;padding:.35rem .6rem;border:1px solid rgba(255,255,255,.3);border-radius:8px">View</a></div></div>`).join('') || '<div class="muted">No items.</div>';
+          grid.innerHTML = items.map(x=>`<div class="list-item" style="flex-direction:column;align-items:flex-start"><a href="/member-v2/product.html?id=${x.id}"><img src="${x.thumbnail_url||''}" alt="" style="width:100%;height:160px;object-fit:cover;border-radius:8px"></a><div style="margin-top:6px"><strong><a href="/member-v2/product.html?id=${x.id}" style="text-decoration:none;color:inherit">${x.title}</a></strong></div><div class="meta">MRP ₹${(x.mrp||0).toFixed(2)} · Price ₹${(x.price||0).toFixed(2)}</div><div class="grid" style="grid-auto-flow:column;gap:8px;margin-top:6px"><a class="secondary" href="/member-v2/product.html?id=${x.id}" style="text-decoration:none;padding:.35rem .6rem;border:1px solid rgba(255,255,255,.3);border-radius:8px">View</a><button class="buyNow" data-id="${x.id}" style="padding:.35rem .6rem">Buy Now</button></div></div>`).join('') || '<div class="muted">No items.</div>';
+          // bind Buy Now
+          grid.querySelectorAll('button.buyNow').forEach(btn=>{ btn.addEventListener('click', async ()=>{ const pid=btn.getAttribute('data-id'); if(!publicNonce) publicNonce = await getPublicNonce(); await fetch('/wp-json/svntex2/v1/cart', { method:'GET' }); await fetch('/wp-json/svntex2/v1/cart/remove', { method:'POST', headers:{'Content-Type':'application/json','X-SVNTeX2-Nonce': publicNonce }, body: JSON.stringify({ product_id: pid, variant_id: 0 }) }).catch(()=>{}); await fetch('/wp-json/svntex2/v1/cart/add', { method:'POST', headers:{'Content-Type':'application/json','X-SVNTeX2-Nonce': publicNonce }, body: JSON.stringify({ product_id: pid, variant_id: 0, qty: 1 }) }); location.hash='#cart'; document.getElementById('chkForm').scrollIntoView({behavior:'smooth'}); }); });
         }catch(e){ document.getElementById('prodGrid').textContent='Failed to load'; }
       }
+      // load categories for filter
+      try{
+        const r=await fetch('/wp-json/wp/v2/svntex_category?per_page=100'); const cats=r.ok?await r.json():[]; const sel=document.getElementById('prodCat'); if(sel){ sel.innerHTML = '<option value="">All</option>'+cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join(''); }
+      }catch(e){}
+      document.getElementById('prodApply')?.addEventListener('click', (e)=>{ e.preventDefault(); loadCatalog(); });
 
       // Cart
       let publicNonce='';

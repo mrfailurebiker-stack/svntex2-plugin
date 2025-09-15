@@ -122,7 +122,7 @@ function svntex2_commerce_cart_totals(){
     return [ 'lines'=>$lines,'items_total'=>round($items_total,2),'delivery_total'=>round($delivery_total,2),'grand_total'=>round($grand,2) ];
 }
 
-function svntex2_commerce_checkout($address){
+function svntex2_commerce_checkout($address, $payment = []){
     global $wpdb; $orders=$wpdb->prefix.'svntex_orders'; $itemsT=$wpdb->prefix.'svntex_order_items';
     $totals = svntex2_commerce_cart_totals();
     if (empty($totals['lines'])) return new WP_Error('empty_cart','Cart empty');
@@ -133,6 +133,7 @@ function svntex2_commerce_checkout($address){
         $dec = svntex2_inventory_batch_decrement($variant_qty);
         if(is_wp_error($dec)) return $dec; // do not proceed, stock insufficient
     }
+    $meta = [ 'payment' => $payment ];
     $wpdb->insert($orders,[
         'user_id'=> is_user_logged_in()? get_current_user_id(): null,
         'status'=>'pending',
@@ -140,7 +141,7 @@ function svntex2_commerce_checkout($address){
         'delivery_total'=>$totals['delivery_total'],
         'grand_total'=>$totals['grand_total'],
         'address'=> wp_json_encode($address),
-        'meta'=> null,
+        'meta'=> wp_json_encode($meta),
     ]);
     $order_id = (int)$wpdb->insert_id;
     foreach($totals['lines'] as $ln){
@@ -189,7 +190,17 @@ add_action('rest_api_init', function(){
             'phone'=>sanitize_text_field($r['phone']??''),
         ];
         if(!$address['name'] || !$address['line1'] || !$address['city'] || !$address['zip']) return new WP_Error('bad_address','Missing required address fields', ['status'=>400]);
-        return svntex2_commerce_checkout($address);
+        $payment = [ 'method' => sanitize_key($r['payment_method'] ?? 'cod') ];
+        // Optional wallet immediate capture (deduct up to grand total)
+        if ($payment['method'] === 'wallet' && is_user_logged_in()) {
+            $totals = svntex2_commerce_cart_totals();
+            $uid = get_current_user_id();
+            if ( function_exists('svntex2_wallet_add_transaction') ) {
+                svntex2_wallet_add_transaction($uid, 'order_payment', -1 * (float)$totals['grand_total'], 'checkout:'.uniqid(), [ 'note'=>'Wallet pay' ], 'order_payment' );
+                $payment['captured'] = (float)$totals['grand_total'];
+            }
+        }
+        return svntex2_commerce_checkout($address, $payment);
     },'permission_callback'=>$secure_cb ] ]);
     register_rest_route('svntex2/v1','/order/(?P<id>\d+)', [ [ 'methods'=>'GET','callback'=>function($r){
         global $wpdb; $oid=(int)$r['id']; if(!$oid) return new WP_Error('bad_request','id required',['status'=>400]);
