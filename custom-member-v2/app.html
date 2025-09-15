@@ -59,6 +59,16 @@
           <h2>Orders</h2>
           <div id="ordersList" class="list">Loading…</div>
         </section>
+        <!-- Order detail modal -->
+        <div id="orderModal" class="modal hidden" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.6);z-index:50">
+          <div class="card" style="max-width:720px;width:92%;padding:14px 16px;background:#0b1220;border:1px solid rgba(255,255,255,.12);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35)">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px">
+              <h3 id="ordTitle" style="margin:0">Order</h3>
+              <button id="ordClose" class="secondary" style="padding:.35rem .6rem">Close</button>
+            </div>
+            <div id="orderDetail" class="list">Loading…</div>
+          </div>
+        </div>
         <section id="wallet" class="section hidden">
           <h2>Wallet</h2>
           <div id="wBalance" class="kpi">--</div>
@@ -175,8 +185,38 @@
         try{
           const r = await fetch('/wp-json/svntex2/v1/orders', { credentials:'include', headers });
           const j = await r.json(); const items = (j && j.items)||[];
-          document.getElementById('ordersList').innerHTML = items.map(o=>`<div class="list-item"><div>Order #${o.id} · ${o.status}</div><div class="meta">₹${(o.grand_total||0).toFixed(2)} · ${o.created_at||''}</div></div>`).join('') || 'No orders yet.';
+          const html = items.map(o=>`<div class="list-item" data-oid="${o.id}" style="cursor:pointer"><div>Order #${o.id} · ${o.status}</div><div class="meta">₹${(o.grand_total||0).toFixed(2)} · ${o.created_at||''}</div></div>`).join('') || 'No orders yet.';
+          const wrap = document.getElementById('ordersList'); wrap.innerHTML = html;
+          // Click to open modal
+          wrap.querySelectorAll('.list-item[data-oid]').forEach(el=>{
+            el.addEventListener('click', async ()=>{ const oid = el.getAttribute('data-oid'); if(!publicNonce) publicNonce = await getPublicNonce(); openOrderModal(oid); });
+          });
         }catch(e){ document.getElementById('ordersList').textContent='Failed to load'; }
+      }
+
+      // Modal helpers
+      const orderModal = document.getElementById('orderModal');
+      const orderDetail = document.getElementById('orderDetail');
+      const ordTitle = document.getElementById('ordTitle');
+      document.getElementById('ordClose').addEventListener('click', ()=>{ orderModal.classList.add('hidden'); });
+      function openOrderModal(id){ ordTitle.textContent = 'Order #'+id; orderDetail.textContent='Loading…'; orderModal.classList.remove('hidden'); fetchOrderDetail(id); }
+      async function fetchOrderDetail(id){
+        try{
+          if(!publicNonce) publicNonce = await getPublicNonce();
+          const r = await fetch('/wp-json/svntex2/v1/order/'+id, { headers: { 'X-SVNTeX2-Nonce': publicNonce } });
+          const j = await r.json();
+          if(!r.ok){ orderDetail.textContent = (j && (j.error||j.message)) || 'Failed'; return; }
+          const addr = j.address||{};
+          const items = j.items||[];
+          const lines = items.map(x=>`<div class="list-item"><div>Product ${x.product_id}${x.variant_id?(' · Var '+x.variant_id):''} · Qty ${x.qty}</div><div class="meta">₹${Number(x.subtotal||0).toFixed(2)}</div></div>`).join('') || '<div class="muted">No items.</div>';
+          orderDetail.innerHTML = `
+            <div class="list-item"><strong>Status</strong><div class="meta">${j.status||'-'}</div></div>
+            <div class="list-item"><strong>Totals</strong><div class="meta">Items ₹${Number(j.items_total||0).toFixed(2)} · Delivery ₹${Number(j.delivery_total||0).toFixed(2)} · Grand ₹${Number(j.grand_total||0).toFixed(2)}</div></div>
+            <div class="list-item"><strong>Ship To</strong><div class="meta">${[addr.name,addr.line1,addr.line2,addr.city,addr.state,addr.zip,addr.country].filter(Boolean).join(', ')||'-'}</div></div>
+            <div style="margin-top:8px"></div>
+            ${lines}
+          `;
+        }catch(e){ orderDetail.textContent='Failed'; }
       }
 
       // Wallet
