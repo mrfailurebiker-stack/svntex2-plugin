@@ -162,6 +162,8 @@ function svntex2_commerce_checkout($address){
 // REST endpoints
 add_action('rest_api_init', function(){
     register_rest_route('svntex2/v1','/cart', [ [ 'methods'=>'GET','callback'=>function(){ return svntex2_commerce_cart_totals(); },'permission_callback'=>'__return_true' ] ]); // read-only can stay public
+    // Public nonce endpoint so static apps can call cart/checkout endpoints
+    register_rest_route('svntex2/v1','/public-nonce', [ [ 'methods'=>'GET','callback'=>function(){ return [ 'nonce' => svntex2_public_nonce() ]; },'permission_callback'=>'__return_true' ] ]);
     $secure_cb = function( $request ){ $nonce = $request->get_header('X-SVNTeX2-Nonce'); if ( ! $nonce ) $nonce = $request['nonce'] ?? ''; if ( svntex2_verify_public_nonce( $nonce ) ) return true; return new WP_Error('forbidden','Invalid nonce',['status'=>403]); };
     register_rest_route('svntex2/v1','/cart/add', [ [ 'methods'=>'POST','callback'=>function($r){
         $pid=(int)$r['product_id']; $vid= isset($r['variant_id'])?(int)$r['variant_id']:0; $qty=max(1,(int)($r['qty']??1));

@@ -43,6 +43,18 @@ add_action('rest_api_init', function(){
         'permission_callback' => function(){ return is_user_logged_in(); },
         'callback' => function(){ return ['balance' => svntex2_wallet_get_balance(get_current_user_id())]; }
     ]);
+
+    // Orders: list my orders (member)
+    register_rest_route('svntex2/v1','/orders', [
+        'methods' => 'GET',
+        'permission_callback' => function(){ return is_user_logged_in(); },
+        'callback' => function( WP_REST_Request $r ){
+            global $wpdb; $orders=$wpdb->prefix.'svntex_orders'; $uid=get_current_user_id();
+            $limit = min( (int)($r->get_param('per_page') ?: 20), 100 );
+            $rows = $wpdb->get_results( $wpdb->prepare("SELECT id,status,grand_total,created_at FROM $orders WHERE user_id=%d ORDER BY id DESC LIMIT %d", $uid, $limit), ARRAY_A );
+            return [ 'items' => $rows ?: [] ];
+        }
+    ]);
     register_rest_route('svntex2/v1','/wallet/topup', [
         'methods' => 'POST',
         'permission_callback' => function(){ return is_user_logged_in(); },
@@ -93,6 +105,16 @@ add_action('rest_api_init', function(){
             return [ 'items' => $rows ?: [] ];
         }
     ]);
+    // Referrals for current member
+    register_rest_route('svntex2/v1','/referrals/mine', [
+        'methods' => 'GET', 'permission_callback' => function(){ return is_user_logged_in(); },
+        'callback' => function(){
+            global $wpdb; $t = $wpdb->prefix.'svntex_referrals'; $uid = get_current_user_id();
+            $rows = $wpdb->get_results( $wpdb->prepare("SELECT referee_id, qualified, created_at FROM $t WHERE referrer_id=%d ORDER BY id DESC LIMIT 100", $uid), ARRAY_A );
+            $code = get_user_meta($uid,'customer_id', true) ?: ('SVN'.str_pad((string)$uid,6,'0',STR_PAD_LEFT));
+            return [ 'code' => $code, 'items' => array_map(function($r){ return [ 'referee_id'=>(int)$r['referee_id'], 'qualified'=> (bool)$r['qualified'], 'created_at'=>$r['created_at'] ]; }, $rows ?: []) ];
+        }
+    ]);
     register_rest_route('svntex2/v1','/referrals/link', [
         'methods' => 'POST','permission_callback' => 'svntex2_api_can_manage',
         'callback' => function( WP_REST_Request $r ){
@@ -119,6 +141,63 @@ add_action('rest_api_init', function(){
             global $wpdb; $t=$wpdb->prefix.'svntex_kyc_submissions';
             $rows = $wpdb->get_results("SELECT id,user_id,status,created_at,updated_at FROM $t ORDER BY id DESC LIMIT 200", ARRAY_A);
             return [ 'items' => $rows ?: [] ];
+        }
+    ]);
+    // KYC (member): status and submit
+    register_rest_route('svntex2/v1','/kyc/me', [
+        'methods' => 'GET', 'permission_callback' => function(){ return is_user_logged_in(); },
+        'callback' => function(){
+            $uid = get_current_user_id();
+            $status = function_exists('svntex2_kyc_get_status') ? svntex2_kyc_get_status($uid) : 'pending';
+            return [ 'status' => $status ];
+        }
+    ]);
+    register_rest_route('svntex2/v1','/kyc/submit', [
+        'methods' => 'POST', 'permission_callback' => function(){ return is_user_logged_in(); },
+        'callback' => function( WP_REST_Request $r ){
+            $uid = get_current_user_id();
+            $full = sanitize_text_field($r->get_param('full_name'));
+            $addr = sanitize_textarea_field($r->get_param('address'));
+            $docn = sanitize_text_field($r->get_param('doc_number'));
+            if ( ! function_exists('svntex2_kyc_submit') ) return new WP_REST_Response(['error'=>'KYC not available'],400);
+            $id = svntex2_kyc_submit($uid, $docn, null, [ 'documents'=>[], 'address'=>$addr, 'full_name'=>$full ]);
+            return [ 'ok'=>true, 'submission_id'=>$id ];
+        }
+    ]);
+
+    // Withdrawals: request + list mine
+    register_rest_route('svntex2/v1','/withdrawals', [
+        'methods' => 'GET','permission_callback' => function(){ return is_user_logged_in(); },
+        'callback' => function(){
+            global $wpdb; $t=$wpdb->prefix.'svntex_withdrawals'; $uid=get_current_user_id();
+            $rows = $wpdb->get_results( $wpdb->prepare("SELECT id,amount,status,tds_amount,amc_amount,net_amount,requested_at,processed_at FROM $t WHERE user_id=%d ORDER BY id DESC LIMIT 50", $uid), ARRAY_A );
+            return [ 'items' => $rows ?: [] ];
+        }
+    ]);
+    register_rest_route('svntex2/v1','/withdrawals/request', [
+        'methods' => 'POST','permission_callback' => function(){ return is_user_logged_in(); },
+        'callback' => function( WP_REST_Request $r ){
+            $amt = (float)$r->get_param('amount'); $method = sanitize_text_field( $r->get_param('method') ?: 'bank' ); $dest = sanitize_text_field( $r->get_param('destination') ?: '' );
+            if ( $amt <= 0 ) return new WP_REST_Response(['error'=>'Invalid amount'],400);
+            if ( ! function_exists('svntex2_withdraw_request') ) return new WP_REST_Response(['error'=>'Withdrawals not enabled'],400);
+            $res = svntex2_withdraw_request( get_current_user_id(), $amt, $method, $dest );
+            if ( is_wp_error($res) ) return new WP_REST_Response(['error'=>$res->get_error_message()],400);
+            return $res;
+        }
+    ]);
+
+    // Support: simple ticket intake (stores as comment on a hidden page or as an option log)
+    register_rest_route('svntex2/v1','/support/ticket', [
+        'methods' => 'POST', 'permission_callback' => function(){ return is_user_logged_in(); },
+        'callback' => function( WP_REST_Request $r ){
+            $sub = sanitize_text_field($r->get_param('subject'));
+            $msg = sanitize_textarea_field($r->get_param('message'));
+            if(!$sub || !$msg) return new WP_REST_Response(['error'=>'subject and message required'],400);
+            $uid = get_current_user_id();
+            $log = get_option('svntex2_support_log') ?: [];
+            $log[] = [ 'user_id'=>$uid, 'subject'=>$sub, 'message'=>$msg, 'ts'=>current_time('mysql') ];
+            update_option('svntex2_support_log', $log, false);
+            return [ 'ok'=>true ];
         }
     ]);
     register_rest_route('svntex2/v1','/kyc/(?P<user_id>\d+)', [
@@ -262,6 +341,43 @@ add_action('rest_api_init', function(){
             }
             wp_reset_postdata();
             return [ 'items' => $items, 'total' => (int)$q->found_posts ];
+        }
+    ]);
+
+    // Public single product (read-only) for member product detail page
+    register_rest_route('svntex2/v1','/catalog/(?P<id>\d+)', [
+        'methods' => 'GET', 'permission_callback' => '__return_true',
+        'callback' => function( WP_REST_Request $r ){
+            global $wpdb; $id = (int) $r['id']; if(!$id) return new WP_REST_Response(['error'=>'Invalid id'],400);
+            $p = get_post($id);
+            if( ! $p || $p->post_type !== 'svntex_product' || $p->post_status !== 'publish' ){
+                return new WP_REST_Response(['error'=>'Not found'],404);
+            }
+            // Featured image and gallery
+            $thumb_id = (int) get_post_thumbnail_id($p->ID);
+            $thumb_url = $thumb_id ? wp_get_attachment_image_url($p->ID, 'large') : '';
+            $gallery_ids = (array) get_post_meta($p->ID,'gallery', true);
+            $gallery_urls = array_values( array_filter( array_map(function($aid){ $aid=(int)$aid; return $aid? wp_get_attachment_image_url($aid,'large') : ''; }, $gallery_ids) ) );
+            // Derive min/max price from variants table
+            $vt = $wpdb->prefix.'svntex_product_variants';
+            $range = $wpdb->get_row( $wpdb->prepare("SELECT MIN(price) as min_p, MAX(price) as max_p FROM $vt WHERE product_id=%d AND active=1 AND price IS NOT NULL", $p->ID) );
+            $min_price = $range && $range->min_p !== null ? (float)$range->min_p : (float) get_post_meta($p->ID,'discount_price', true) ?: (float) get_post_meta($p->ID,'base_price', true);
+            $max_price = $range && $range->max_p !== null ? (float)$range->max_p : $min_price;
+            // Shallow content and tax/mrp for display
+            $excerpt = has_excerpt($p) ? wp_strip_all_tags(get_the_excerpt($p)) : wp_trim_words( wp_strip_all_tags( $p->post_content ), 40, '…' );
+            $mrp = (float) get_post_meta($p->ID,'mrp', true);
+            $tax_percent = (float) get_post_meta($p->ID,'tax_percent', true);
+            return [
+                'id' => (int)$p->ID,
+                'title' => get_the_title($p),
+                'excerpt' => $excerpt,
+                'thumbnail_url' => $thumb_url,
+                'images' => $gallery_urls,
+                'min_price' => $min_price,
+                'max_price' => $max_price,
+                'mrp' => $mrp,
+                'tax_percent' => $tax_percent,
+            ];
         }
     ]);
 

@@ -34,6 +34,10 @@ function svntex_include_files() {
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/enqueue.php';
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/products.php';
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/rest.php';
+    $commerce = SVNTEX_PLUGIN_DIR . 'includes/functions/commerce.php';
+    if ( file_exists($commerce) ) require_once $commerce;
+    $withdrawals = SVNTEX_PLUGIN_DIR . 'includes/functions/withdrawals.php';
+    if ( file_exists($withdrawals) ) require_once $withdrawals;
     $vendors = SVNTEX_PLUGIN_DIR . 'includes/functions/vendors.php';
     if ( file_exists($vendors) ) require_once $vendors;
     $referrals = SVNTEX_PLUGIN_DIR . 'includes/functions/referrals.php';
@@ -137,6 +141,55 @@ function svntex_activate(){
     ) $charset;";
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
     dbDelta($sql);
+    // Orders
+    $orders = $wpdb->prefix.'svntex_orders';
+    $order_items = $wpdb->prefix.'svntex_order_items';
+    $sql_orders = "CREATE TABLE IF NOT EXISTS $orders (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id BIGINT UNSIGNED NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        items_total DECIMAL(18,2) NOT NULL DEFAULT 0,
+        delivery_total DECIMAL(18,2) NOT NULL DEFAULT 0,
+        grand_total DECIMAL(18,2) NOT NULL DEFAULT 0,
+        address LONGTEXT NULL,
+        meta LONGTEXT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY user_idx (user_id)
+    ) $charset;";
+    dbDelta($sql_orders);
+    $sql_items = "CREATE TABLE IF NOT EXISTS $order_items (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        order_id BIGINT UNSIGNED NOT NULL,
+        product_id BIGINT UNSIGNED NOT NULL,
+        variant_id BIGINT UNSIGNED NULL,
+        qty INT NOT NULL DEFAULT 1,
+        price DECIMAL(18,2) NOT NULL DEFAULT 0,
+        subtotal DECIMAL(18,2) NOT NULL DEFAULT 0,
+        meta LONGTEXT NULL,
+        PRIMARY KEY (id),
+        KEY order_idx (order_id)
+    ) $charset;";
+    dbDelta($sql_items);
+    // Withdrawals
+    $wd = $wpdb->prefix.'svntex_withdrawals';
+    $sql_wd = "CREATE TABLE IF NOT EXISTS $wd (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id BIGINT UNSIGNED NOT NULL,
+        amount DECIMAL(18,2) NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'requested',
+        method VARCHAR(50) NULL,
+        destination VARCHAR(191) NULL,
+        tds_amount DECIMAL(18,2) NULL,
+        amc_amount DECIMAL(18,2) NULL,
+        net_amount DECIMAL(18,2) NULL,
+        admin_note TEXT NULL,
+        requested_at DATETIME NULL,
+        processed_at DATETIME NULL,
+        PRIMARY KEY (id),
+        KEY user_idx (user_id)
+    ) $charset;";
+    dbDelta($sql_wd);
     // Create essential pages if missing
     svntex2_ensure_page( SVNTEX2_LOGIN_SLUG, 'Customer Login', '[svntex_login]' );
     svntex2_ensure_page( SVNTEX2_REGISTER_SLUG, 'Customer Registration', '[svntex_registration]' );

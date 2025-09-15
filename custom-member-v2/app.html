@@ -19,9 +19,13 @@
         <nav>
           <a href="#home" class="active">Home</a>
           <a href="#products">Products</a>
+          <a href="#cart">Cart</a>
           <a href="#wallet">Wallet</a>
+          <a href="#orders">Orders</a>
           <a href="#referrals">Referrals</a>
           <a href="#kyc">KYC</a>
+          <a href="#withdrawals">Withdrawals</a>
+          <a href="#support">Support</a>
           <a href="#profile">Profile</a>
           <a id="logout" href="#logout">Logout</a>
         </nav>
@@ -35,6 +39,25 @@
         <section id="products" class="section hidden">
           <h2>Products</h2>
           <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px" id="prodGrid">Loading...</div>
+        </section>
+        <section id="cart" class="section hidden">
+          <h2>Cart</h2>
+          <div id="cartWrap" class="list">Loading…</div>
+          <form id="chkForm" class="grid" style="max-width:560px;margin-top:10px">
+            <label>Name<input name="name" required></label>
+            <label>Line 1<input name="line1" required></label>
+            <label>Line 2<input name="line2"></label>
+            <label>City<input name="city" required></label>
+            <label>State<input name="state" required></label>
+            <label>PIN Code<input name="zip" required></label>
+            <label>Phone<input name="phone" required></label>
+            <div><button type="submit">Checkout</button></div>
+            <div id="chkMsg" class="muted"></div>
+          </form>
+        </section>
+        <section id="orders" class="section hidden">
+          <h2>Orders</h2>
+          <div id="ordersList" class="list">Loading…</div>
         </section>
         <section id="wallet" class="section hidden">
           <h2>Wallet</h2>
@@ -58,6 +81,26 @@
           </form>
           <div style="margin-top:12px" id="kycStatus" class="muted">Status: --</div>
         </section>
+        <section id="withdrawals" class="section hidden">
+          <h2>Withdrawals</h2>
+          <form id="wdForm" class="grid" style="max-width:400px">
+            <label>Amount<input type="number" step="0.01" min="1" name="amount" required></label>
+            <label>Method<select name="method"><option value="bank">Bank</option><option value="upi">UPI</option></select></label>
+            <label>Destination<input name="destination" placeholder="Acct/UPI ID"></label>
+            <div><button type="submit">Request Withdraw</button></div>
+            <div id="wdMsg" class="muted"></div>
+          </form>
+          <div id="wdList" class="list" style="margin-top:10px">Loading…</div>
+        </section>
+        <section id="support" class="section hidden">
+          <h2>Support</h2>
+          <form id="spForm" class="grid" style="max-width:560px">
+            <label>Subject<input name="subject" required></label>
+            <label>Message<textarea name="message" rows="3" required></textarea></label>
+            <div><button type="submit">Submit Ticket</button></div>
+            <div id="spMsg" class="muted"></div>
+          </form>
+        </section>
         <section id="profile" class="section hidden">
           <h2>Profile</h2>
           <form id="profileForm" class="grid" style="max-width:540px">
@@ -80,7 +123,7 @@
       const me = await meRes.json();
       document.getElementById('hello').textContent = 'Hello, '+(me.name||me.username||'member');
 
-  const sections=['home','products','wallet','referrals','kyc','profile'];
+  const sections=['home','products','cart','wallet','orders','referrals','kyc','withdrawals','support','profile'];
       function show(name){ sections.forEach(id=>{ const el=document.getElementById(id); if(!el) return; if(id===name) el.classList.remove('hidden'); else el.classList.add('hidden'); });
         document.querySelectorAll('.topbar nav a').forEach(a=>{ if(a.getAttribute('href')==='#'+name) a.classList.add('active'); else a.classList.remove('active'); }); }
       function route(){ const hash=location.hash||'#home'; const name=hash.replace('#',''); show(sections.includes(name)?name:'home'); }
@@ -92,15 +135,48 @@
           const r = await fetch('/wp-json/svntex2/v1/catalog?per_page=8');
           const j = await r.json(); const items = j.items||[];
           const grid = document.getElementById('homeGrid');
-          grid.innerHTML = items.map(x=>`<div class="list-item" style="flex-direction:column;align-items:flex-start"><img src="${x.thumbnail_url||''}" alt="" style="width:100%;height:140px;object-fit:cover;border-radius:8px"><div style="margin-top:6px"><strong>${x.title}</strong></div><div class="meta">₹${(x.price||0).toFixed(2)}</div></div>`).join('') || '<div class="muted">No items.</div>';
+          grid.innerHTML = items.map(x=>`<div class="list-item" style="flex-direction:column;align-items:flex-start"><a href="/member-v2/product.html?id=${x.id}"><img src="${x.thumbnail_url||''}" alt="" style="width:100%;height:140px;object-fit:cover;border-radius:8px"></a><div style="margin-top:6px"><strong><a href="/member-v2/product.html?id=${x.id}" style="text-decoration:none;color:inherit">${x.title}</a></strong></div><div class="meta">₹${(x.price||0).toFixed(2)}</div></div>`).join('') || '<div class="muted">No items.</div>';
         }catch(e){ document.getElementById('homeGrid').textContent='Failed to load'; }
       }
       async function loadCatalog(){
         try{
           const r = await fetch('/wp-json/svntex2/v1/catalog?per_page=24');
           const j = await r.json(); const items = j.items||[]; const grid = document.getElementById('prodGrid');
-          grid.innerHTML = items.map(x=>`<div class="list-item" style="flex-direction:column;align-items:flex-start"><img src="${x.thumbnail_url||''}" alt="" style="width:100%;height:160px;object-fit:cover;border-radius:8px"><div style="margin-top:6px"><strong>${x.title}</strong></div><div class="meta">MRP ₹${(x.mrp||0).toFixed(2)} · Price ₹${(x.price||0).toFixed(2)}</div><div class="grid" style="grid-auto-flow:column;gap:8px;margin-top:6px"><button class="secondary" disabled>Add to cart</button></div></div>`).join('') || '<div class="muted">No items.</div>';
+          grid.innerHTML = items.map(x=>`<div class="list-item" style="flex-direction:column;align-items:flex-start"><a href="/member-v2/product.html?id=${x.id}"><img src="${x.thumbnail_url||''}" alt="" style="width:100%;height:160px;object-fit:cover;border-radius:8px"></a><div style="margin-top:6px"><strong><a href="/member-v2/product.html?id=${x.id}" style="text-decoration:none;color:inherit">${x.title}</a></strong></div><div class="meta">MRP ₹${(x.mrp||0).toFixed(2)} · Price ₹${(x.price||0).toFixed(2)}</div><div class="grid" style="grid-auto-flow:column;gap:8px;margin-top:6px"><a class="secondary" href="/member-v2/product.html?id=${x.id}" style="text-decoration:none;padding:.35rem .6rem;border:1px solid rgba(255,255,255,.3);border-radius:8px">View</a></div></div>`).join('') || '<div class="muted">No items.</div>';
         }catch(e){ document.getElementById('prodGrid').textContent='Failed to load'; }
+      }
+
+      // Cart
+      let publicNonce='';
+      async function getPublicNonce(){ try{ const r=await fetch('/wp-json/svntex2/v1/public-nonce'); const j=await r.json(); return j.nonce||''; }catch(e){ return ''; } }
+      async function loadCart(){
+        try{
+          if(!publicNonce) publicNonce = await getPublicNonce();
+          const r = await fetch('/wp-json/svntex2/v1/cart'); const j = await r.json();
+          const lines = (j && j.lines)||[];
+          const wrap = document.getElementById('cartWrap');
+          if(!lines.length){ wrap.textContent='Your cart is empty.'; return; }
+          wrap.innerHTML = lines.map(x=>`<div class="list-item"><div>Product ${x.product_id} · Qty ${x.qty}</div><div class="meta">₹${x.subtotal.toFixed(2)} + Delivery ₹${x.delivery.toFixed(2)}</div></div>`).join('') +
+            `<div class="list-item"><strong>Total</strong><div class="meta">Items ₹${(j.items_total||0).toFixed(2)} · Delivery ₹${(j.delivery_total||0).toFixed(2)} · Grand ₹${(j.grand_total||0).toFixed(2)}</div></div>`;
+        }catch(e){ document.getElementById('cartWrap').textContent='Failed to load'; }
+      }
+      const chkMsg = document.getElementById('chkMsg');
+      document.getElementById('chkForm').addEventListener('submit', async (e)=>{
+        e.preventDefault(); chkMsg.textContent='Placing order…'; if(!publicNonce) publicNonce = await getPublicNonce();
+        const data = Object.fromEntries(new FormData(e.target).entries());
+        const r = await fetch('/wp-json/svntex2/v1/checkout', { method:'POST', headers:{'X-SVNTeX2-Nonce': publicNonce}, body: new URLSearchParams(data) });
+        const j = await r.json();
+        if(r.ok && j.order_id){ chkMsg.textContent='Order placed: #'+j.order_id; loadCart(); loadOrders(); }
+        else { chkMsg.textContent=(j && (j.error||j.message))||'Failed'; }
+      });
+
+      // Orders
+      async function loadOrders(){
+        try{
+          const r = await fetch('/wp-json/svntex2/v1/orders', { credentials:'include', headers });
+          const j = await r.json(); const items = (j && j.items)||[];
+          document.getElementById('ordersList').innerHTML = items.map(o=>`<div class="list-item"><div>Order #${o.id} · ${o.status}</div><div class="meta">₹${(o.grand_total||0).toFixed(2)} · ${o.created_at||''}</div></div>`).join('') || 'No orders yet.';
+        }catch(e){ document.getElementById('ordersList').textContent='Failed to load'; }
       }
 
       // Wallet
@@ -135,6 +211,26 @@
         loadKyc();
       });
       // Profile
+      // Withdrawals
+      const wdMsg = document.getElementById('wdMsg');
+      async function loadWd(){
+        try{ const r=await fetch('/wp-json/svntex2/v1/withdrawals', { credentials:'include', headers }); const j=await r.json(); const items=(j&&j.items)||[]; document.getElementById('wdList').innerHTML = items.map(w=>`<div class="list-item"><div>#${w.id} · ${w.status}</div><div class="meta">₹${(w.amount||0).toFixed(2)}${w.net_amount?(' · Net ₹'+Number(w.net_amount).toFixed(2)):'')}</div></div>`).join('') || 'No withdrawals yet.'; }catch(e){ document.getElementById('wdList').textContent='Failed to load'; }
+      }
+      document.getElementById('wdForm').addEventListener('submit', async (e)=>{
+        e.preventDefault(); wdMsg.textContent='Requesting…';
+        const data = Object.fromEntries(new FormData(e.target).entries());
+        const r = await fetch('/wp-json/svntex2/v1/withdrawals/request', { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify(data) });
+        const j = await r.json(); if(r.ok && j.withdrawal_id){ wdMsg.textContent='Requested #'+j.withdrawal_id; loadWd(); } else { wdMsg.textContent=(j && (j.error||j.message))||'Failed'; }
+      });
+
+      // Support
+      const spMsg = document.getElementById('spMsg');
+      document.getElementById('spForm').addEventListener('submit', async (e)=>{
+        e.preventDefault(); spMsg.textContent='Sending…';
+        const data = Object.fromEntries(new FormData(e.target).entries());
+        const r = await fetch('/wp-json/svntex2/v1/support/ticket', { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify(data) });
+        const j = await r.json(); spMsg.textContent = (r.ok && j && j.ok)? 'Submitted' : ((j && (j.error||j.message))||'Failed');
+      });
       const pf=document.getElementById('profileForm'); const pm=document.getElementById('pMsg');
       pf.email.value = me.email||''; pf.first_name.value = me.first_name||''; pf.last_name.value = me.last_name||''; pf.mobile.value = (me.meta&&me.meta.mobile)||'';
       pf.addEventListener('submit', async (e)=>{
@@ -147,7 +243,7 @@
       document.getElementById('logout').addEventListener('click', async (e)=>{ e.preventDefault(); try{ await fetch('/wp-admin/admin-post.php?action=svntex2_logout',{credentials:'include'});}catch(e){} const dest=(location.hostname.replace(/^www\./,'')==='svntex.com')?'https://www.svntex.com/member-v2/':'/member-v2/'; location.href=dest; });
 
       // Initial lazy loads
-  await Promise.allSettled([loadHome(), loadCatalog(), loadWallet(), loadRef(), loadKyc()]);
+  await Promise.allSettled([loadHome(), loadCatalog(), loadCart(), loadOrders(), loadWallet(), loadRef(), loadKyc(), loadWd()]);
     })();
     </script>
   </body>
