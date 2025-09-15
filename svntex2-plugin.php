@@ -34,6 +34,9 @@ function svntex_include_files() {
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/enqueue.php';
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/products.php';
     require_once SVNTEX_PLUGIN_DIR . 'includes/functions/rest.php';
+    // Admin UI (adds SVNTeX 2.0 menu in wp-admin)
+    $admin_ui = SVNTEX_PLUGIN_DIR . 'includes/functions/admin.php';
+    if ( file_exists($admin_ui) ) require_once $admin_ui;
     $commerce = SVNTEX_PLUGIN_DIR . 'includes/functions/commerce.php';
     if ( file_exists($commerce) ) require_once $commerce;
     $withdrawals = SVNTEX_PLUGIN_DIR . 'includes/functions/withdrawals.php';
