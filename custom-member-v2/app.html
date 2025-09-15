@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SVNTeX Member v2</title>
     <link rel="stylesheet" href="member.css" />
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   </head>
   <body>
     <script>
@@ -238,17 +239,39 @@
         if(data.payment_method==='online'){
           try{
             const totals = await fetch('/wp-json/svntex2/v1/cart').then(r=>r.json());
-    const createBody = { gateway:'razorpay', amount: totals.grand_total, name:data.name, line1:data.line1, line2:data.line2, city:data.city, state:data.state, zip:data.zip, country:'IN', phone:data.phone };
-    const create = await fetch('/wp-json/svntex2/v1/payments/create', { method:'POST', headers:{ 'Content-Type':'application/json','X-SVNTeX2-Nonce': publicNonce }, body: JSON.stringify(createBody) });
+            const createBody = { gateway:'razorpay', amount: totals.grand_total, name:data.name, line1:data.line1, line2:data.line2, city:data.city, state:data.state, zip:data.zip, country:'IN', phone:data.phone };
+            const create = await fetch('/wp-json/svntex2/v1/payments/create', { method:'POST', headers:{ 'Content-Type':'application/json','X-SVNTeX2-Nonce': publicNonce }, body: JSON.stringify(createBody) });
             const cj = await create.json(); if(!create.ok){ chkMsg.textContent=(cj.error||'Gateway create failed'); return; }
-    // If Razorpay configured, load its Checkout; else show error
-    if(!cj.key_id){ chkMsg.textContent='Online payment not available'; return; }
-    // Razorpay Checkout SDK must be included on the page in production; simulate without external load here.
-    // Simulate a successful payment for now by computing a matching signature with secret on server only. Instead, after SDK success, post fields as below:
-    const payment = { razorpay_order_id: cj.rzp_order_id, razorpay_payment_id: 'pay_'+Math.random().toString(36).slice(2), razorpay_signature: 'SIMULATED' };
-    const conf = await fetch('/wp-json/svntex2/v1/payments/confirm', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ order_id: cj.order_id, ...payment }) });
-    const ok = await conf.json(); if(conf.ok && ok.ok){ chkMsg.textContent='Payment success. Order #'+cj.order_id; loadCart(); loadOrders(); }
-    else { chkMsg.textContent=(ok && ok.error)||'Payment confirm failed'; }
+            if(!cj.key_id){ chkMsg.textContent='Online payment not available'; return; }
+            // Launch Razorpay Checkout
+            const options = {
+              key: cj.key_id,
+              amount: Math.round(Number(cj.amount||0)*100),
+              currency: cj.currency || 'INR',
+              name: 'SVNTeX',
+              description: 'Order #'+cj.order_id,
+              order_id: cj.rzp_order_id,
+              prefill: { name: data.name||'', email: (me && (me.email||'')) || '', contact: data.phone || '' },
+              notes: { order_id: String(cj.order_id) },
+              handler: async function (resp){
+                chkMsg.textContent='Confirming payment...';
+                try{
+                  const conf = await fetch('/wp-json/svntex2/v1/payments/confirm', { method:'POST', headers:{ 'Content-Type':'application/json','X-SVNTeX2-Nonce': publicNonce }, body: JSON.stringify({ order_id: cj.order_id, razorpay_order_id: resp.razorpay_order_id, razorpay_payment_id: resp.razorpay_payment_id, razorpay_signature: resp.razorpay_signature }) });
+                  const ok = await conf.json();
+                  if(conf.ok && ok && ok.ok){ chkMsg.textContent='Payment success. Order #'+cj.order_id; loadCart(); loadOrders(); }
+                  else { chkMsg.textContent=(ok && (ok.error||ok.message)) || 'Payment confirm failed'; }
+                }catch(e){ chkMsg.textContent='Payment confirm failed'; }
+              },
+              modal: { ondismiss: function(){ chkMsg.textContent='Payment cancelled'; } }
+            };
+            // Handle possible SDK absence
+            if(typeof Razorpay === 'function'){
+              const rz = new Razorpay(options);
+              rz.on && rz.on('payment.failed', function(){ chkMsg.textContent='Payment failed'; });
+              rz.open();
+            } else {
+              chkMsg.textContent = 'Payment SDK not loaded. Please refresh and try again.';
+            }
           }catch(err){ chkMsg.textContent='Payment failed'; }
           return;
         }

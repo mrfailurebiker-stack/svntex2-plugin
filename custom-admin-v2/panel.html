@@ -29,6 +29,7 @@
           <a href="#support">Support</a>
           <a href="#withdrawalsAdmin">Withdrawals</a>
           <a href="#kyc">KYC</a>
+          <a href="#settings">Settings</a>
           <a href="#logout" id="logout">Logout</a>
         </nav>
       </aside>
@@ -45,6 +46,18 @@
             <div class="card" data-goto="#referrals"><div class="title">Referrals</div><div class="kpi" id="kpiReferrals">--</div><div class="desc">Linked entries</div></div>
             <div class="card" data-goto="#withdrawalsAdmin"><div class="title">Withdrawals</div><div class="kpi" id="kpiWd">--</div><div class="desc">Requested</div></div>
             <div class="card" data-goto="#kyc"><div class="title">KYC</div><div class="kpi" id="kpiKyc">--</div><div class="desc">Pending/Total</div></div>
+          </div>
+        </section>
+        <section id="settings" class="section hidden"><h2>Settings</h2>
+          <div class="card" style="max-width:560px">
+            <h3>Payments: Razorpay</h3>
+            <form id="payForm" class="grid">
+              <label>Enabled <select name="enabled"><option value="1">Yes</option><option value="0">No</option></select></label>
+              <label>Key ID <input name="key_id" placeholder="rzp_test_xxx" /></label>
+              <label>Secret <input name="secret" placeholder="*****" /></label>
+              <div><button type="submit">Save</button></div>
+              <div id="payMsg" class="muted"></div>
+            </form>
           </div>
         </section>
         <section id="orders" class="section hidden"><h2>Orders</h2>
@@ -379,9 +392,9 @@
         qs.set('per_page', String(per()));
         qs.set('page', String(prodPage));
         const r = await fetch('/wp-json/svntex2/v1/products'+(qs.toString()?('?'+qs.toString()):''), { credentials:'include', headers });
-        const j = await r.json(); const items = (j && j.items) || []; const total=j.total||0;
+  const j = await r.json(); const items = (j && j.items) || []; const total=j.total||0;
         prodList.innerHTML = items.map(p=>`<div class="list-item"><label style="display:flex;gap:10px;align-items:center"><input type="checkbox" class="sel" value="${p.id}" />${p.thumbnail_url?`<img src="${p.thumbnail_url}" alt="thumb" style="width:48px;height:48px;object-fit:cover;border-radius:6px">`:''}<div><strong>#${p.id}</strong> ${p.title} <div class="meta">SKU ${p.sku||'-'} · ${p.stock_status||'-'} · Qty ${p.stock_qty||0}</div></div></label><div class="grid" style="grid-auto-flow:column;gap:8px;align-items:center"><a href="#" data-edit="${p.id}">Edit</a><a href="#" data-del="${p.id}">Delete</a><a href="#" data-toggle-status="${p.id}" data-st="${p.status==='draft'?'publish':'draft'}">${p.status==='draft'?'Make Active':'Make Draft'}</a><a href="#" data-toggle-stock="${p.id}" data-stock="${p.stock_status==='outofstock'?'instock':'outofstock'}">${p.stock_status==='outofstock'?'Mark In-stock':'Mark Out-of-stock'}</a></div></div>`).join('') || '<div class="muted">No products yet.</div>';
-        const pi=document.getElementById('prodPageInfo'); if(pi){ const pages = Math.max(1, Math.ceil(total/ per())); pi.textContent = `Page ${prodPage} / ${pages}`; }
+  const pi=document.getElementById('prodPageInfo'); if(pi){ const pages = Math.max(1, Math.ceil(total/ per())); pi.textContent = `Page ${prodPage} / ${pages}`; const prev=document.getElementById('prodPrev'); const next=document.getElementById('prodNext'); if(prev) prev.disabled = (prodPage<=1); if(next) next.disabled = (prodPage>=pages); }
       }
       await loadProducts();
       document.getElementById('prodPrev')?.addEventListener('click', (e)=>{ e.preventDefault(); if(prodPage>1){ prodPage--; loadProducts(); } });
@@ -404,7 +417,7 @@
       // Products: list item actions
       prodList.addEventListener('click', async (e)=>{
         const a = e.target.closest('a'); if(!a) return; e.preventDefault();
-        const id = parseInt(a.dataset.edit||a.dataset.del||a.dataset.toggleStatus||a.dataset.toggleStock||'0',10);
+        const id = parseInt(a.getAttribute('data-edit')||a.getAttribute('data-del')||a.getAttribute('data-toggle-status')||a.getAttribute('data-toggle-stock')||'0',10);
         if(!id) return;
         if(a.hasAttribute('data-del')){
           if(!confirm('Delete product #'+id+'?')) return;
@@ -413,12 +426,12 @@
           else toast(j.error||'Delete failed');
           return;
         }
-        if(a.hasAttribute('data-toggleStatus')){
+        if(a.hasAttribute('data-toggle-status')){
           const st = a.getAttribute('data-st')||'publish';
           await fetch('/wp-json/svntex2/v1/products/'+id,{ method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ status: st }) });
           toast('Status updated'); loadProducts(); return;
         }
-        if(a.hasAttribute('data-toggleStock')){
+        if(a.hasAttribute('data-toggle-stock')){
           const sv = a.getAttribute('data-stock')||'instock';
           await fetch('/wp-json/svntex2/v1/products/'+id,{ method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ stock_status: sv }) });
           toast('Stock updated'); loadProducts(); return;
@@ -618,6 +631,26 @@
 
       // Logout
       document.getElementById('logout')?.addEventListener('click', (e)=>{ e.preventDefault(); location.href = '/logout-handler.php'; });
+
+      // Settings: Payments
+      const payForm = document.getElementById('payForm');
+      const payMsg = document.getElementById('payMsg');
+      async function loadPay(){
+        try{
+          const r = await fetch('/wp-json/svntex2/v1/admin/payments/config', { credentials:'include', headers });
+          if(!r.ok) return; const j = await r.json(); const rz=(j && j.razorpay)||{};
+          payForm.enabled.value = (rz.enabled? '1':'0');
+          payForm.key_id.value = rz.key_id || '';
+        }catch(e){}
+      }
+      await loadPay();
+      payForm.addEventListener('submit', async (e)=>{
+        e.preventDefault(); payMsg.textContent='Saving...';
+        const data = Object.fromEntries(new FormData(payForm).entries());
+        const body = { enabled: data.enabled==='1', razorpay: { key_id: data.key_id, secret: data.secret||undefined } };
+        const r = await fetch('/wp-json/svntex2/v1/admin/payments/config', { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify(body) });
+        const j = await r.json(); payMsg.textContent = (r.ok && j && j.ok)? 'Saved' : ((j && (j.error||j.message))||'Failed');
+      });
     </script>
   </body>
 </html>
