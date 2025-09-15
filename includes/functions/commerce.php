@@ -195,9 +195,12 @@ add_action('rest_api_init', function(){
         if ($payment['method'] === 'wallet' && is_user_logged_in()) {
             $totals = svntex2_commerce_cart_totals();
             $uid = get_current_user_id();
-            if ( function_exists('svntex2_wallet_add_transaction') ) {
-                svntex2_wallet_add_transaction($uid, 'order_payment', -1 * (float)$totals['grand_total'], 'checkout:'.uniqid(), [ 'note'=>'Wallet pay' ], 'order_payment' );
-                $payment['captured'] = (float)$totals['grand_total'];
+            $need = (float)$totals['grand_total'];
+            if ( function_exists('svntex2_wallet_get_balance') && function_exists('svntex2_wallet_add_transaction') ) {
+                $bal = (float) svntex2_wallet_get_balance($uid);
+                if ($bal < $need) return new WP_Error('insufficient_wallet','Insufficient wallet balance', ['status'=>400]);
+                svntex2_wallet_add_transaction($uid, 'order_payment', -1 * $need, 'checkout:'.uniqid(), [ 'note'=>'Wallet pay' ], 'order_payment' );
+                $payment['captured'] = $need;
             }
         }
         return svntex2_commerce_checkout($address, $payment);
