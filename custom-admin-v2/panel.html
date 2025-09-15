@@ -291,6 +291,16 @@
     <button id="globalMenuBtn" title="Menu" aria-label="Menu" style="position:fixed;left:12px;top:12px;z-index:9999;display:none;background:#0f172a;border:1px solid #23304d;color:#e5e7eb;border-radius:10px;padding:10px 12px;cursor:pointer">☰</button>
     <script>
     (async function(){
+      // Prime router early so navigation works even if later loads fail/are slow
+      const sectionsPrime = Array.from(document.querySelectorAll('main .section'));
+      const navLinksPrime = Array.from(document.querySelectorAll('aside nav a'));
+      function showPrime(hash){
+        if(!hash) hash = '#dashboard';
+        sectionsPrime.forEach(s=>{ s.classList.toggle('hidden', '#'+s.id !== hash); });
+        navLinksPrime.forEach(a=>{ a.classList.toggle('active', a.getAttribute('href')===hash); });
+      }
+      window.addEventListener('hashchange', ()=>showPrime(location.hash));
+      showPrime(location.hash||'#dashboard');
       async function getRestNonce(){
         const r = await fetch('/wp-admin/admin-ajax.php?action=svntex2_get_rest_nonce', { credentials:'include' });
         try { const j = await r.json(); if(j.success) return j.data.nonce; } catch(e){}
@@ -306,10 +316,12 @@
       }
       const me = await res.json();
       // Users pre-load (for KPI and quick list)
-      const ures = await fetch('/wp-json/wp/v2/users?per_page=10&orderby=registered&order=desc',{ credentials:'include', headers });
-      const users = ures.ok ? await ures.json() : [];
-      const box = document.getElementById('usersBox');
-      box.innerHTML = users.map(u=>`<div>#${u.id} — ${u.name} (${u.email||'-'})</div>`).join('') || 'No users.';
+      try{
+        const ures = await fetch('/wp-json/wp/v2/users?per_page=10&orderby=registered&order=desc',{ credentials:'include', headers });
+        const users = ures.ok ? await ures.json() : [];
+        const box = document.getElementById('usersBox');
+        box.innerHTML = users.map(u=>`<div>#${u.id} — ${u.name} (${u.email||'-'})</div>`).join('') || 'No users.';
+      }catch(e){ /* ignore */ }
 
       // Sidebar + menu button
       const layout = document.getElementById('layout');
@@ -340,7 +352,7 @@
         const items = (j && j.items) || [];
         userList.innerHTML = items.map(u=>`<div><a href="#" data-uid="${u.id}">#${u.id}</a> ${u.username} · ${u.email} · ${u.meta.customer_id||''}</div>`).join('') || 'No users.';
       }
-      await loadUsers('');
+  try{ await loadUsers(''); }catch(e){}
       document.getElementById('userSearch').addEventListener('input', (e)=>{ loadUsers(e.target.value); });
       userList.addEventListener('click', async (e)=>{
         const id = e.target.getAttribute('data-uid'); if(!id) return; e.preventDefault(); um('');
@@ -396,7 +408,7 @@
         prodList.innerHTML = items.map(p=>`<div class="list-item"><label style="display:flex;gap:10px;align-items:center"><input type="checkbox" class="sel" value="${p.id}" />${p.thumbnail_url?`<img src="${p.thumbnail_url}" alt="thumb" style="width:48px;height:48px;object-fit:cover;border-radius:6px">`:''}<div><strong>#${p.id}</strong> ${p.title} <div class="meta">SKU ${p.sku||'-'} · ${p.stock_status||'-'} · Qty ${p.stock_qty||0}</div></div></label><div class="grid" style="grid-auto-flow:column;gap:8px;align-items:center"><a href="#" data-edit="${p.id}">Edit</a><a href="#" data-del="${p.id}">Delete</a><a href="#" data-toggle-status="${p.id}" data-st="${p.status==='draft'?'publish':'draft'}">${p.status==='draft'?'Make Active':'Make Draft'}</a><a href="#" data-toggle-stock="${p.id}" data-stock="${p.stock_status==='outofstock'?'instock':'outofstock'}">${p.stock_status==='outofstock'?'Mark In-stock':'Mark Out-of-stock'}</a></div></div>`).join('') || '<div class="muted">No products yet.</div>';
   const pi=document.getElementById('prodPageInfo'); if(pi){ const pages = Math.max(1, Math.ceil(total/ per())); pi.textContent = `Page ${prodPage} / ${pages}`; const prev=document.getElementById('prodPrev'); const next=document.getElementById('prodNext'); if(prev) prev.disabled = (prodPage<=1); if(next) next.disabled = (prodPage>=pages); }
       }
-      await loadProducts();
+  try{ await loadProducts(); }catch(e){}
       document.getElementById('prodPrev')?.addEventListener('click', (e)=>{ e.preventDefault(); if(prodPage>1){ prodPage--; loadProducts(); } });
       document.getElementById('prodNext')?.addEventListener('click', (e)=>{ e.preventDefault(); prodPage++; loadProducts(); });
       document.getElementById('prodPer')?.addEventListener('change', ()=>{ prodPage=1; loadProducts(); });
@@ -477,7 +489,7 @@
           const r = await fetch('/wp-json/svntex2/v1/vendors',{credentials:'include',headers}); if(r.ok){ const j=await r.json(); const vs=document.getElementById('vendorSelect'); vs.innerHTML='<option value="">— None —</option>'+ (Array.isArray(j.items)?j.items.map(v=>`<option value="${v.id}">${v.name}</option>`).join(''):'' ); }
         }catch(e){ /* ignore */ }
       }
-      await loadSelects();
+  try{ await loadSelects(); }catch(e){}
 
       // Media upload helper
       async function uploadMedia(file){
