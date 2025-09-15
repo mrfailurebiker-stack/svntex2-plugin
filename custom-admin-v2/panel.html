@@ -300,6 +300,15 @@
         navLinksPrime.forEach(a=>{ a.classList.toggle('active', a.getAttribute('href')===hash); });
       }
       window.addEventListener('hashchange', ()=>showPrime(location.hash));
+      // Also bind direct click to ensure immediate switch even if hashchange is suppressed
+      Array.from(document.querySelectorAll('aside nav a')).forEach(a=>{
+        a.addEventListener('click', (e)=>{
+          const h = a.getAttribute('href');
+          if(h && h.startsWith('#') && h !== '#logout'){
+            e.preventDefault(); showPrime(h); if(location.hash !== h){ location.hash = h; }
+          }
+        });
+      });
       showPrime(location.hash||'#dashboard');
       async function getRestNonce(){
         const r = await fetch('/wp-admin/admin-ajax.php?action=svntex2_get_rest_nonce', { credentials:'include' });
@@ -349,7 +358,7 @@
         userList.textContent='Loading...';
         const r = await fetch('/wp-json/svntex2/v1/users?per_page=20&search='+encodeURIComponent(q), { credentials:'include', headers });
         const j = await r.json();
-        const items = (j && j.items) || [];
+  const items = (j && j.items) || [];
         userList.innerHTML = items.map(u=>`<div><a href="#" data-uid="${u.id}">#${u.id}</a> ${u.username} · ${u.email} · ${u.meta.customer_id||''}</div>`).join('') || 'No users.';
       }
   try{ await loadUsers(''); }catch(e){}
@@ -426,7 +435,7 @@
         const simple = { ...updates }; delete simple.discount_price_delta; if(Object.keys(simple).length){ const r=await fetch('/wp-json/svntex2/v1/products/bulk-update',{method:'POST',credentials:'include',headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ ids, updates: simple })}); const j=await r.json(); toast(j.updated?('Updated '+j.updated):'No updates'); }
         loadProducts();
       });
-      // Products: list item actions
+  // Products: list item actions
       prodList.addEventListener('click', async (e)=>{
         const a = e.target.closest('a'); if(!a) return; e.preventDefault();
         const id = parseInt(a.getAttribute('data-edit')||a.getAttribute('data-del')||a.getAttribute('data-toggle-status')||a.getAttribute('data-toggle-stock')||'0',10);
@@ -635,14 +644,14 @@
       });
 
       // Support
-      document.getElementById('supLoad')?.addEventListener('click', async ()=>{ const r=await fetch('/wp-json/svntex2/v1/admin/support',{credentials:'include',headers}); const j=await r.json(); const box=document.getElementById('supList'); const items=(j&&j.items)||[]; box.innerHTML = items.length? items.map(t=>`<div class="list-item">U${t.user_id}: <strong>${t.subject}</strong><br>${t.message}<div class="muted">${t.ts}</div></div>`).join('') : 'No tickets.'; });
-      document.getElementById('supClear')?.addEventListener('click', async ()=>{ if(!confirm('Clear all tickets?')) return; await fetch('/wp-json/svntex2/v1/admin/support/clear',{method:'POST',credentials:'include',headers}); toast('Cleared'); document.getElementById('supList').textContent='No tickets.'; });
+  var supLoad=document.getElementById('supLoad'); if(supLoad){ supLoad.addEventListener('click', async ()=>{ const r=await fetch('/wp-json/svntex2/v1/admin/support',{credentials:'include',headers}); const j=await r.json(); const box=document.getElementById('supList'); const items=(j&&j.items)||[]; box.innerHTML = items.length? items.map(t=>`<div class="list-item">U${t.user_id}: <strong>${t.subject}</strong><br>${t.message}<div class="muted">${t.ts}</div></div>`).join('') : 'No tickets.'; }); }
+  var supClear=document.getElementById('supClear'); if(supClear){ supClear.addEventListener('click', async ()=>{ if(!confirm('Clear all tickets?')) return; await fetch('/wp-json/svntex2/v1/admin/support/clear',{method:'POST',credentials:'include',headers}); toast('Cleared'); document.getElementById('supList').textContent='No tickets.'; }); }
 
       // KYC
       document.getElementById('kycLoad')?.addEventListener('click', async ()=>{ const r=await fetch('/wp-json/svntex2/v1/kyc',{credentials:'include',headers}); const j=await r.json(); const box=document.getElementById('kycList'); const items=(j&&j.items)||[]; box.innerHTML = items.length? items.map(k=>`<div class="list-item">#${k.id} · U${k.user_id} · ${k.status} · ${k.created_at||''}</div>`).join('') : 'No submissions.'; });
 
       // Logout
-      document.getElementById('logout')?.addEventListener('click', (e)=>{ e.preventDefault(); location.href = '/logout-handler.php'; });
+  var logoutEl=document.getElementById('logout'); if(logoutEl){ logoutEl.addEventListener('click', (e)=>{ e.preventDefault(); location.href = '/logout-handler.php'; }); }
 
       // Settings: Payments
       const payForm = document.getElementById('payForm');
@@ -655,8 +664,8 @@
           payForm.key_id.value = rz.key_id || '';
         }catch(e){}
       }
-      await loadPay();
-      payForm.addEventListener('submit', async (e)=>{
+  await loadPay();
+  payForm.addEventListener('submit', async (e)=>{
         e.preventDefault(); payMsg.textContent='Saving...';
         const data = Object.fromEntries(new FormData(payForm).entries());
         const body = { enabled: data.enabled==='1', razorpay: { key_id: data.key_id, secret: data.secret||undefined } };

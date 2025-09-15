@@ -165,12 +165,12 @@
     async function loadCatalog(){
         try{
           const qs = new URLSearchParams();
-          const s=document.getElementById('prodSearch')?.value; if(s) qs.set('search', s);
-          const c=document.getElementById('prodCat')?.value; if(c) qs.set('category', c);
-          const a=document.getElementById('prodAvail')?.value; if(a) qs.set('availability', a);
-          const sort=document.getElementById('prodSort')?.value; if(sort) qs.set('sort', sort);
-      const minp=document.getElementById('minPrice')?.value; if(minp) qs.set('min_price', minp);
-      const maxp=document.getElementById('maxPrice')?.value; if(maxp) qs.set('max_price', maxp);
+      var _sEl=document.getElementById('prodSearch'); const s=_sEl&&_sEl.value; if(s) qs.set('search', s);
+      var _cEl=document.getElementById('prodCat'); const c=_cEl&&_cEl.value; if(c) qs.set('category', c);
+      var _aEl=document.getElementById('prodAvail'); const a=_aEl&&_aEl.value; if(a) qs.set('availability', a);
+      var _sortEl=document.getElementById('prodSort'); const sort=_sortEl&&_sortEl.value; if(sort) qs.set('sort', sort);
+    var _minEl=document.getElementById('minPrice'); const minp=_minEl&&_minEl.value; if(minp) qs.set('min_price', minp);
+    var _maxEl=document.getElementById('maxPrice'); const maxp=_maxEl&&_maxEl.value; if(maxp) qs.set('max_price', maxp);
       qs.set('per_page', String(per)); qs.set('page', String(cPage));
       const r = await fetch('/wp-json/svntex2/v1/catalog'+(qs.toString()?('?'+qs.toString()):''));
       const j = await r.json(); const items = j.items||[]; const total=j.total||0; const grid = document.getElementById('prodGrid');
@@ -184,9 +184,9 @@
       try{
         const r=await fetch('/wp-json/wp/v2/svntex_category?per_page=100'); const cats=r.ok?await r.json():[]; const sel=document.getElementById('prodCat'); if(sel){ sel.innerHTML = '<option value="">All</option>'+cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join(''); }
       }catch(e){}
-  document.getElementById('prodApply')?.addEventListener('click', (e)=>{ e.preventDefault(); cPage=1; loadCatalog(); });
-  document.getElementById('prodPrev')?.addEventListener('click', (e)=>{ e.preventDefault(); if(cPage>1){ cPage--; loadCatalog(); }});
-  document.getElementById('prodNext')?.addEventListener('click', (e)=>{ e.preventDefault(); cPage++; loadCatalog(); });
+  var _apply=document.getElementById('prodApply'); if(_apply){ _apply.addEventListener('click', (e)=>{ e.preventDefault(); cPage=1; loadCatalog(); }); }
+  var _prev=document.getElementById('prodPrev'); if(_prev){ _prev.addEventListener('click', (e)=>{ e.preventDefault(); if(cPage>1){ cPage--; loadCatalog(); }}); }
+  var _next=document.getElementById('prodNext'); if(_next){ _next.addEventListener('click', (e)=>{ e.preventDefault(); cPage++; loadCatalog(); }); }
 
       // Cart
       let publicNonce='';
