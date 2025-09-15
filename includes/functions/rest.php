@@ -50,7 +50,7 @@ add_action('rest_api_init', function(){
         'permission_callback' => function(){ return is_user_logged_in(); },
         'callback' => function( WP_REST_Request $r ){
             global $wpdb; $orders=$wpdb->prefix.'svntex_orders'; $uid=get_current_user_id();
-            $limit = min( (int)($r->get_param('per_page') ?: 20), 100 );
+            $pp = $r->get_param('per_page'); $limit = min( (int)($pp ? $pp : 20), 100 );
             $rows = $wpdb->get_results( $wpdb->prepare("SELECT id,status,grand_total,created_at FROM $orders WHERE user_id=%d ORDER BY id DESC LIMIT %d", $uid, $limit), ARRAY_A );
             return [ 'items' => $rows ?: [] ];
         }
@@ -81,10 +81,10 @@ add_action('rest_api_init', function(){
         'callback' => function( WP_REST_Request $r ){
             global $wpdb; $t = $wpdb->prefix.'svntex_wallet_transactions';
             $uid = (int) $r->get_param('user_id');
-            $limit = min( (int) ($r->get_param('per_page') ?: 50), 200 );
+            $pp = $r->get_param('per_page'); $limit = min( (int) ($pp ? $pp : 50), 200 );
             $rows = $uid ? $wpdb->get_results( $wpdb->prepare("SELECT * FROM $t WHERE user_id=%d ORDER BY id DESC LIMIT %d", $uid, $limit), ARRAY_A )
                          : $wpdb->get_results( $wpdb->prepare("SELECT * FROM $t ORDER BY id DESC LIMIT %d", $limit), ARRAY_A );
-            return [ 'items' => $rows ?: [] ];
+            return [ 'items' => ($rows ? $rows : []) ];
         }
     ]);
 
@@ -102,7 +102,7 @@ add_action('rest_api_init', function(){
             $uid = (int) $r->get_param('referrer_id');
             $rows = $uid ? $wpdb->get_results( $wpdb->prepare("SELECT * FROM $t WHERE referrer_id=%d ORDER BY id DESC", $uid), ARRAY_A )
                          : $wpdb->get_results( "SELECT * FROM $t ORDER BY id DESC LIMIT 200", ARRAY_A );
-            return [ 'items' => $rows ?: [] ];
+            return [ 'items' => ($rows ? $rows : []) ];
         }
     ]);
     // Referrals for current member
@@ -111,7 +111,8 @@ add_action('rest_api_init', function(){
         'callback' => function(){
             global $wpdb; $t = $wpdb->prefix.'svntex_referrals'; $uid = get_current_user_id();
             $rows = $wpdb->get_results( $wpdb->prepare("SELECT referee_id, qualified, created_at FROM $t WHERE referrer_id=%d ORDER BY id DESC LIMIT 100", $uid), ARRAY_A );
-            $code = get_user_meta($uid,'customer_id', true) ?: ('SVN'.str_pad((string)$uid,6,'0',STR_PAD_LEFT));
+            $cid_meta = get_user_meta($uid,'customer_id', true);
+            $code = $cid_meta ? $cid_meta : ('SVN'.str_pad((string)$uid,6,'0',STR_PAD_LEFT));
             return [ 'code' => $code, 'items' => array_map(function($r){ return [ 'referee_id'=>(int)$r['referee_id'], 'qualified'=> (bool)$r['qualified'], 'created_at'=>$r['created_at'] ]; }, $rows ?: []) ];
         }
     ]);
@@ -140,7 +141,7 @@ add_action('rest_api_init', function(){
         'callback' => function(){
             global $wpdb; $t=$wpdb->prefix.'svntex_kyc_submissions';
             $rows = $wpdb->get_results("SELECT id,user_id,status,created_at,updated_at FROM $t ORDER BY id DESC LIMIT 200", ARRAY_A);
-            return [ 'items' => $rows ?: [] ];
+            return [ 'items' => ($rows ? $rows : []) ];
         }
     ]);
     // KYC (member): status and submit
@@ -177,7 +178,9 @@ add_action('rest_api_init', function(){
     register_rest_route('svntex2/v1','/withdrawals/request', [
         'methods' => 'POST','permission_callback' => function(){ return is_user_logged_in(); },
         'callback' => function( WP_REST_Request $r ){
-            $amt = (float)$r->get_param('amount'); $method = sanitize_text_field( $r->get_param('method') ?: 'bank' ); $dest = sanitize_text_field( $r->get_param('destination') ?: '' );
+            $amt = (float)$r->get_param('amount');
+            $method = sanitize_text_field( $r->get_param('method') ? $r->get_param('method') : 'bank' );
+            $dest = sanitize_text_field( $r->get_param('destination') ? $r->get_param('destination') : '' );
             if ( $amt <= 0 ) return new WP_REST_Response(['error'=>'Invalid amount'],400);
             if ( ! function_exists('svntex2_withdraw_request') ) return new WP_REST_Response(['error'=>'Withdrawals not enabled'],400);
             $res = svntex2_withdraw_request( get_current_user_id(), $amt, $method, $dest );
@@ -194,7 +197,7 @@ add_action('rest_api_init', function(){
             $msg = sanitize_textarea_field($r->get_param('message'));
             if(!$sub || !$msg) return new WP_REST_Response(['error'=>'subject and message required'],400);
             $uid = get_current_user_id();
-            $log = get_option('svntex2_support_log') ?: [];
+            $log = get_option('svntex2_support_log'); if(!is_array($log)) $log = [];
             $log[] = [ 'user_id'=>$uid, 'subject'=>$sub, 'message'=>$msg, 'ts'=>current_time('mysql') ];
             update_option('svntex2_support_log', $log, false);
             return [ 'ok'=>true ];
@@ -217,8 +220,8 @@ add_action('rest_api_init', function(){
             'callback' => function( WP_REST_Request $r ){
                 $q = new WP_Query([
                     'post_type' => 'svntex_product',
-                    'posts_per_page' => (int) ($r->get_param('per_page') ?: 20),
-                    'paged' => (int) ($r->get_param('page') ?: 1),
+                    'posts_per_page' => (int) ($r->get_param('per_page') ? $r->get_param('per_page') : 20),
+                    'paged' => (int) ($r->get_param('page') ? $r->get_param('page') : 1),
                     's' => (string) $r->get_param('search'),
                 ]);
                 $items = [];
@@ -286,7 +289,7 @@ add_action('rest_api_init', function(){
                 $slug = sanitize_title($r->get_param('slug'));
                 $pid = wp_insert_post([
                     'post_type' => 'svntex_product', 'post_title' => $title, 'post_content' => $content,
-                    'post_status' => $post_status, 'post_name' => $slug ?: null,
+                    'post_status' => $post_status, 'post_name' => ($slug ? $slug : null),
                 ]);
                 if(is_wp_error($pid)) return new WP_REST_Response(['error'=>$pid->get_error_message()],500);
                 $vendor_id = (int) $r->get_param('vendor_id'); if($vendor_id) update_post_meta($pid,'vendor_id',$vendor_id);
@@ -321,8 +324,8 @@ add_action('rest_api_init', function(){
         'callback' => function( WP_REST_Request $r ){
             $q = new WP_Query([
                 'post_type' => 'svntex_product',
-                'posts_per_page' => (int) ($r->get_param('per_page') ?: 12),
-                'paged' => (int) ($r->get_param('page') ?: 1),
+                'posts_per_page' => (int) ($r->get_param('per_page') ? $r->get_param('per_page') : 12),
+                'paged' => (int) ($r->get_param('page') ? $r->get_param('page') : 1),
                 's' => (string) $r->get_param('search'),
                 'post_status' => 'publish',
             ]);
@@ -333,7 +336,7 @@ add_action('rest_api_init', function(){
                 $items[] = [
                     'id' => $p->ID,
                     'title' => get_the_title($p),
-                    'price' => (float) get_post_meta($p->ID,'discount_price', true) ?: (float) get_post_meta($p->ID,'base_price', true),
+                    'price' => ((float) get_post_meta($p->ID,'discount_price', true)) ?: ((float) get_post_meta($p->ID,'base_price', true)),
                     'mrp' => (float) get_post_meta($p->ID,'mrp', true),
                     'tax_percent' => (float) get_post_meta($p->ID,'tax_percent', true),
                     'thumbnail_url' => $thumb_url,
@@ -355,13 +358,17 @@ add_action('rest_api_init', function(){
             }
             // Featured image and gallery
             $thumb_id = (int) get_post_thumbnail_id($p->ID);
-            $thumb_url = $thumb_id ? wp_get_attachment_image_url($p->ID, 'large') : '';
+            $thumb_url = $thumb_id ? wp_get_attachment_image_url($thumb_id, 'large') : '';
             $gallery_ids = (array) get_post_meta($p->ID,'gallery', true);
             $gallery_urls = array_values( array_filter( array_map(function($aid){ $aid=(int)$aid; return $aid? wp_get_attachment_image_url($aid,'large') : ''; }, $gallery_ids) ) );
             // Derive min/max price from variants table
             $vt = $wpdb->prefix.'svntex_product_variants';
             $range = $wpdb->get_row( $wpdb->prepare("SELECT MIN(price) as min_p, MAX(price) as max_p FROM $vt WHERE product_id=%d AND active=1 AND price IS NOT NULL", $p->ID) );
-            $min_price = $range && $range->min_p !== null ? (float)$range->min_p : (float) get_post_meta($p->ID,'discount_price', true) ?: (float) get_post_meta($p->ID,'base_price', true);
+            // Avoid nested ternary with elvis operator (PHP 7.4+/8 fatal without parentheses)
+            $disc_p = (float) get_post_meta($p->ID,'discount_price', true);
+            $base_p = (float) get_post_meta($p->ID,'base_price', true);
+            $fallback_price = $disc_p ?: $base_p;
+            $min_price = ($range && $range->min_p !== null) ? (float)$range->min_p : $fallback_price;
             $max_price = $range && $range->max_p !== null ? (float)$range->max_p : $min_price;
             // Shallow content and tax/mrp for display
             $excerpt = has_excerpt($p) ? wp_strip_all_tags(get_the_excerpt($p)) : wp_trim_words( wp_strip_all_tags( $p->post_content ), 40, '…' );
@@ -489,8 +496,8 @@ add_action('rest_api_init', function(){
             $imported=0; foreach($lines as $line){ if(!trim($line)) continue; $cols = str_getcsv($line);
                 list($id,$title,$sku,$base,$disc,$tax,$qty,$sstatus,$status) = array_pad($cols,9,null);
                 $title = trim($title,'"');
-                if($id){ wp_update_post([ 'ID'=>(int)$id, 'post_title'=>$title, 'post_status'=> $status?:'publish' ]); }
-                else { $id = wp_insert_post([ 'post_type'=>'svntex_product','post_title'=>$title,'post_status'=>$status?:'publish' ]); }
+                if($id){ wp_update_post([ 'ID'=>(int)$id, 'post_title'=>$title, 'post_status'=> ($status ? $status : 'publish') ]); }
+                else { $id = wp_insert_post([ 'post_type'=>'svntex_product','post_title'=>$title,'post_status'=> ($status ? $status : 'publish') ]); }
                 update_post_meta($id,'sku', sanitize_text_field($sku));
                 update_post_meta($id,'base_price', (float)$base);
                 update_post_meta($id,'discount_price', (float)$disc);
