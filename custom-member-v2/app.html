@@ -166,8 +166,38 @@
           const lines = (j && j.lines)||[];
           const wrap = document.getElementById('cartWrap');
           if(!lines.length){ wrap.textContent='Your cart is empty.'; return; }
-          wrap.innerHTML = lines.map(x=>`<div class="list-item"><div>Product ${x.product_id} · Qty ${x.qty}</div><div class="meta">₹${x.subtotal.toFixed(2)} + Delivery ₹${x.delivery.toFixed(2)}</div></div>`).join('') +
+          wrap.innerHTML = lines.map(x=>`<div class="list-item" data-pid="${x.product_id}" data-vid="${x.variant_id||0}">
+              <div>Product ${x.product_id}${x.variant_id?(' · Var '+x.variant_id):''}
+                <span class="muted" style="margin-left:6px">Qty</span>
+                <input type="number" class="qty" min="1" value="${x.qty}" style="width:70px;margin-left:6px" />
+                <button class="uBtn secondary" style="margin-left:6px;padding:.25rem .5rem">Update</button>
+                <button class="rBtn danger" style="margin-left:6px;padding:.25rem .5rem">Remove</button>
+              </div>
+              <div class="meta">₹${x.subtotal.toFixed(2)} + Delivery ₹${x.delivery.toFixed(2)}</div>
+            </div>`).join('') +
             `<div class="list-item"><strong>Total</strong><div class="meta">Items ₹${(j.items_total||0).toFixed(2)} · Delivery ₹${(j.delivery_total||0).toFixed(2)} · Grand ₹${(j.grand_total||0).toFixed(2)}</div></div>`;
+          // Bind actions
+          wrap.querySelectorAll('.uBtn').forEach(btn=>{
+            btn.addEventListener('click', async ()=>{
+              const row = btn.closest('.list-item'); const pid = row.getAttribute('data-pid'); const vid = row.getAttribute('data-vid');
+              const qty = Math.max(1, parseInt(row.querySelector('input.qty').value||'1',10));
+              btn.disabled=true; try{
+                const r = await fetch('/wp-json/svntex2/v1/cart/update', { method:'POST', headers:{ 'Content-Type':'application/json','X-SVNTeX2-Nonce': publicNonce }, body: JSON.stringify({ product_id:pid, variant_id:vid, qty }) });
+                await r.json();
+                loadCart();
+              } finally { btn.disabled=false; }
+            });
+          });
+          wrap.querySelectorAll('.rBtn').forEach(btn=>{
+            btn.addEventListener('click', async ()=>{
+              const row = btn.closest('.list-item'); const pid = row.getAttribute('data-pid'); const vid = row.getAttribute('data-vid');
+              btn.disabled=true; try{
+                const r = await fetch('/wp-json/svntex2/v1/cart/remove', { method:'POST', headers:{ 'Content-Type':'application/json','X-SVNTeX2-Nonce': publicNonce }, body: JSON.stringify({ product_id:pid, variant_id:vid }) });
+                await r.json();
+                loadCart();
+              } finally { btn.disabled=false; }
+            });
+          });
         }catch(e){ document.getElementById('cartWrap').textContent='Failed to load'; }
       }
       const chkMsg = document.getElementById('chkMsg');
@@ -254,7 +284,12 @@
       // Withdrawals
       const wdMsg = document.getElementById('wdMsg');
       async function loadWd(){
-        try{ const r=await fetch('/wp-json/svntex2/v1/withdrawals', { credentials:'include', headers }); const j=await r.json(); const items=(j&&j.items)||[]; document.getElementById('wdList').innerHTML = items.map(w=>`<div class="list-item"><div>#${w.id} · ${w.status}</div><div class="meta">₹${(w.amount||0).toFixed(2)}${w.net_amount?(' · Net ₹'+Number(w.net_amount).toFixed(2)):'')}</div></div>`).join('') || 'No withdrawals yet.'; }catch(e){ document.getElementById('wdList').textContent='Failed to load'; }
+        try{
+          const r=await fetch('/wp-json/svntex2/v1/withdrawals', { credentials:'include', headers });
+          const j=await r.json();
+          const items=(j&&j.items)||[];
+          document.getElementById('wdList').innerHTML = items.map(w=>`<div class="list-item"><div>#${w.id} · ${w.status}</div><div class="meta">₹${(w.amount||0).toFixed(2)}${w.net_amount?(' · Net ₹'+Number(w.net_amount).toFixed(2)):''}</div></div>`).join('') || 'No withdrawals yet.';
+        }catch(e){ document.getElementById('wdList').textContent='Failed to load'; }
       }
       document.getElementById('wdForm').addEventListener('submit', async (e)=>{
         e.preventDefault(); wdMsg.textContent='Requesting…';

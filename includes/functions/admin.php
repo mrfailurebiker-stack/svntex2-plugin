@@ -25,7 +25,8 @@ function svntex2_admin_root(){
         'overview' => 'Overview',
         'products' => 'Products', // New Products Tab
 		'users' => 'Users',
-        'referrals' => 'Referrals',
+    'referrals' => 'Referrals',
+    'reviews' => 'Reviews',
         'kyc' => 'KYC',
         'withdrawals' => 'Withdrawals',
         'distributions' => 'Profit Distributions',
@@ -69,6 +70,7 @@ function svntex2_admin_root(){
         case 'withdrawals': svntex2_admin_withdrawals(); break;
     case 'distributions': svntex2_admin_distributions(); break;
     case 'reports': svntex2_admin_reports(); break;
+    case 'reviews': svntex2_admin_reviews(); break;
     case 'settings': svntex2_admin_settings(); break;
     case 'users': svntex2_admin_users(); break;
         default: svntex2_admin_overview($counts); break;
@@ -306,6 +308,68 @@ function svntex2_admin_withdrawals(){
                 $r->id,$r->user_id, number_format_i18n($r->amount,2), $r->status==='approved'?'ok':($r->status==='rejected'?'bad':'pending'), ucfirst($r->status), esc_html($r->method ?: '-'), esc_html($r->destination ?: '-'), esc_html($r->requested_at), esc_html($r->processed_at ?: '-'), $actions);
         }
     } else { echo '<tr><td colspan="9">No withdrawals.</td></tr>'; }
+    echo '</tbody></table>';
+}
+
+/** Reviews moderation for product comments */
+function svntex2_admin_reviews(){
+    if ( ! current_user_can('manage_options') ) return;
+    global $wpdb;
+    $pref = $wpdb->prefix;
+    // Handle actions
+    if( isset($_POST['svntex2_review_action']) && check_admin_referer('svntex2_review_action','svntex2_review_nonce') ){
+        $cid = (int)($_POST['comment_id'] ?? 0);
+        $act = sanitize_key($_POST['svntex2_review_action']);
+        if($cid && in_array($act,['approve','spam','trash','unspam','restore'],true)){
+            switch($act){
+                case 'approve': wp_set_comment_status($cid, 'approve'); break;
+                case 'spam': wp_spam_comment($cid); break;
+                case 'unspam': wp_unspam_comment($cid); break;
+                case 'trash': wp_trash_comment($cid); break;
+                case 'restore': wp_untrash_comment($cid); break;
+            }
+            echo '<div class="updated notice"><p>Review updated.</p></div>';
+        }
+    }
+    // Fetch latest product comments (reviews)
+    $sql = "SELECT c.comment_ID,c.comment_post_ID,c.comment_author,c.comment_author_email,c.comment_date,c.comment_content,c.comment_approved,p.post_title
+            FROM {$pref}comments c INNER JOIN {$pref}posts p ON p.ID=c.comment_post_ID
+            WHERE p.post_type='svntex_product' AND c.comment_type='' 
+            ORDER BY c.comment_ID DESC LIMIT 100";
+    $rows = $wpdb->get_results($sql);
+    echo '<h2>Reviews</h2>';
+    echo '<table class="widefat striped svntex2-table"><thead><tr><th>ID</th><th>Product</th><th>Author</th><th>Date</th><th>Content</th><th>Status</th><th>Action</th></tr></thead><tbody>';
+    if($rows){
+        foreach($rows as $r){
+            $status = $r->comment_approved=='1' ? 'approved' : ($r->comment_approved==='spam' ? 'spam' : ($r->comment_approved==='trash'?'trash':'pending'));
+            $actions = '<form method="post" style="display:inline">'.wp_nonce_field('svntex2_review_action','svntex2_review_nonce',true,false).'<input type="hidden" name="comment_id" value="'.(int)$r->comment_ID.'" />';
+            if($status==='approved'){
+                $actions .= '<button class="button button-small" name="svntex2_review_action" value="spam">Mark Spam</button> ';
+                $actions .= '<button class="button button-small" name="svntex2_review_action" value="trash">Trash</button>';
+            } elseif($status==='pending'){
+                $actions .= '<button class="button button-small" name="svntex2_review_action" value="approve">Approve</button> ';
+                $actions .= '<button class="button button-small" name="svntex2_review_action" value="spam">Spam</button> ';
+                $actions .= '<button class="button button-small" name="svntex2_review_action" value="trash">Trash</button>';
+            } elseif($status==='spam'){
+                $actions .= '<button class="button button-small" name="svntex2_review_action" value="unspam">Not Spam</button>';
+            } elseif($status==='trash'){
+                $actions .= '<button class="button button-small" name="svntex2_review_action" value="restore">Restore</button>';
+            }
+            $actions .= '</form>';
+            $purl = get_edit_post_link($r->comment_post_ID);
+            printf('<tr><td>%d</td><td><a href="%s">%s</a></td><td>%s<br/><span class="description">%s</span></td><td>%s</td><td style="max-width:420px">%s</td><td>%s</td><td>%s</td></tr>',
+                $r->comment_ID,
+                esc_url($purl),
+                esc_html($r->post_title),
+                esc_html($r->comment_author ?: '—'),
+                esc_html($r->comment_author_email ?: ''),
+                esc_html(mysql2date('Y-m-d H:i', $r->comment_date)),
+                esc_html(wp_trim_words($r->comment_content, 24, '…')),
+                esc_html(ucfirst($status)),
+                $actions
+            );
+        }
+    } else { echo '<tr><td colspan="7">No reviews.</td></tr>'; }
     echo '</tbody></table>';
 }
 
