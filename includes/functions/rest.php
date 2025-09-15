@@ -64,6 +64,8 @@ add_action('rest_api_init', function(){
             $cat = (int) $r->get_param('category');
             $availability = sanitize_key($r->get_param('availability') ?: ''); // instock|outofstock
             $sort = sanitize_key($r->get_param('sort') ?: 'date'); // price_asc|price_desc|title|date
+            $minp = $r->get_param('min_price'); $maxp = $r->get_param('max_price');
+
             $args = [
                 'post_type' => 'svntex_product',
                 'posts_per_page' => $per_page,
@@ -71,28 +73,44 @@ add_action('rest_api_init', function(){
                 's' => $search,
                 'post_status' => 'publish',
             ];
+            $meta_query = [];
+            if ($availability) { $meta_query[] = [ 'key'=>'stock_status', 'value'=>$availability ]; }
+            // Price filter on discount_price (fallback base_price handled after fetch)
+            if ($minp !== null) { $meta_query[] = [ 'key'=>'discount_price', 'value'=>(float)$minp, 'compare'=>'>=', 'type'=>'NUMERIC' ]; }
+            if ($maxp !== null) { $meta_query[] = [ 'key'=>'discount_price', 'value'=>(float)$maxp, 'compare'=>'<=', 'type'=>'NUMERIC' ]; }
+            if (!empty($meta_query)) $args['meta_query'] = [ 'relation'=>'AND', ...$meta_query ];
             if ($cat) { $args['tax_query'] = [ [ 'taxonomy'=>'svntex_category','field'=>'term_id','terms'=>[$cat] ] ]; }
-            if ($availability) { $args['meta_query'] = [ [ 'key'=>'stock_status', 'value'=>$availability ] ]; }
             if ($sort === 'title') { $args['orderby']='title'; $args['order']='ASC'; }
             elseif ($sort === 'date') { $args['orderby']='date'; $args['order']='DESC'; }
-            // price sort needs filtering after query since price is meta or variants; approximate by discount/base price meta
+
             $q = new WP_Query($args);
-            $rl_key = 'svntex2_topup_rl_'.$uid; $bucket = get_transient($rl_key); if(!is_array($bucket)) $bucket=[];
-            $now = time(); $bucket = array_filter($bucket, function($ts) use ($now){ return ($now - $ts) < HOUR_IN_SECONDS; });
-            if( count($bucket) >= 10 ) return new WP_REST_Response( [ 'error' => 'Too many top-ups, try later' ], 429 );
-            $allow = apply_filters('svntex2_wallet_topup_allowed', true, $uid, $amount );
-            if( ! $allow ) return new WP_REST_Response( [ 'error' => 'Top-up not allowed' ], 403 );
-            $balance = svntex2_wallet_add_transaction( $uid, 'wallet_topup', $amount, 'topup:'.uniqid(), [ 'source'=>'dashboard_rest' ], 'topup' );
-            $bucket[] = $now; set_transient($rl_key, $bucket, HOUR_IN_SECONDS );
-            return [ 'ok'=> true, 'balance' => $balance, 'amount' => $amount, 'display' => function_exists('wc_price') ? wc_price($balance) : number_format($balance,2) ];
+            $items = [];
+            while($q->have_posts()){ $q->the_post(); $p = get_post();
+                $thumb_id = (int) get_post_thumbnail_id($p->ID);
+                $thumb_url = $thumb_id ? wp_get_attachment_image_url($thumb_id, 'medium') : '';
+                $disc = (float) get_post_meta($p->ID,'discount_price', true);
+                $base = (float) get_post_meta($p->ID,'base_price', true);
+                $price = $disc ?: $base;
+                $items[] = [
+                    'id' => $p->ID,
+                    'title' => get_the_title($p),
+                    'price' => $price,
+                    'mrp' => (float) get_post_meta($p->ID,'mrp', true),
+                    'tax_percent' => (float) get_post_meta($p->ID,'tax_percent', true),
+                    'thumbnail_url' => $thumb_url,
+                ];
+            }
+            wp_reset_postdata();
+            // Client-side price sort
+            if ($sort === 'price_asc') { usort($items, function($a,$b){ return ($a['price']<=>$b['price']); }); }
+            elseif ($sort === 'price_desc') { usort($items, function($a,$b){ return ($b['price']<=>$a['price']); }); }
+            return [ 'items' => $items, 'total' => (int)$q->found_posts ];
         }
     ]);
     register_rest_route('svntex2/v1','/wallet/transactions', [
         'methods' => 'GET',
         'permission_callback' => 'svntex2_api_can_manage',
         'callback' => function( WP_REST_Request $r ){
-            if ($sort === 'price_asc') { usort($items, function($a,$b){ return ($a['price']<=>$b['price']); }); }
-            elseif ($sort === 'price_desc') { usort($items, function($a,$b){ return ($b['price']<=>$a['price']); }); }
             global $wpdb; $t = $wpdb->prefix.'svntex_wallet_transactions';
             $uid = (int) $r->get_param('user_id');
             $pp = $r->get_param('per_page'); $limit = min( (int) ($pp ? $pp : 50), 200 );
@@ -419,34 +437,7 @@ add_action('rest_api_init', function(){
         ],
     ]);
 
-    // Public browse (read-only) for member app landing/products
-    register_rest_route('svntex2/v1','/catalog', [
-        'methods' => 'GET', 'permission_callback' => '__return_true',
-        'callback' => function( WP_REST_Request $r ){
-            $q = new WP_Query([
-                'post_type' => 'svntex_product',
-                'posts_per_page' => (int) ($r->get_param('per_page') ? $r->get_param('per_page') : 12),
-                'paged' => (int) ($r->get_param('page') ? $r->get_param('page') : 1),
-                's' => (string) $r->get_param('search'),
-                'post_status' => 'publish',
-            ]);
-            $items = [];
-            while($q->have_posts()){ $q->the_post(); $p = get_post();
-                $thumb_id = (int) get_post_thumbnail_id($p->ID);
-                $thumb_url = $thumb_id ? wp_get_attachment_image_url($p->ID, 'medium') : '';
-                $items[] = [
-                    'id' => $p->ID,
-                    'title' => get_the_title($p),
-                    'price' => ((float) get_post_meta($p->ID,'discount_price', true)) ?: ((float) get_post_meta($p->ID,'base_price', true)),
-                    'mrp' => (float) get_post_meta($p->ID,'mrp', true),
-                    'tax_percent' => (float) get_post_meta($p->ID,'tax_percent', true),
-                    'thumbnail_url' => $thumb_url,
-                ];
-            }
-            wp_reset_postdata();
-            return [ 'items' => $items, 'total' => (int)$q->found_posts ];
-        }
-    ]);
+    // Public single product (read-only) for member product detail page
 
     // Public single product (read-only) for member product detail page
     register_rest_route('svntex2/v1','/catalog/(?P<id>\d+)', [

@@ -167,7 +167,7 @@
           const j = await r.json(); const items = j.items||[]; const grid = document.getElementById('prodGrid');
           grid.innerHTML = items.map(x=>`<div class="list-item" style="flex-direction:column;align-items:flex-start"><a href="/member-v2/product.html?id=${x.id}"><img src="${x.thumbnail_url||''}" alt="" style="width:100%;height:160px;object-fit:cover;border-radius:8px"></a><div style="margin-top:6px"><strong><a href="/member-v2/product.html?id=${x.id}" style="text-decoration:none;color:inherit">${x.title}</a></strong></div><div class="meta">MRP ₹${(x.mrp||0).toFixed(2)} · Price ₹${(x.price||0).toFixed(2)}</div><div class="grid" style="grid-auto-flow:column;gap:8px;margin-top:6px"><a class="secondary" href="/member-v2/product.html?id=${x.id}" style="text-decoration:none;padding:.35rem .6rem;border:1px solid rgba(255,255,255,.3);border-radius:8px">View</a><button class="buyNow" data-id="${x.id}" style="padding:.35rem .6rem">Buy Now</button></div></div>`).join('') || '<div class="muted">No items.</div>';
           // bind Buy Now
-          grid.querySelectorAll('button.buyNow').forEach(btn=>{ btn.addEventListener('click', async ()=>{ const pid=btn.getAttribute('data-id'); if(!publicNonce) publicNonce = await getPublicNonce(); await fetch('/wp-json/svntex2/v1/cart', { method:'GET' }); await fetch('/wp-json/svntex2/v1/cart/remove', { method:'POST', headers:{'Content-Type':'application/json','X-SVNTeX2-Nonce': publicNonce }, body: JSON.stringify({ product_id: pid, variant_id: 0 }) }).catch(()=>{}); await fetch('/wp-json/svntex2/v1/cart/add', { method:'POST', headers:{'Content-Type':'application/json','X-SVNTeX2-Nonce': publicNonce }, body: JSON.stringify({ product_id: pid, variant_id: 0, qty: 1 }) }); location.hash='#cart'; document.getElementById('chkForm').scrollIntoView({behavior:'smooth'}); }); });
+          grid.querySelectorAll('button.buyNow').forEach(btn=>{ btn.addEventListener('click', async ()=>{ const pid=btn.getAttribute('data-id'); if(!publicNonce) publicNonce = await getPublicNonce(); await fetch('/wp-json/svntex2/v1/cart/clear', { method:'POST', headers:{'X-SVNTeX2-Nonce': publicNonce} }); await fetch('/wp-json/svntex2/v1/cart/add', { method:'POST', headers:{'Content-Type':'application/json','X-SVNTeX2-Nonce': publicNonce }, body: JSON.stringify({ product_id: pid, variant_id: 0, qty: 1 }) }); location.hash='#cart'; document.getElementById('chkForm').scrollIntoView({behavior:'smooth'}); }); });
         }catch(e){ document.getElementById('prodGrid').textContent='Failed to load'; }
       }
       // load categories for filter
@@ -224,6 +224,19 @@
       document.getElementById('chkForm').addEventListener('submit', async (e)=>{
         e.preventDefault(); chkMsg.textContent='Placing order…'; if(!publicNonce) publicNonce = await getPublicNonce();
         const data = Object.fromEntries(new FormData(e.target).entries());
+        if(data.payment_method==='online'){
+          try{
+            const totals = await fetch('/wp-json/svntex2/v1/cart').then(r=>r.json());
+            const create = await fetch('/wp-json/svntex2/v1/payments/create', { method:'POST', headers:{ 'Content-Type':'application/json','X-SVNTeX2-Nonce': publicNonce }, body: JSON.stringify({ gateway:'razorpay', amount: totals.grand_total }) });
+            const cj = await create.json(); if(!create.ok){ chkMsg.textContent=(cj.error||'Gateway create failed'); return; }
+            // TODO: invoke real gateway checkout here; simulate immediate success
+            const fakePaymentId = 'pay_'+Math.random().toString(36).slice(2);
+            const conf = await fetch('/wp-json/svntex2/v1/payments/confirm', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ order_id: cj.order_id, payment_id: fakePaymentId }) });
+            const ok = await conf.json(); if(conf.ok && ok.ok){ chkMsg.textContent='Payment success. Order #'+cj.order_id; loadCart(); loadOrders(); }
+            else { chkMsg.textContent=(ok && ok.error)||'Payment confirm failed'; }
+          }catch(err){ chkMsg.textContent='Payment failed'; }
+          return;
+        }
         const r = await fetch('/wp-json/svntex2/v1/checkout', { method:'POST', headers:{'X-SVNTeX2-Nonce': publicNonce}, body: new URLSearchParams(data) });
         const j = await r.json();
         if(r.ok && j.order_id){ chkMsg.textContent='Order placed: #'+j.order_id; loadCart(); loadOrders(); }

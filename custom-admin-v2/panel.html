@@ -105,7 +105,17 @@
             <div><button id="prodLoad">Load</button></div>
             <div class="muted">Quick actions: toggle Active/Draft and stock status inline.</div>
           </div>
-          <div class="grid" style="grid-auto-flow:column;gap:10px;margin:10px 0"><button id="btnNewProduct">Add product</button></div>
+          <div class="grid" style="grid-auto-flow:column;gap:10px;margin:10px 0">
+            <button id="btnNewProduct">Add product</button>
+            <label>Per page<select id="prodPer"><option>20</option><option>50</option><option>100</option></select></label>
+            <div class="grid" style="grid-auto-flow:column;gap:8px;align-items:center">
+              <button id="bulkApply" class="secondary">Bulk apply</button>
+              <label><input type="checkbox" id="bulkActive"> Active</label>
+              <label><input type="checkbox" id="bulkDraft"> Draft</label>
+              <label>Stock<select id="bulkStock"><option value="">—</option><option value="instock">In stock</option><option value="outofstock">Out of stock</option></select></label>
+              <label>Price Δ<input id="bulkPriceDelta" type="number" step="0.01" placeholder="+10 / -5"></label>
+            </div>
+          </div>
           <form id="prodForm" class="grid" style="max-width:640px;display:none">
             <input type="hidden" name="id" />
             <input type="hidden" name="featured_media" />
@@ -203,6 +213,7 @@
             <div id="prodMsg" class="muted"></div>
           </form>
           <div id="prodList" class="list">Loading...</div>
+          <div id="prodPager" class="grid" style="grid-auto-flow:column;gap:8px;justify-content:center;margin-top:8px"><button id="prodPrev" class="secondary">Prev</button><span id="prodPageInfo" class="muted"></span><button id="prodNext" class="secondary">Next</button></div>
           <div id="prodReviewsBox" class="grid" style="max-width:860px;margin-top:16px;display:none">
             <div class="grid" style="grid-auto-flow:column;justify-content:start"><button id="prodRevLoad">Load Reviews</button></div>
             <div id="prodRevList" class="list">No reviews.</div>
@@ -352,6 +363,7 @@
       const prodCatFilter = document.getElementById('prodCatFilter');
       document.getElementById('btnNewProduct')?.addEventListener('click', ()=>{ prodForm.style.display='grid'; window.scrollTo({top: prodForm.offsetTop-60, behavior:'smooth'}); });
 
+      let prodPage = 1; function per(){ const el=document.getElementById('prodPer'); return el?parseInt(el.value,10)||20:20; }
       async function loadProducts(){
         pm(''); prodList.textContent = 'Loading...';
         const qs = new URLSearchParams();
@@ -364,154 +376,246 @@
         if(prodStatus?.value){ qs.set('status', prodStatus.value); }
         if(prodStock?.value){ qs.set('stock_status', prodStock.value); }
         if(prodCatFilter?.value){ qs.set('category', prodCatFilter.value); }
+        qs.set('per_page', String(per()));
+        qs.set('page', String(prodPage));
         const r = await fetch('/wp-json/svntex2/v1/products'+(qs.toString()?('?'+qs.toString()):''), { credentials:'include', headers });
-        const j = await r.json(); const items = (j && j.items) || [];
-        prodList.innerHTML = items.map(p=>`<div class="list-item">
-          <div style="display:flex;gap:10px;align-items:center">
-            ${p.thumbnail_url?`<img src="${p.thumbnail_url}" alt="thumb" style="width:48px;height:48px;object-fit:cover;border-radius:6px">`:''}
-            <div><strong>#${p.id}</strong> ${p.title} <div class="meta">SKU ${p.sku||'-'} · ${p.stock_status||'-'} · Qty ${p.stock_qty||0}</div></div>
-          </div>
-          <div class="grid" style="grid-auto-flow:column;gap:8px;align-items:center">
-            <a href="#" data-edit="${p.id}">Edit</a>
-            <a href="#" data-del="${p.id}">Delete</a>
-            <a href="#" data-toggle-status="${p.id}" data-st="${p.status==='draft'?'publish':'draft'}">${p.status==='draft'?'Make Active':'Make Draft'}</a>
-            <a href="#" data-toggle-stock="${p.id}" data-stock="${p.stock_status==='outofstock'?'instock':'outofstock'}">${p.stock_status==='outofstock'?'Mark In-stock':'Mark Out-of-stock'}</a>
-          </div>
-        </div>`).join('') || '<div class="muted">No products yet.</div>';
+        const j = await r.json(); const items = (j && j.items) || []; const total=j.total||0;
+        prodList.innerHTML = items.map(p=>`<div class="list-item"><label style="display:flex;gap:10px;align-items:center"><input type="checkbox" class="sel" value="${p.id}" />${p.thumbnail_url?`<img src="${p.thumbnail_url}" alt="thumb" style="width:48px;height:48px;object-fit:cover;border-radius:6px">`:''}<div><strong>#${p.id}</strong> ${p.title} <div class="meta">SKU ${p.sku||'-'} · ${p.stock_status||'-'} · Qty ${p.stock_qty||0}</div></div></label><div class="grid" style="grid-auto-flow:column;gap:8px;align-items:center"><a href="#" data-edit="${p.id}">Edit</a><a href="#" data-del="${p.id}">Delete</a><a href="#" data-toggle-status="${p.id}" data-st="${p.status==='draft'?'publish':'draft'}">${p.status==='draft'?'Make Active':'Make Draft'}</a><a href="#" data-toggle-stock="${p.id}" data-stock="${p.stock_status==='outofstock'?'instock':'outofstock'}">${p.stock_status==='outofstock'?'Mark In-stock':'Mark Out-of-stock'}</a></div></div>`).join('') || '<div class="muted">No products yet.</div>';
+        const pi=document.getElementById('prodPageInfo'); if(pi){ const pages = Math.max(1, Math.ceil(total/ per())); pi.textContent = `Page ${prodPage} / ${pages}`; }
       }
       await loadProducts();
+      document.getElementById('prodPrev')?.addEventListener('click', (e)=>{ e.preventDefault(); if(prodPage>1){ prodPage--; loadProducts(); } });
+      document.getElementById('prodNext')?.addEventListener('click', (e)=>{ e.preventDefault(); prodPage++; loadProducts(); });
+      document.getElementById('prodPer')?.addEventListener('change', ()=>{ prodPage=1; loadProducts(); });
 
-      async function loadCategories(){
-        const r = await fetch('/wp-json/wp/v2/svntex_category?per_page=100', { credentials:'include', headers });
-        const cats = r.ok ? await r.json() : [];
-        const sel = document.getElementById('prodCats'); if(sel) sel.innerHTML = cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-        if(prodCatFilter){ prodCatFilter.innerHTML = '<option value="">All</option>' + cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join(''); }
-      }
-      await loadCategories();
-
-      document.getElementById('prodLoad')?.addEventListener('click', (e)=>{ e.preventDefault(); loadProducts(); });
-      prodSearch?.addEventListener('keyup', (e)=>{ if(e.key==='Enter') loadProducts(); });
-      prodStatus?.addEventListener('change', ()=> loadProducts());
-      prodStock?.addEventListener('change', ()=> loadProducts());
-      prodCatFilter?.addEventListener('change', ()=> loadProducts());
-
+      document.getElementById('bulkApply')?.addEventListener('click', async (e)=>{
+        e.preventDefault(); const ids = Array.from(prodList.querySelectorAll('input.sel:checked')).map(x=>parseInt(x.value,10)).filter(Boolean); if(!ids.length){ toast('Select items'); return; }
+        const updates={}; if(document.getElementById('bulkActive').checked) updates.status='publish'; if(document.getElementById('bulkDraft').checked) updates.status='draft'; const sst=document.getElementById('bulkStock').value; if(sst) updates.stock_status=sst; const d=document.getElementById('bulkPriceDelta').value; if(d){ updates.discount_price_delta=parseFloat(d); }
+        // If price delta specified, fetch each item and update price individually
+        if(updates.discount_price_delta){
+          for(const id of ids){
+            const r=await fetch('/wp-json/svntex2/v1/products?id='+id,{credentials:'include',headers}); const j=await r.json(); const p=(j.items||[])[0]; const cur=parseFloat(p.discount_price||p.base_price||0); const next=(cur + updates.discount_price_delta); await fetch('/wp-json/svntex2/v1/products/'+id,{method:'POST',credentials:'include',headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ discount_price: next })});
+          }
+          toast('Prices updated');
+        }
+        const simple = { ...updates }; delete simple.discount_price_delta; if(Object.keys(simple).length){ const r=await fetch('/wp-json/svntex2/v1/products/bulk-update',{method:'POST',credentials:'include',headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ ids, updates: simple })}); const j=await r.json(); toast(j.updated?('Updated '+j.updated):'No updates'); }
+        loadProducts();
+      });
+      // Products: list item actions
       prodList.addEventListener('click', async (e)=>{
-        const id = e.target.getAttribute('data-edit');
-        if(id){ /* existing edit handler unchanged */ return; }
-        const delId = e.target.getAttribute('data-del');
-        if(delId){ /* existing delete handler unchanged */ return; }
-        const tog = e.target.getAttribute('data-toggle-status');
-        const st = e.target.getAttribute('data-st');
-        if(tog && st){ e.preventDefault(); const r = await fetch(`/wp-json/svntex2/v1/products/${tog}`, { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ status: st }) }); const j = await r.json(); toast(j.id?'Updated':'Failed'); loadProducts(); return; }
-        const tstock = e.target.getAttribute('data-toggle-stock');
-        const nstock = e.target.getAttribute('data-stock');
-        if(tstock && nstock){ e.preventDefault(); const r = await fetch(`/wp-json/svntex2/v1/products/${tstock}`, { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ stock_status: nstock }) }); const j = await r.json(); toast(j.id?'Stock updated':'Failed'); loadProducts(); return; }
+        const a = e.target.closest('a'); if(!a) return; e.preventDefault();
+        const id = parseInt(a.dataset.edit||a.dataset.del||a.dataset.toggleStatus||a.dataset.toggleStock||'0',10);
+        if(!id) return;
+        if(a.hasAttribute('data-del')){
+          if(!confirm('Delete product #'+id+'?')) return;
+          const r = await fetch('/wp-json/svntex2/v1/products/'+id,{ method:'DELETE', credentials:'include', headers });
+          const j = await r.json(); if(j && j.deleted){ toast('Deleted'); loadProducts(); }
+          else toast(j.error||'Delete failed');
+          return;
+        }
+        if(a.hasAttribute('data-toggleStatus')){
+          const st = a.getAttribute('data-st')||'publish';
+          await fetch('/wp-json/svntex2/v1/products/'+id,{ method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ status: st }) });
+          toast('Status updated'); loadProducts(); return;
+        }
+        if(a.hasAttribute('data-toggleStock')){
+          const sv = a.getAttribute('data-stock')||'instock';
+          await fetch('/wp-json/svntex2/v1/products/'+id,{ method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ stock_status: sv }) });
+          toast('Stock updated'); loadProducts(); return;
+        }
+        if(a.hasAttribute('data-edit')){
+          // Load single product and fill form
+          const r = await fetch('/wp-json/svntex2/v1/products?id='+id, { credentials:'include', headers });
+          const j = await r.json(); const p=(j.items||[])[0]; if(!p){ toast('Not found'); return; }
+          fillProductForm(p); prodForm.style.display='grid'; window.scrollTo({top: prodForm.offsetTop-60, behavior:'smooth'});
+          return;
+        }
       });
-      document.getElementById('prodReset').addEventListener('click', (e)=>{ e.preventDefault(); prodForm.reset(); prodForm.id.value=''; document.getElementById('imgPreview').textContent=''; document.getElementById('vidPreview').textContent=''; pm(''); });
 
-  // Product reviews moderation
-  document.getElementById('prodRevLoad')?.addEventListener('click', async (e)=>{ e.preventDefault(); const box=document.getElementById('prodReviewsBox'); const pid=box?.getAttribute('data-pid'); if(!pid){ toast('Select a product'); return; } const r=await fetch(`/wp-json/svntex2/v1/products/${pid}/reviews`,{credentials:'include',headers}); const j=await r.json(); const items=j.items||[]; const list=document.getElementById('prodRevList'); list.innerHTML = items.map(rv=>`<div class="list-item"><div>#${rv.id} · ${rv.author||''} · ${rv.status}</div><div class="meta">${rv.date||''}${rv.rating?(' · ★'+rv.rating):''}${rv.featured?' · featured':''}</div><div class="muted" style="margin-top:6px">${(rv.content||'').replace(/[<>]/g,'')}</div><div style="margin-top:6px"><a href="#" data-rid="${rv.id}" data-ra="approve">Approve</a> <a href="#" data-rid="${rv.id}" data-ra="hold">Hold</a> <a href="#" data-rid="${rv.id}" data-ra="trash">Trash</a> <a href="#" data-rid="${rv.id}" data-ra="feature">Feature</a> <a href="#" data-rid="${rv.id}" data-ra="unfeature">Unfeature</a></div></div>`).join('') || '<div class="muted">No reviews.</div>'; });
-  document.getElementById('prodRevList')?.addEventListener('click', async (e)=>{ const cid=e.target.getAttribute('data-rid'); const act=e.target.getAttribute('data-ra'); if(!cid||!act) return; e.preventDefault(); const r=await fetch('/wp-json/svntex2/v1/products/0/reviews',{method:'POST',credentials:'include',headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({comment_id:parseInt(cid,10), action:act})}); const j=await r.json(); toast(j.ok?'Done':'Failed'); document.getElementById('prodRevLoad').click(); });
+      // Load button and filters
+      document.getElementById('prodLoad')?.addEventListener('click', ()=>{ prodPage=1; loadProducts(); });
+      prodSearch?.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); prodPage=1; loadProducts(); }});
+      prodStatus?.addEventListener('change', ()=>{ prodPage=1; loadProducts(); });
+      prodStock?.addEventListener('change', ()=>{ prodPage=1; loadProducts(); });
+      prodCatFilter?.addEventListener('change', ()=>{ prodPage=1; loadProducts(); });
 
-      const imgInput = document.getElementById('prodImage');
-      imgInput.addEventListener('change', async (e)=>{
-        const file = e.target.files && e.target.files[0]; if(!file){ return; }
-        const okTypes = ['image/png','image/jpeg','image/jpg','image/webp'];
-        if(!okTypes.includes(file.type)){ toast('Unsupported image type'); e.target.value=''; return; }
-        const fd = new FormData(); fd.append('file', file, file.name);
-        const r = await fetch('/wp-json/wp/v2/media', { method:'POST', credentials:'include', headers: { ...headers }, body: fd });
-        if(!r.ok){ toast('Upload failed'); return; }
-        const m = await r.json(); prodForm.featured_media.value = m.id; document.getElementById('imgPreview').innerHTML = `<img src="${m.media_details?.sizes?.thumbnail?.source_url || m.source_url}" style="max-width:120px;border-radius:6px">`;
-        toast('Image uploaded');
-      });
-      const vidInput = document.getElementById('prodVideo');
-      vidInput.addEventListener('change', async (e)=>{
-        const file = e.target.files && e.target.files[0]; if(!file){ return; }
-        const okVideo = ['video/mp4','video/webm','video/ogg'];
-        if(!okVideo.includes(file.type)){ toast('Unsupported video type'); e.target.value=''; return; }
-        const fd = new FormData(); fd.append('file', file, file.name); fd.append('post', prodForm.id.value || 0);
-        const r = await fetch('/wp-json/wp/v2/media', { method:'POST', credentials:'include', headers: { ...headers }, body: fd });
-        if(!r.ok){ toast('Video upload failed'); return; }
-        const m = await r.json(); prodForm.video_media.value = m.id; document.getElementById('vidPreview').innerHTML = `<video src="${m.source_url}" controls style="max-width:220px;border-radius:6px"></video>`; toast('Video uploaded');
-      });
+      // Taxonomies and vendors into selects
+      async function loadSelects(){
+        try{
+          const [cats, brands, tags, ships] = await Promise.all([
+            fetch('/wp-json/wp/v2/svntex_category?per_page=100',{credentials:'include',headers}),
+            fetch('/wp-json/wp/v2/svntex_brand?per_page=100',{credentials:'include',headers}),
+            fetch('/wp-json/wp/v2/svntex_tag?per_page=100',{credentials:'include',headers}),
+            fetch('/wp-json/wp/v2/svntex_shipping_class?per_page=100',{credentials:'include',headers}),
+          ]);
+          const [jc, jb, jt, js] = await Promise.all([cats.json(), brands.json(), tags.json(), ships.json()]);
+          const catSel = document.getElementById('prodCats'); const catFilter = document.getElementById('prodCatFilter');
+          function opt(el, id, name){ const o=document.createElement('option'); o.value=id; o.textContent=name; el.appendChild(o); }
+          if(Array.isArray(jc)){
+            catSel.innerHTML=''; jc.forEach(t=>opt(catSel, t.id, t.name));
+            const keepFirst = catFilter.querySelector('option'); catFilter.innerHTML=''; if(keepFirst) catFilter.appendChild(keepFirst); jc.forEach(t=>opt(catFilter, t.id, t.name));
+          }
+          const bSel=document.getElementById('brandSelect'); if(Array.isArray(jb)){ bSel.innerHTML=''; jb.forEach(t=>opt(bSel, t.id, t.name)); }
+          const tSel=document.getElementById('tagSelect'); if(Array.isArray(jt)){ tSel.innerHTML=''; jt.forEach(t=>opt(tSel, t.id, t.name)); }
+          const sSel=document.getElementById('shipClassSelect'); if(Array.isArray(js)){ sSel.innerHTML=''; js.forEach(t=>opt(sSel, t.id, t.name)); }
+        }catch(e){ /* ignore */ }
+        // Vendors (best-effort, may not exist)
+        try{
+          const r = await fetch('/wp-json/svntex2/v1/vendors',{credentials:'include',headers}); if(r.ok){ const j=await r.json(); const vs=document.getElementById('vendorSelect'); vs.innerHTML='<option value="">— None —</option>'+ (Array.isArray(j.items)?j.items.map(v=>`<option value="${v.id}">${v.name}</option>`).join(''):'' ); }
+        }catch(e){ /* ignore */ }
+      }
+      await loadSelects();
+
+      // Media upload helper
+      async function uploadMedia(file){
+        const fd = new FormData(); fd.append('file', file); fd.append('status','inherit');
+        const r = await fetch('/wp-json/wp/v2/media', { method:'POST', credentials:'include', headers:{ 'X-WP-Nonce': nonce }, body: fd });
+        const j = await r.json(); if(j && j.id) return j.id; throw new Error(j.message||'Upload failed');
+      }
+
+      // Product form helpers
+      function fillProductForm(p){
+        prodForm.id.value = p.id || '';
+        prodForm.title.value = p.title || '';
+        prodForm.slug.value = p.slug || '';
+        prodForm.mrp.value = p.mrp || '';
+        prodForm.tax_percent.value = p.tax_percent || '';
+        prodForm.company_profit.value = p.company_profit || '';
+        prodForm.base_price.value = p.base_price || '';
+        prodForm.discount_price.value = p.discount_price || '';
+        prodForm.sku.value = p.sku || '';
+        prodForm.vendor_id.value = p.vendor_id || '';
+        prodForm.stock_qty.value = p.stock_qty || '';
+        prodForm.stock_status.value = p.stock_status || '';
+        prodForm.low_stock_threshold.value = p.low_stock_threshold || '';
+        prodForm.content.value = p.content || '';
+        document.getElementById('statusSelect').value = p.status || 'publish';
+        prodForm.meta_title.value = p.meta_title || '';
+        prodForm.meta_description.value = p.meta_description || '';
+        prodForm.visibility.value = p.visibility || 'public';
+        prodForm.querySelector('input[name="is_featured"]').checked = !!p.is_featured;
+        prodForm.querySelector('input[name="approved"]').checked = !!p.approved;
+        prodForm.querySelector('input[name="archived"]').checked = !!p.archived;
+        // Multi-selects
+        function setMulti(sel, ids){ const set=new Set((ids||[]).map(String)); Array.from(sel.options).forEach(o=>{ o.selected = set.has(String(o.value)); }); }
+        setMulti(document.getElementById('prodCats'), p.categories);
+        setMulti(document.getElementById('brandSelect'), p.brands);
+        setMulti(document.getElementById('tagSelect'), p.tags);
+        const shipSel=document.getElementById('shipClassSelect'); if(p.shipping_class && p.shipping_class.length){ shipSel.value = String(p.shipping_class[0]); }
+        // Media hidden IDs
+        prodForm.featured_media.value = p.featured_media||'';
+        prodForm.video_media.value = p.video_media||'';
+        document.getElementById('imgPreview').textContent = p.thumbnail_url?('Current image set'):'';
+        document.getElementById('vidPreview').textContent = p.video_url?('Video URL set'):'';
+      }
+
+      document.getElementById('prodReset')?.addEventListener('click', ()=>{ prodForm.reset(); prodForm.style.display='none'; document.getElementById('imgPreview').textContent=''; document.getElementById('vidPreview').textContent=''; document.getElementById('galleryPreview').innerHTML=''; pm(''); });
+
+      // Image/video previews and uploads
+      document.getElementById('prodImage')?.addEventListener('change', async (e)=>{ const f=e.target.files[0]; if(!f) return; document.getElementById('imgPreview').textContent='Uploading...'; try{ const id=await uploadMedia(f); prodForm.featured_media.value=id; document.getElementById('imgPreview').textContent='Image uploaded'; }catch(err){ document.getElementById('imgPreview').textContent='Upload failed'; }});
+      document.getElementById('prodVideo')?.addEventListener('change', async (e)=>{ const f=e.target.files[0]; if(!f) return; document.getElementById('vidPreview').textContent='Uploading...'; try{ const id=await uploadMedia(f); prodForm.video_media.value=id; document.getElementById('vidPreview').textContent='Video uploaded'; }catch(err){ document.getElementById('vidPreview').textContent='Upload failed'; }});
+      document.getElementById('galleryInput')?.addEventListener('change', async (e)=>{ const files=Array.from(e.target.files||[]); const box=document.getElementById('galleryPreview'); box.textContent='Uploading '+files.length+' images...'; const ids=[]; for(const f of files){ try{ const id=await uploadMedia(f); ids.push(id); }catch(err){} } box.textContent = ids.length?('Added '+ids.length+' images'):'No images added'; prodForm.querySelector('input[name="gallery"]')?.remove(); const hidden=document.createElement('input'); hidden.type='hidden'; hidden.name='gallery'; hidden.value = ids.join(','); prodForm.appendChild(hidden); });
+
+      // Submit product create/update
       prodForm.addEventListener('submit', async (e)=>{
         e.preventDefault(); pm('Saving...');
-        const data = new FormData(prodForm); const id = data.get('id'); data.delete('id');
-        const payload = Object.fromEntries(data.entries());
-        if(payload.vendor_id) payload.vendor_id = parseInt(payload.vendor_id,10)||0; else delete payload.vendor_id;
-        const catSel = document.getElementById('prodCats'); const selCats = Array.from(catSel.selectedOptions).map(o=>parseInt(o.value,10)).filter(Boolean); payload.categories = selCats.length?selCats:[];
-        const brandSel = document.getElementById('brandSelect'); const selBrands = Array.from(brandSel.selectedOptions).map(o=>parseInt(o.value,10)).filter(Boolean); payload.brands = selBrands.length?selBrands:[];
-        const tagSel = document.getElementById('tagSelect'); const selTags = Array.from(tagSel.selectedOptions).map(o=>parseInt(o.value,10)).filter(Boolean); payload.tags = selTags.length?selTags:[];
-        const scSel = document.getElementById('shipClassSelect'); const sc = parseInt(scSel.value||'0',10)||0; payload.shipping_class = sc ? [sc] : [];
-        ['base_price','discount_price','mrp','tax_percent','company_profit','weight','length','width','height'].forEach(k=>{ if(payload[k]!==undefined && payload[k]!=='' ) payload[k] = parseFloat(payload[k]); });
-        ['stock_qty','low_stock_threshold'].forEach(k=>{ if(payload[k]!==undefined && payload[k]!=='' ) payload[k] = parseInt(payload[k],10); });
-        payload.is_featured = !!data.get('is_featured'); payload.archived = !!data.get('archived'); payload.approved = !!data.get('approved');
-        if(galleryIds && galleryIds.length) payload.gallery = galleryIds.slice(); else payload.gallery = [];
-        const url = id ? `/wp-json/svntex2/v1/products/${id}` : '/wp-json/svntex2/v1/products';
-        const r = await fetch(url, { method:'POST', credentials:'include', headers: { ...headers, 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
-        // Auto-calc Profit
-        const pMrp = document.getElementById('pMrp'); const pTax = document.getElementById('pTax'); const pProfit = document.getElementById('pProfit');
-        function recalcProfit(){ const mrp = parseFloat(pMrp.value||'0'); const tax = parseFloat(pTax.value||'0'); if(mrp>=0 && tax>=0){ const profit = Math.max(0, mrp - (mrp * (tax/100))); pProfit.value = profit.toFixed(2); } }
-        pMrp.addEventListener('input', recalcProfit); pTax.addEventListener('input', recalcProfit);
-        const j = await r.json(); if(j.id){ pm('Saved'); toast('Saved'); prodForm.reset(); await loadProducts(); } else { pm(j.error || 'Save failed'); toast('Save failed'); }
+        const data = Object.fromEntries(new FormData(prodForm).entries());
+        // Normalize multi-selects
+        function vals(sel){ return Array.from(sel.selectedOptions).map(o=>parseInt(o.value,10)).filter(Boolean); }
+        data.categories = vals(document.getElementById('prodCats'));
+        data.brands = vals(document.getElementById('brandSelect'));
+        data.tags = vals(document.getElementById('tagSelect'));
+        const sc = document.getElementById('shipClassSelect'); data.shipping_class = sc && sc.value? [parseInt(sc.value,10)] : [];
+        data.is_featured = prodForm.querySelector('input[name="is_featured"]').checked ? 1 : 0;
+        data.archived = prodForm.querySelector('input[name="archived"]').checked ? 1 : 0;
+        data.approved = prodForm.querySelector('input[name="approved"]').checked ? 1 : 0;
+        // Numeric coercion
+        ['mrp','tax_percent','company_profit','base_price','discount_price','stock_qty','low_stock_threshold','weight','length','width','height','vendor_id'].forEach(k=>{ if(data[k]!==undefined && data[k]!=='' ) data[k] = Number(data[k]); });
+        const id = data.id; delete data.id;
+        const url = id? ('/wp-json/svntex2/v1/products/'+id) : '/wp-json/svntex2/v1/products';
+        const method = id? 'POST' : 'POST';
+        const r = await fetch(url, { method, credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify(data) });
+        const j = await r.json(); if(j && (j.id || j.ok)) { pm('Saved'); toast('Saved'); prodForm.style.display='none'; loadProducts(); }
+        else { pm(j.error||'Save failed'); }
       });
 
-      // Logout back to admin-v2 login
-      document.getElementById('logout').addEventListener('click', async (e)=>{ e.preventDefault(); try{ await fetch('/wp-admin/admin-post.php?action=svntex2_logout',{credentials:'include'});}catch(e){} const dest=(location.hostname.replace(/^www\./,'')==='svntex.com')?'https://www.svntex.com/admin-v2/':'/admin-v2/'; location.href=dest; });
+      // Simple hash router for sections
+      const sections = Array.from(document.querySelectorAll('main .section'));
+      const navLinks = Array.from(document.querySelectorAll('aside nav a'));
+      function show(hash){
+        if(!hash) hash = '#dashboard';
+        sections.forEach(s=>{ s.classList.toggle('hidden', '#'+s.id !== hash); });
+        navLinks.forEach(a=>{ a.classList.toggle('active', a.getAttribute('href')===hash); });
+        if(hash==='#dashboard'){ loadKpis(); }
+      }
+      window.addEventListener('hashchange', ()=>show(location.hash));
+      show(location.hash||'#dashboard');
 
-      // Wallet
-      const wUserId = document.getElementById('wUserId');
-      const wList = document.getElementById('wList');
-      async function loadWallet(){ const q = wUserId.value ? ('?user_id='+encodeURIComponent(wUserId.value)) : ''; const r = await fetch('/wp-json/svntex2/v1/wallet/transactions'+q, { credentials:'include', headers }); const j = await r.json(); const items = j.items || []; wList.innerHTML = items.map(x=>`<div class="list-item"><div>#${x.id} · u${x.user_id} · ${x.type} · ${x.category} · ${x.amount}</div><div class="meta">${x.created_at}</div></div>`).join('') || '<div class="muted">No transactions.</div>'; }
-      document.getElementById('wLoad').addEventListener('click', (e)=>{ e.preventDefault(); loadWallet(); });
-      // Wallet Adjust quick form UI
-      try{
-        const wAdj = document.createElement('div'); wAdj.className='grid columns-3'; wAdj.style.maxWidth='840px'; wAdj.style.marginTop='10px';
-        wAdj.innerHTML = '<label>Adjust Amount<input id="wAdjAmt" type="number" step="0.01" min="0"></label><label>Direction<select id="wAdjDir"><option value="credit">Credit</option><option value="debit">Debit</option></select></label><div class="grid" style="grid-auto-flow:column;align-items:end"><button id="wAdjBtn">Apply</button></div>';
-        const wl = document.getElementById('wList'); wl.parentElement.insertBefore(wAdj, wl);
-        document.getElementById('wAdjBtn').addEventListener('click', async (e)=>{ e.preventDefault(); const uid=parseInt(wUserId.value||'0',10)||0; const amt=parseFloat(document.getElementById('wAdjAmt').value||'0')||0; const dir=document.getElementById('wAdjDir').value; if(!uid||!amt){ toast('User and amount required'); return; } const r=await fetch('/wp-json/svntex2/v1/wallet/adjust',{ method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ user_id:uid, amount:amt, direction:dir, category:'general', note:'panel' }) }); const j=await r.json(); toast(j.ok?'Adjusted':'Failed'); loadWallet(); });
-      }catch(e){}
+      // KPIs
+      async function loadKpis(){
+        try{
+          const r = await fetch('/wp-json/svntex2/v1/admin/analytics', { credentials:'include', headers });
+          const j = await r.json();
+          if(!j) return;
+          const $ = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent = (typeof v==='number')? String(v) : (v||'--'); };
+          $('kpiUsers', j.users_total);
+          $('kpiProducts', j.products_total);
+          $('kpiOrders', `${j.orders_total} / ${j.orders_pending}`);
+          $('kpiWallet', `${j.wallet_7d_count} (${(j.wallet_7d_sum||0).toFixed(2)})`);
+          $('kpiRevToday', (j.revenue_today||0).toFixed(2));
+          $('kpiRevMonth', (j.revenue_month||0).toFixed(2));
+          $('kpiReferrals', '--');
+          $('kpiWd', j.withdrawals_requested);
+          $('kpiKyc', '--');
+        }catch(e){}
+      }
+
+      // Orders list
+      document.getElementById('ordLoad')?.addEventListener('click', async ()=>{
+        const st = document.getElementById('ordStatus').value; const qs = st? ('?status='+encodeURIComponent(st)) : '';
+        const r = await fetch('/wp-json/svntex2/v1/admin/orders'+qs, { credentials:'include', headers }); const j=await r.json(); const box=document.getElementById('ordList');
+        const items = (j && j.items)||[]; box.innerHTML = items.length? items.map(o=>`<div class="list-item">#${o.id} · User ${o.user_id} · ${o.status} · Total ₹${o.grand_total?.toFixed?o.grand_total.toFixed(2):o.grand_total} <button data-oid="${o.id}" data-st="processing" class="btnSmall">Mark Processing</button> <button data-oid="${o.id}" data-st="shipped" class="btnSmall">Mark Shipped</button></div>`).join('') : 'No orders.';
+        box.querySelectorAll('button[data-oid]')?.forEach(btn=>btn.addEventListener('click', async (e)=>{ const b=e.currentTarget; const id=b.getAttribute('data-oid'); const st=b.getAttribute('data-st'); await fetch('/wp-json/svntex2/v1/admin/orders/'+id,{method:'POST',credentials:'include',headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ status: st })}); toast('Updated'); }));
+      });
+
+      // Withdrawals list
+      document.getElementById('wdAdminLoad')?.addEventListener('click', async ()=>{
+        const st=document.getElementById('wdStatus').value; const qs=st?('?status='+encodeURIComponent(st)) : '';
+        const r=await fetch('/wp-json/svntex2/v1/admin/withdrawals'+qs,{credentials:'include',headers}); const j=await r.json(); const box=document.getElementById('wdAdminList');
+        const items=(j&&j.items)||[]; box.innerHTML = items.length? items.map(w=>`<div class="list-item">#${w.id} · User ${w.user_id} · ${w.status} · ₹${w.amount?.toFixed?w.amount.toFixed(2):w.amount} <button data-wid="${w.id}" data-act="approve" class="btnSmall">Approve</button> <button data-wid="${w.id}" data-act="reject" class="btnSmall">Reject</button></div>`).join('') : 'No withdrawals.';
+        box.querySelectorAll('button[data-wid]')?.forEach(btn=>btn.addEventListener('click', async (e)=>{ const b=e.currentTarget; const id=b.getAttribute('data-wid'); const act=b.getAttribute('data-act'); await fetch('/wp-json/svntex2/v1/admin/withdrawals/'+id,{method:'POST',credentials:'include',headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ action: act })}); toast('Updated'); }));
+      });
+
+      // Wallet transactions (admin view)
+      document.getElementById('wLoad')?.addEventListener('click', async ()=>{
+        const uid = parseInt(document.getElementById('wUserId').value||'0',10); const qs = uid? ('?user_id='+uid) : '';
+        const r = await fetch('/wp-json/svntex2/v1/wallet/transactions'+qs, { credentials:'include', headers }); const j = await r.json(); const box=document.getElementById('wList');
+        const items=(j&&j.items)||[]; box.innerHTML = items.length? items.map(t=>`<div class="list-item">#${t.id} · U${t.user_id} · ${t.category} · ${(t.amount>0?'+':'')}${t.amount} · ${t.created_at}</div>`).join('') : 'No data.';
+      });
 
       // Referrals
-      const refList = document.getElementById('refList');
-      async function loadReferrals(){ const v = document.getElementById('refListReferrer').value; const q = v ? ('?referrer_id='+encodeURIComponent(v)) : ''; const r = await fetch('/wp-json/svntex2/v1/referrals'+q, { credentials:'include', headers }); const j = await r.json(); const items = j.items || []; refList.innerHTML = items.map(x=>`<div class="list-item"><div>#${x.id} · ${x.referrer_id} → ${x.referee_id} ${x.qualified? '· qualified':''}</div><div class="meta">${x.created_at||''}</div></div>`).join('') || '<div class="muted">No referrals.</div>'; }
-      document.getElementById('refLoad').addEventListener('click', (e)=>{ e.preventDefault(); loadReferrals(); });
-      document.getElementById('refLink').addEventListener('click', async (e)=>{ e.preventDefault(); const ref = parseInt(document.getElementById('refReferrer').value,10)||0; const ree = parseInt(document.getElementById('refReferee').value,10)||0; if(!ref||!ree){ toast('IDs required'); return; } const r = await fetch('/wp-json/svntex2/v1/referrals/link', { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ referrer_id:ref, referee_id:ree }) }); const j = await r.json(); toast(j.ok?'Linked':'Not linked'); loadReferrals(); });
-      document.getElementById('refQualify').addEventListener('click', async (e)=>{ e.preventDefault(); const ref = parseInt(document.getElementById('refReferrer').value,10)||0; const ree = parseInt(document.getElementById('refReferee').value,10)||0; const amt = parseFloat(document.getElementById('refAmount').value||'0')||0; if(!ref||!ree){ toast('IDs required'); return; } const r = await fetch('/wp-json/svntex2/v1/referrals/qualify', { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ referrer_id:ref, referee_id:ree, amount:amt }) }); const j = await r.json(); toast(j.ok?'Qualified':'Failed'); loadReferrals(); });
-      
-  // Vendors
-  const venList = document.getElementById('venList');
-  const venForm = document.getElementById('venForm');
-  function vm(t){ const el=document.getElementById('venMsg'); if(el) el.textContent=t; }
-  async function loadVendorsUI(){ if(!venList) return; venList.textContent='Loading...'; const r=await fetch('/wp-json/svntex2/v1/vendors',{credentials:'include',headers}); const j=await r.json(); const items=j.items||[]; venList.innerHTML = items.map(v=>`<div class="list-item"><div><a href="#" data-vid="${v.id}">#${v.id}</a> ${v.name}</div><div class="meta">${v.email||''} ${v.phone?('· '+v.phone):''}</div></div>`).join('') || '<div class="muted">No vendors.</div>'; }
-  if(venList){ await loadVendorsUI(); venList.addEventListener('click', async (e)=>{ const id=e.target.getAttribute('data-vid'); if(!id) return; e.preventDefault(); const r=await fetch('/wp-json/svntex2/v1/vendors/'+id,{credentials:'include',headers}); const v=await r.json(); venForm.id.value=v.id; venForm.name.value=v.name||''; venForm.email.value=v.email||''; venForm.phone.value=v.phone||''; venForm.notes.value=v.notes||''; vm(''); }); }
-  document.getElementById('venNew')?.addEventListener('click',(e)=>{ e.preventDefault(); venForm.reset(); venForm.id.value=''; vm(''); });
-  venForm?.addEventListener('submit', async (e)=>{ e.preventDefault(); vm('Saving...'); const data=Object.fromEntries(new FormData(venForm).entries()); const id=data.id; delete data.id; const url=id?('/wp-json/svntex2/v1/vendors/'+id):'/wp-json/svntex2/v1/vendors'; const r=await fetch(url,{method:'POST',credentials:'include',headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify(data)}); const j=await r.json(); vm(j.id?'Saved':'Failed'); loadVendorsUI(); });
+      document.getElementById('refLink')?.addEventListener('click', async ()=>{
+        const ref = parseInt(document.getElementById('refReferrer').value||'0',10); const ree = parseInt(document.getElementById('refReferee').value||'0',10); if(!ref||!ree){ toast('IDs required'); return; }
+        const r=await fetch('/wp-json/svntex2/v1/referrals/link',{method:'POST',credentials:'include',headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ referrer_id:ref, referee_id:ree })}); const j=await r.json(); toast(j.ok?'Linked':'Failed');
+      });
+      document.getElementById('refQualify')?.addEventListener('click', async ()=>{
+        const ref = parseInt(document.getElementById('refReferrer').value||'0',10); const ree = parseInt(document.getElementById('refReferee').value||'0',10); const amt = parseFloat(document.getElementById('refAmount').value||'0'); if(!ref||!ree){ toast('IDs required'); return; }
+        const r=await fetch('/wp-json/svntex2/v1/referrals/qualify',{method:'POST',credentials:'include',headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ referrer_id:ref, referee_id:ree, amount: amt })}); const j=await r.json(); toast(j.ok?'Marked':'Failed');
+      });
+      document.getElementById('refLoad')?.addEventListener('click', async ()=>{
+        const rid = parseInt(document.getElementById('refListReferrer').value||'0',10); const qs = rid? ('?referrer_id='+rid) : '';
+        const r=await fetch('/wp-json/svntex2/v1/referrals'+qs,{credentials:'include',headers}); const j=await r.json(); const box=document.getElementById('refList'); const items=(j&&j.items)||[]; box.innerHTML = items.length? items.map(x=>`<div class="list-item">Referrer ${x.referrer_id||'?'} → Referee ${x.referee_id||'?'} · ${x.qualified?'Qualified':'—'}</div>`).join('') : 'No referrals.';
+      });
 
-  // Support Admin
-  const supList = document.getElementById('supList');
-  document.getElementById('supLoad')?.addEventListener('click', async (e)=>{ e.preventDefault(); const r=await fetch('/wp-json/svntex2/v1/admin/support',{credentials:'include',headers}); const j=await r.json(); const items=j.items||[]; supList.innerHTML = items.map(t=>`<div class="list-item"><div>u${t.user_id} · ${t.subject}</div><div class="meta">${t.ts||''}</div><div class="muted" style="margin-top:6px">${(t.message||'').replace(/[<>]/g,'')}</div></div>`).join('') || '<div class="muted">No tickets.</div>'; });
-  document.getElementById('supClear')?.addEventListener('click', async (e)=>{ e.preventDefault(); if(!confirm('Clear all tickets?')) return; const r=await fetch('/wp-json/svntex2/v1/admin/support/clear',{method:'POST',credentials:'include',headers}); const j=await r.json(); if(j.ok){ supList.innerHTML='<div class="muted">No tickets.</div>'; toast('Cleared'); }
-  });
+      // Support
+      document.getElementById('supLoad')?.addEventListener('click', async ()=>{ const r=await fetch('/wp-json/svntex2/v1/admin/support',{credentials:'include',headers}); const j=await r.json(); const box=document.getElementById('supList'); const items=(j&&j.items)||[]; box.innerHTML = items.length? items.map(t=>`<div class="list-item">U${t.user_id}: <strong>${t.subject}</strong><br>${t.message}<div class="muted">${t.ts}</div></div>`).join('') : 'No tickets.'; });
+      document.getElementById('supClear')?.addEventListener('click', async ()=>{ if(!confirm('Clear all tickets?')) return; await fetch('/wp-json/svntex2/v1/admin/support/clear',{method:'POST',credentials:'include',headers}); toast('Cleared'); document.getElementById('supList').textContent='No tickets.'; });
 
-      // KYC Admin
-      const kycList = document.getElementById('kycList');
-      async function loadKyc(){ const r = await fetch('/wp-json/svntex2/v1/kyc', { credentials:'include', headers }); const j = await r.json(); const items = j.items || []; kycList.innerHTML = items.map(x=>`<div class="list-item"><div>User ${x.user_id} · ${x.status}</div><div><a href="#" data-kyc-user="${x.user_id}" data-kyc-status="approved">Approve</a> <a href="#" data-kyc-user="${x.user_id}" data-kyc-status="rejected">Reject</a></div></div>`).join('') || '<div class="muted">No submissions.</div>'; }
-      document.getElementById('kycLoad').addEventListener('click', (e)=>{ e.preventDefault(); loadKyc(); });
-      kycList.addEventListener('click', async (e)=>{ const uid = e.target.getAttribute('data-kyc-user'); const st = e.target.getAttribute('data-kyc-status'); if(!uid||!st) return; e.preventDefault(); const r = await fetch(`/wp-json/svntex2/v1/kyc/${uid}`, { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ status:st }) }); const j = await r.json(); if(j && j.user_id){ toast('KYC '+st); loadKyc(); } else { toast('Failed'); } });
+      // KYC
+      document.getElementById('kycLoad')?.addEventListener('click', async ()=>{ const r=await fetch('/wp-json/svntex2/v1/kyc',{credentials:'include',headers}); const j=await r.json(); const box=document.getElementById('kycList'); const items=(j&&j.items)||[]; box.innerHTML = items.length? items.map(k=>`<div class="list-item">#${k.id} · U${k.user_id} · ${k.status} · ${k.created_at||''}</div>`).join('') : 'No submissions.'; });
 
-  // Orders Admin
-  const ordList = document.getElementById('ordList');
-  const ordLoadBtn = document.getElementById('ordLoad'); if(ordLoadBtn){ ordLoadBtn.addEventListener('click', async (e)=>{ e.preventDefault(); await loadOrdersAdmin(); }); }
-  async function loadOrdersAdmin(){ const st = document.getElementById('ordStatus').value; const q = st? ('?status='+encodeURIComponent(st)) : ''; const r = await fetch('/wp-json/svntex2/v1/admin/orders'+q, { credentials:'include', headers }); const j = await r.json(); const items=j.items||[]; ordList.innerHTML = items.map(o=>`<div class="list-item"><div>#${o.id} · u${o.user_id} · ${o.status}</div><div class="meta">₹${Number(o.grand_total||0).toFixed(2)} · ${o.created_at}</div><div><a href="#" data-oid="${o.id}" data-st="processing">Processing</a> <a href="#" data-oid="${o.id}" data-st="shipped">Shipped</a> <a href="#" data-oid="${o.id}" data-st="delivered">Delivered</a></div></div>`).join('') || '<div class="muted">No orders.</div>'; }
-  if(ordList){ ordList.addEventListener('click', async (e)=>{ const id=e.target.getAttribute('data-oid'); const st=e.target.getAttribute('data-st'); if(!id||!st) return; e.preventDefault(); const r=await fetch('/wp-json/svntex2/v1/admin/orders/'+id,{ method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ status:st }) }); const j=await r.json(); toast(j.id?'Updated':'Failed'); loadOrdersAdmin(); }); }
-
-  // Withdrawals Admin
-  const wdAdminList = document.getElementById('wdAdminList');
-  const wdAdminLoad = document.getElementById('wdAdminLoad'); if(wdAdminLoad){ wdAdminLoad.addEventListener('click', async (e)=>{ e.preventDefault(); await loadWdAdmin(); }); }
-  async function loadWdAdmin(){ const st=document.getElementById('wdStatus').value; const q=st?('?status='+encodeURIComponent(st)) : ''; const r=await fetch('/wp-json/svntex2/v1/admin/withdrawals'+q,{ credentials:'include', headers }); const j=await r.json(); const items=j.items||[]; wdAdminList.innerHTML = items.map(w=>`<div class="list-item"><div>#${w.id} · u${w.user_id} · ${w.status}</div><div class="meta">₹${Number(w.amount||0).toFixed(2)}${w.net_amount?(' · Net ₹'+Number(w.net_amount).toFixed(2)) : ''} · ${w.requested_at||''}</div><div>${w.status==='requested'?`<a href="#" data-wid="${w.id}" data-act="approve">Approve</a> <a href="#" data-wid="${w.id}" data-act="reject">Reject</a>`:''}</div></div>`).join('') || '<div class="muted">No withdrawals.</div>'; }
-  if(wdAdminList){ wdAdminList.addEventListener('click', async (e)=>{ const id=e.target.getAttribute('data-wid'); const act=e.target.getAttribute('data-act'); if(!id||!act) return; e.preventDefault(); const note=prompt('Note (optional)',''); const r=await fetch('/wp-json/svntex2/v1/admin/withdrawals/'+id,{ method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ action:act, admin_note: note||'' }) }); const j=await r.json(); toast(j.ok?'Updated':'Failed'); loadWdAdmin(); }); }
-    })();
+      // Logout
+      document.getElementById('logout')?.addEventListener('click', (e)=>{ e.preventDefault(); location.href = '/logout-handler.php'; });
     </script>
   </body>
 </html>

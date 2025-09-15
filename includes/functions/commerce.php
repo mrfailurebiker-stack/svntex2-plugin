@@ -178,6 +178,9 @@ add_action('rest_api_init', function(){
         $pid=(int)$r['product_id']; $vid=(int)($r['variant_id']??0);
         svntex2_commerce_cart_remove($pid,$vid); return svntex2_commerce_cart_totals();
     },'permission_callback'=>$secure_cb ] ]);
+    register_rest_route('svntex2/v1','/cart/clear', [ [ 'methods'=>'POST','callback'=>function($r){
+        svntex2_commerce_save_cart([]); return svntex2_commerce_cart_totals();
+    },'permission_callback'=>$secure_cb ] ]);
     register_rest_route('svntex2/v1','/checkout', [ [ 'methods'=>'POST','callback'=>function($r){
         $address = [
             'name'=>sanitize_text_field($r['name']??''),
@@ -205,6 +208,43 @@ add_action('rest_api_init', function(){
         }
         return svntex2_commerce_checkout($address, $payment);
     },'permission_callback'=>$secure_cb ] ]);
+    // Payments create: prepare gateway order and attach to our pending order
+    register_rest_route('svntex2/v1','/payments/create', [ [ 'methods'=>'POST','callback'=>function($r){
+        $gateway = sanitize_key($r['gateway'] ?? 'razorpay'); // razorpay|phonepe|payu
+        $amount = (float) ($r['amount'] ?? 0);
+        if ($amount <= 0) return new WP_Error('bad_amount','Invalid amount',['status'=>400]);
+        // Create internal pending order if needed (no address means use placeholder)
+        $totals = svntex2_commerce_cart_totals(); if (empty($totals['lines'])) return new WP_Error('empty_cart','Cart empty',['status'=>400]);
+        // Minimal address placeholder when using gateways directly before full address capture
+        $addr = [ 'name'=>'-', 'line1'=>'-', 'city'=>'-', 'zip'=>'-', 'country'=>'IN' ];
+        $res = svntex2_commerce_checkout($addr, [ 'method'=>$gateway, 'intent'=>'gateway'] );
+        if (is_wp_error($res)) return $res;
+        $order_id = (int)$res['order_id'];
+        // Simulate gateway order/create response payload (replace with SDK/server call)
+        $gateway_order_id = 'gw_'.wp_generate_password(12,false,false);
+        global $wpdb; $orders=$wpdb->prefix.'svntex_orders';
+        $meta = $wpdb->get_var($wpdb->prepare("SELECT meta FROM $orders WHERE id=%d", $order_id)); $obj = json_decode((string)$meta,true); if(!is_array($obj)) $obj=[];
+        $obj['gateway'] = [ 'name'=>$gateway, 'order_id'=>$gateway_order_id, 'amount'=>$amount, 'currency'=>'INR', 'status'=>'created' ];
+        $wpdb->update($orders,[ 'meta'=> wp_json_encode($obj) ],[ 'id'=>$order_id ]);
+        return [ 'order_id'=>$order_id, 'gateway'=>$gateway, 'gateway_order_id'=>$gateway_order_id, 'amount'=>$amount, 'currency'=>'INR' ];
+    },'permission_callback'=>$secure_cb ] ]);
+    // Payments confirm: called from frontend after successful gateway payment; marks our order as paid
+    register_rest_route('svntex2/v1','/payments/confirm', [ [ 'methods'=>'POST','callback'=>function($r){
+        global $wpdb; $orders=$wpdb->prefix.'svntex_orders';
+        $order_id=(int)$r['order_id']; $payment_id=sanitize_text_field($r['payment_id']??''); $signature=sanitize_text_field($r['signature']??'');
+        if(!$order_id || !$payment_id) return new WP_Error('bad_request','order_id and payment_id required',['status'=>400]);
+        // TODO: Verify signature using gateway secret (server-side). Skipped here.
+        $meta = $wpdb->get_var($wpdb->prepare("SELECT meta FROM $orders WHERE id=%d", $order_id)); $obj = json_decode((string)$meta,true); if(!is_array($obj)) $obj=[];
+        $obj['gateway'] = isset($obj['gateway'])? $obj['gateway'] : [];
+        $obj['gateway']['payment_id'] = $payment_id; $obj['gateway']['signature'] = $signature; $obj['gateway']['status']='paid';
+        $wpdb->update($orders,[ 'status'=>'paid', 'meta'=> wp_json_encode($obj) ],[ 'id'=>$order_id ]);
+        return [ 'ok'=>true, 'order_id'=>$order_id, 'status'=>'paid' ];
+    },'permission_callback'=>'__return_true' ] ]);
+    // Webhook endpoint placeholder (optional if using confirm above)
+    register_rest_route('svntex2/v1','/payments/webhook', [ [ 'methods'=>'POST','callback'=>function($r){
+        // Parse gateway webhook and update order accordingly
+        return [ 'ok'=>true ];
+    },'permission_callback'=>'__return_true' ] ]);
     register_rest_route('svntex2/v1','/order/(?P<id>\d+)', [ [ 'methods'=>'GET','callback'=>function($r){
         global $wpdb; $oid=(int)$r['id']; if(!$oid) return new WP_Error('bad_request','id required',['status'=>400]);
         $orders=$wpdb->prefix.'svntex_orders'; $itemsT=$wpdb->prefix.'svntex_order_items';
