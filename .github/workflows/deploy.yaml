@@ -22,6 +22,7 @@ jobs:
           server-dir: /public_html/wp-content/plugins/svntex2-plugin/
           protocol: ftps
           port: 21
+          # Restrict local-dir to root but explicitly exclude SPA/static app folders and non-plugin assets
           local-dir: ./
           state-name: .ftp-deploy-sync-state.json
           exclude: |
@@ -35,6 +36,11 @@ jobs:
             **/*.log
             dev/**
             docs/**
+            custom-admin-v2/**
+            custom-member-v2/**
+            custom-admin/**
+            custom-landing/**
+            legacy/**
 
       # Static landing deploy removed to let WP render the styled landing as the homepage
 
