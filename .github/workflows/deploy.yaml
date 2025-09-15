@@ -18,8 +18,8 @@ jobs:
           server: 145.79.211.169
           username: u271371274
           password: ${{ secrets.FTP_PASSWORD }}
-          # Deploy into the domain's WordPress plugin folder
-          server-dir: /domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin/
+          # Deploy into the WordPress plugin folder (Hostinger single-domain path)
+          server-dir: /public_html/wp-content/plugins/svntex2-plugin/
           protocol: ftps
           port: 21
           local-dir: ./
@@ -44,7 +44,7 @@ jobs:
           server: 145.79.211.169
           username: u271371274
           password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: /domains/svntex.com/public_html/admin/
+          server-dir: /public_html/admin/
           protocol: ftps
           port: 21
           local-dir: ./custom-admin/
@@ -59,7 +59,7 @@ jobs:
           server: 145.79.211.169
           username: u271371274
           password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: /domains/svntex.com/public_html/admin-v2/
+          server-dir: /public_html/admin-v2/
           protocol: ftps
           port: 21
           local-dir: ./custom-admin-v2/
@@ -74,7 +74,7 @@ jobs:
           server: 145.79.211.169
           username: u271371274
           password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: /domains/svntex.com/public_html/member-v2/
+          server-dir: /public_html/member-v2/
           protocol: ftps
           port: 21
           local-dir: ./custom-member-v2/
