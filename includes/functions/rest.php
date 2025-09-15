@@ -203,6 +203,15 @@ add_action('rest_api_init', function(){
             return [ 'ok'=>true ];
         }
     ]);
+    // Admin: Support tickets (view/clear)
+    register_rest_route('svntex2/v1','/admin/support', [
+        'methods' => 'GET','permission_callback' => 'svntex2_api_can_manage',
+        'callback' => function(){ $log = get_option('svntex2_support_log'); if(!is_array($log)) $log=[]; return [ 'items'=> $log ]; }
+    ]);
+    register_rest_route('svntex2/v1','/admin/support/clear', [
+        'methods' => 'POST','permission_callback' => 'svntex2_api_can_manage',
+        'callback' => function(){ update_option('svntex2_support_log', [], false); return [ 'ok'=>true ]; }
+    ]);
     register_rest_route('svntex2/v1','/kyc/(?P<user_id>\d+)', [
         'methods' => 'POST', 'permission_callback' => 'svntex2_api_can_manage',
         'callback' => function( WP_REST_Request $r ){
@@ -534,6 +543,104 @@ add_action('rest_api_init', function(){
         }
     ]);
 
+    // Admin: Orders list + update
+    register_rest_route('svntex2/v1','/admin/orders', [
+        'methods'=>'GET','permission_callback'=>'svntex2_api_can_manage',
+        'callback'=>function(WP_REST_Request $r){
+            global $wpdb; $t=$wpdb->prefix.'svntex_orders';
+            $status = sanitize_text_field($r->get_param('status'));
+            $pp = min( (int)($r->get_param('per_page') ?: 50), 200 );
+            if($status){ $rows=$wpdb->get_results( $wpdb->prepare("SELECT id,user_id,status,items_total,delivery_total,grand_total,created_at FROM $t WHERE status=%s ORDER BY id DESC LIMIT %d", $status, $pp), ARRAY_A ); }
+            else { $rows=$wpdb->get_results( $wpdb->prepare("SELECT id,user_id,status,items_total,delivery_total,grand_total,created_at FROM $t ORDER BY id DESC LIMIT %d", $pp), ARRAY_A ); }
+            return [ 'items'=> ($rows?:[]) ];
+        }
+    ]);
+    register_rest_route('svntex2/v1','/admin/orders/(?P<id>\d+)', [
+        'methods'=>'POST','permission_callback'=>'svntex2_api_can_manage',
+        'callback'=>function(WP_REST_Request $r){
+            global $wpdb; $t=$wpdb->prefix.'svntex_orders'; $id=(int)$r['id']; if(!$id) return new WP_REST_Response(['error'=>'Invalid id'],400);
+            $status = sanitize_text_field($r->get_param('status'));
+            $note = sanitize_text_field($r->get_param('admin_note'));
+            $allowed = ['pending','paid','processing','shipped','delivered','cancelled','refunded'];
+            if($status && !in_array($status,$allowed,true)) return new WP_REST_Response(['error'=>'Invalid status'],400);
+            // Update status
+            if($status){ $wpdb->update($t,[ 'status'=>$status ],[ 'id'=>$id ]); }
+            // Append note into meta JSON
+            if($note!==''){
+                $meta = $wpdb->get_var( $wpdb->prepare("SELECT meta FROM $t WHERE id=%d", $id) );
+                $obj = json_decode((string)$meta, true); if(!is_array($obj)) $obj=[]; if(!isset($obj['admin_notes'])) $obj['admin_notes']=[]; $obj['admin_notes'][]=['note'=>$note,'by'=>get_current_user_id(),'at'=>current_time('mysql')];
+                $wpdb->update($t,[ 'meta'=> wp_json_encode($obj) ],[ 'id'=>$id ]);
+            }
+            return [ 'id'=>$id, 'status'=>$status?:null ];
+        }
+    ]);
+
+    // Admin: Withdrawals list + actions
+    register_rest_route('svntex2/v1','/admin/withdrawals', [
+        'methods'=>'GET','permission_callback'=>'svntex2_api_can_manage',
+        'callback'=>function(WP_REST_Request $r){
+            global $wpdb; $t=$wpdb->prefix.'svntex_withdrawals';
+            $status = sanitize_text_field($r->get_param('status'));
+            $pp = min( (int)($r->get_param('per_page') ?: 100), 300 );
+            if($status){ $rows=$wpdb->get_results( $wpdb->prepare("SELECT * FROM $t WHERE status=%s ORDER BY id DESC LIMIT %d", $status, $pp), ARRAY_A ); }
+            else { $rows=$wpdb->get_results( $wpdb->prepare("SELECT * FROM $t ORDER BY id DESC LIMIT %d", $pp), ARRAY_A ); }
+            return [ 'items'=> ($rows?:[]) ];
+        }
+    ]);
+    register_rest_route('svntex2/v1','/admin/withdrawals/(?P<id>\d+)', [
+        'methods'=>'POST','permission_callback'=>'svntex2_api_can_manage',
+        'callback'=>function(WP_REST_Request $r){
+            $id=(int)$r['id']; $action=sanitize_key($r->get_param('action')); $note=sanitize_text_field($r->get_param('admin_note'));
+            if(!$id || !in_array($action,['approve','reject'],true)) return new WP_REST_Response(['error'=>'Invalid'],400);
+            $ok = svntex2_withdraw_process($id, $action==='approve'?'approved':'rejected', $note);
+            return [ 'ok'=>(bool)$ok ];
+        }
+    ]);
+
+    // Admin: Wallet adjust (credit/debit)
+    register_rest_route('svntex2/v1','/wallet/adjust', [
+        'methods'=>'POST','permission_callback'=>'svntex2_api_can_manage',
+        'callback'=>function(WP_REST_Request $r){
+            $uid = (int)$r->get_param('user_id'); $amount = (float)$r->get_param('amount'); $dir = sanitize_key($r->get_param('direction')) ?: 'credit';
+            if(!$uid || $amount<=0) return new WP_REST_Response(['error'=>'user_id and positive amount required'],400);
+            $sign = ($dir==='debit'||$dir==='deduct'||$dir==='withdraw') ? -1 : 1;
+            $cat = sanitize_key($r->get_param('category')) ?: 'general';
+            $note = sanitize_text_field($r->get_param('note'));
+            $ref = 'admin:adjust:'.uniqid();
+            $meta = [ 'note'=>$note, 'by'=>get_current_user_id(), 'at'=>current_time('mysql') ];
+            $new = svntex2_wallet_add_transaction($uid, 'admin_adjust', $sign*$amount, $ref, $meta, $cat);
+            return [ 'ok'=>true, 'balance'=>$new ];
+        }
+    ]);
+
+    // Admin: Analytics KPIs
+    register_rest_route('svntex2/v1','/admin/analytics', [
+        'methods'=>'GET','permission_callback'=>'svntex2_api_can_manage',
+        'callback'=>function(){
+            global $wpdb; $pref=$wpdb->prefix; $users_tbl=$wpdb->users; $orders=$pref.'svntex_orders'; $wallet=$pref.'svntex_wallet_transactions'; $wd=$pref.'svntex_withdrawals';
+            $users_total = (int) $wpdb->get_var("SELECT COUNT(*) FROM $users_tbl");
+            $products_total = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$pref}posts WHERE post_type='svntex_product' AND post_status IN ('publish','draft')");
+            $orders_total = (int) $wpdb->get_var("SELECT COUNT(*) FROM $orders");
+            $orders_pending = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $orders WHERE status=%s", 'pending'));
+            $revenue_today = (float) $wpdb->get_var($wpdb->prepare("SELECT COALESCE(SUM(grand_total),0) FROM $orders WHERE DATE(created_at)=CURDATE()"));
+            $revenue_month = (float) $wpdb->get_var($wpdb->prepare("SELECT COALESCE(SUM(grand_total),0) FROM $orders WHERE DATE_FORMAT(created_at,'%Y-%m') = DATE_FORMAT(CURDATE(),'%Y-%m')"));
+            $withdrawals_requested = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $wd WHERE status=%s", 'requested'));
+            $since7 = gmdate('Y-m-d H:i:s', time()-7*DAY_IN_SECONDS);
+            $wallet_7d_count = (int) $wpdb->get_var( $wpdb->prepare("SELECT COUNT(*) FROM $wallet WHERE created_at >= %s", $since7) );
+            $wallet_7d_sum = (float) $wpdb->get_var( $wpdb->prepare("SELECT COALESCE(SUM(amount),0) FROM $wallet WHERE created_at >= %s", $since7) );
+            return [
+                'users_total'=>$users_total,
+                'products_total'=>$products_total,
+                'orders_total'=>$orders_total,
+                'orders_pending'=>$orders_pending,
+                'revenue_today'=>$revenue_today,
+                'revenue_month'=>$revenue_month,
+                'withdrawals_requested'=>$withdrawals_requested,
+                'wallet_7d_count'=>$wallet_7d_count,
+                'wallet_7d_sum'=>$wallet_7d_sum
+            ];
+        }
+    ]);
     // Users
     register_rest_route('svntex2/v1','/users', [
         [

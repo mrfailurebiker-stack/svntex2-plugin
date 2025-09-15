@@ -22,8 +22,12 @@
           <a href="#dashboard" class="active">Dashboard</a>
           <a href="#users">Users</a>
           <a href="#products">Products</a>
+          <a href="#orders">Orders</a>
           <a href="#wallet">Wallet</a>
           <a href="#referrals">Referrals</a>
+          <a href="#vendors">Vendors</a>
+          <a href="#support">Support</a>
+          <a href="#withdrawalsAdmin">Withdrawals</a>
           <a href="#kyc">KYC</a>
           <a href="#logout" id="logout">Logout</a>
         </nav>
@@ -32,32 +36,32 @@
         <section id="dashboard" class="section">
           <h2>Dashboard</h2>
           <div class="cards" style="margin-top:10px">
-            <div class="card" data-goto="#users">
-              <div class="title">Users</div>
-              <div class="kpi" id="kpiUsers">--</div>
-              <div class="desc">Total registered</div>
-            </div>
-            <div class="card" data-goto="#products">
-              <div class="title">Products</div>
-              <div class="kpi" id="kpiProducts">--</div>
-              <div class="desc">Total products</div>
-            </div>
-            <div class="card" data-goto="#wallet">
-              <div class="title">Wallet</div>
-              <div class="kpi" id="kpiWallet">--</div>
-              <div class="desc">Recent transactions</div>
-            </div>
-            <div class="card" data-goto="#referrals">
-              <div class="title">Referrals</div>
-              <div class="kpi" id="kpiReferrals">--</div>
-              <div class="desc">Linked entries</div>
-            </div>
-            <div class="card" data-goto="#kyc">
-              <div class="title">KYC</div>
-              <div class="kpi" id="kpiKyc">--</div>
-              <div class="desc">Pending/Total</div>
-            </div>
+            <div class="card" data-goto="#users"><div class="title">Users</div><div class="kpi" id="kpiUsers">--</div><div class="desc">Total registered</div></div>
+            <div class="card" data-goto="#products"><div class="title">Products</div><div class="kpi" id="kpiProducts">--</div><div class="desc">Total products</div></div>
+            <div class="card" data-goto="#orders"><div class="title">Orders</div><div class="kpi" id="kpiOrders">--</div><div class="desc">Total / Pending</div></div>
+            <div class="card" data-goto="#wallet"><div class="title">Wallet</div><div class="kpi" id="kpiWallet">--</div><div class="desc">Tx (7d)</div></div>
+            <div class="card"><div class="title">Revenue (Today)</div><div class="kpi" id="kpiRevToday">--</div><div class="desc">Gross</div></div>
+            <div class="card"><div class="title">Revenue (Month)</div><div class="kpi" id="kpiRevMonth">--</div><div class="desc">Gross</div></div>
+            <div class="card" data-goto="#referrals"><div class="title">Referrals</div><div class="kpi" id="kpiReferrals">--</div><div class="desc">Linked entries</div></div>
+            <div class="card" data-goto="#withdrawalsAdmin"><div class="title">Withdrawals</div><div class="kpi" id="kpiWd">--</div><div class="desc">Requested</div></div>
+            <div class="card" data-goto="#kyc"><div class="title">KYC</div><div class="kpi" id="kpiKyc">--</div><div class="desc">Pending/Total</div></div>
           </div>
+        </section>
+        <section id="orders" class="section hidden"><h2>Orders</h2>
+          <div class="grid columns-3" style="max-width:840px">
+            <label>Status
+              <select id="ordStatus"><option value="">All</option><option>pending</option><option>paid</option><option>processing</option><option>shipped</option><option>delivered</option><option>cancelled</option><option>refunded</option></select>
+            </label>
+            <div class="grid" style="grid-auto-flow:column;align-items:end"><button id="ordLoad">Load</button></div>
+          </div>
+          <div id="ordList" class="list" style="margin-top:10px">No orders.</div>
+        </section>
+        <section id="withdrawalsAdmin" class="section hidden"><h2>Withdrawals</h2>
+          <div class="grid columns-3" style="max-width:840px">
+            <label>Status<select id="wdStatus"><option value="">All</option><option>requested</option><option>approved</option><option>rejected</option></select></label>
+            <div class="grid" style="grid-auto-flow:column;align-items:end"><button id="wdAdminLoad">Load</button></div>
+          </div>
+          <div id="wdAdminList" class="list" style="margin-top:10px">No withdrawals.</div>
         </section>
         <section id="users" class="section hidden"><h2>Users</h2>
           <div id="usersBox" class="muted">Loading...</div>
@@ -185,6 +189,10 @@
             <div id="prodMsg" class="muted"></div>
           </form>
           <div id="prodList" class="list">Loading...</div>
+          <div id="prodReviewsBox" class="grid" style="max-width:860px;margin-top:16px;display:none">
+            <div class="grid" style="grid-auto-flow:column;justify-content:start"><button id="prodRevLoad">Load Reviews</button></div>
+            <div id="prodRevList" class="list">No reviews.</div>
+          </div>
         </section>
         <section id="wallet" class="section hidden"><h2>Wallet</h2>
           <div class="grid columns-3" style="max-width:840px">
@@ -208,6 +216,29 @@
             <div class="grid" style="grid-auto-flow:column;align-items:end"><button id="refLoad">Load</button></div>
           </div>
           <div id="refList" class="list" style="margin-top:10px">No referrals.</div>
+        </section>
+        <section id="vendors" class="section hidden"><h2>Vendors</h2>
+          <div class="grid columns-2" style="max-width:860px">
+            <div>
+              <div id="venList" class="list">Loading...</div>
+            </div>
+            <form id="venForm" class="grid">
+              <h3>Edit Vendor</h3>
+              <input type="hidden" name="id" />
+              <label>Name<input name="name" required /></label>
+              <label>Email<input name="email" /></label>
+              <label>Phone<input name="phone" /></label>
+              <label>Notes<textarea name="notes" rows="3"></textarea></label>
+              <div class="grid" style="grid-auto-flow:column;justify-content:start"><button type="submit">Save</button><button type="button" id="venNew" class="secondary">New</button></div>
+              <div id="venMsg" class="muted"></div>
+            </form>
+          </div>
+        </section>
+        <section id="support" class="section hidden"><h2>Support</h2>
+          <div class="grid" style="max-width:860px">
+            <div class="grid" style="grid-auto-flow:column;justify-content:start"><button id="supLoad">Load Tickets</button><button id="supClear" class="secondary">Clear</button></div>
+            <div id="supList" class="list">No tickets.</div>
+          </div>
         </section>
         <section id="kyc" class="section hidden"><h2>KYC</h2>
           <div class="grid" style="max-width:860px">
@@ -351,23 +382,29 @@
 
       async function loadKpis(){
         try{
-          const [u, p, w, r, k] = await Promise.all([
-            fetch('/wp-json/svntex2/v1/users?per_page=1', { credentials:'include', headers }).then(r=>r.json()).catch(()=>({total:0})),
-            fetch('/wp-json/svntex2/v1/products?per_page=1', { credentials:'include', headers }).then(r=>r.json()).catch(()=>({total:0})),
-            fetch('/wp-json/svntex2/v1/wallet/transactions?per_page=10', { credentials:'include', headers }).then(r=>r.json()).catch(()=>({items:[]})),
-            fetch('/wp-json/svntex2/v1/referrals', { credentials:'include', headers }).then(r=>r.json()).catch(()=>({items:[]})),
-            fetch('/wp-json/svntex2/v1/kyc', { credentials:'include', headers }).then(r=>r.json()).catch(()=>({items:[]})),
-          ]);
-          document.getElementById('kpiUsers').textContent = (u && typeof u.total==='number') ? u.total : '--';
-          document.getElementById('kpiProducts').textContent = (p && typeof p.total==='number') ? p.total : '--';
-          document.getElementById('kpiWallet').textContent = (w && w.items) ? w.items.length : '--';
-          const refItems = (r && r.items) || []; document.getElementById('kpiReferrals').textContent = refItems.length;
-          const kitems = (k && k.items) || []; const pend = kitems.filter(x=>x.status==='pending').length; document.getElementById('kpiKyc').textContent = `${pend}/${kitems.length}`;
+          const a = await fetch('/wp-json/svntex2/v1/admin/analytics', { credentials:'include', headers });
+          const j = a.ok ? await a.json() : null; if(!j) return;
+          document.getElementById('kpiUsers').textContent = j.users_total ?? '--';
+          document.getElementById('kpiProducts').textContent = j.products_total ?? '--';
+          const oTot = (j.orders_total ?? '--'); const oPen = (j.orders_pending ?? '0'); document.getElementById('kpiOrders').textContent = `${oTot} / ${oPen}`;
+          document.getElementById('kpiWallet').textContent = j.wallet_7d_count ?? '--';
+          document.getElementById('kpiRevToday').textContent = '₹'+Number(j.revenue_today||0).toFixed(2);
+          document.getElementById('kpiRevMonth').textContent = '₹'+Number(j.revenue_month||0).toFixed(2);
+          document.getElementById('kpiWd').textContent = j.withdrawals_requested ?? '--';
+          // Supplementary counts
+          try {
+            const [r, k] = await Promise.all([
+              fetch('/wp-json/svntex2/v1/referrals', { credentials:'include', headers }).then(r=>r.json()).catch(()=>({items:[]})),
+              fetch('/wp-json/svntex2/v1/kyc', { credentials:'include', headers }).then(r=>r.json()).catch(()=>({items:[]})),
+            ]);
+            const refItems = (r && r.items) || []; document.getElementById('kpiReferrals').textContent = refItems.length;
+            const kitems = (k && k.items) || []; const pend = kitems.filter(x=>x.status==='pending').length; document.getElementById('kpiKyc').textContent = `${pend}/${kitems.length}`;
+          } catch(e){}
         }catch(e){}
       }
       await loadKpis();
 
-      const sections = ['dashboard','users','products','wallet','referrals','kyc'];
+  const sections = ['dashboard','users','products','orders','wallet','referrals','vendors','support','withdrawalsAdmin','kyc'];
       function showSection(name){
         sections.forEach(id=>{
           const el = document.getElementById(id);
@@ -460,11 +497,17 @@
           try{ const vm = p.meta?.video_media ?? p.video_media ?? 0; prodForm.video_media.value = vm || ''; if(vm){ const vr = await fetch(`/wp-json/wp/v2/media/${vm}`, { credentials:'include', headers }); if(vr.ok){ const vj = await vr.json(); document.getElementById('vidPreview').innerHTML = `<video src="${vj.source_url}" controls style="max-width:220px;border-radius:6px"></video>`; } } else { document.getElementById('vidPreview').textContent='No video'; } }catch(e){ document.getElementById('vidPreview').textContent='No video'; }
           try{ galleryIds = Array.isArray(p.meta?.gallery) ? p.meta.gallery.map(x=>parseInt(x,10)).filter(Boolean) : []; await renderGallery(); }catch(e){}
           pm('Loaded product for editing'); toast('Product loaded');
+          // Show reviews box for this product
+          const rb=document.getElementById('prodReviewsBox'); if(rb){ rb.style.display='block'; rb.setAttribute('data-pid', String(p.id)); document.getElementById('prodRevList').innerHTML=''; }
         }
         const delId = e.target.getAttribute('data-del');
         if(delId){ e.preventDefault(); if(!confirm('Delete product #'+delId+'?')) return; const r = await fetch(`/wp-json/svntex2/v1/products/${delId}`, { method:'DELETE', credentials:'include', headers }); const j = await r.json(); if(j.deleted){ pm('Deleted'); toast('Deleted'); loadProducts(); } else { pm(j.error||'Delete failed'); toast('Delete failed'); } }
       });
       document.getElementById('prodReset').addEventListener('click', (e)=>{ e.preventDefault(); prodForm.reset(); prodForm.id.value=''; document.getElementById('imgPreview').textContent=''; document.getElementById('vidPreview').textContent=''; pm(''); });
+
+  // Product reviews moderation
+  document.getElementById('prodRevLoad')?.addEventListener('click', async (e)=>{ e.preventDefault(); const box=document.getElementById('prodReviewsBox'); const pid=box?.getAttribute('data-pid'); if(!pid){ toast('Select a product'); return; } const r=await fetch(`/wp-json/svntex2/v1/products/${pid}/reviews`,{credentials:'include',headers}); const j=await r.json(); const items=j.items||[]; const list=document.getElementById('prodRevList'); list.innerHTML = items.map(rv=>`<div class="list-item"><div>#${rv.id} · ${rv.author||''} · ${rv.status}</div><div class="meta">${rv.date||''}${rv.rating?(' · ★'+rv.rating):''}${rv.featured?' · featured':''}</div><div class="muted" style="margin-top:6px">${(rv.content||'').replace(/[<>]/g,'')}</div><div style="margin-top:6px"><a href="#" data-rid="${rv.id}" data-ra="approve">Approve</a> <a href="#" data-rid="${rv.id}" data-ra="hold">Hold</a> <a href="#" data-rid="${rv.id}" data-ra="trash">Trash</a> <a href="#" data-rid="${rv.id}" data-ra="feature">Feature</a> <a href="#" data-rid="${rv.id}" data-ra="unfeature">Unfeature</a></div></div>`).join('') || '<div class="muted">No reviews.</div>'; });
+  document.getElementById('prodRevList')?.addEventListener('click', async (e)=>{ const cid=e.target.getAttribute('data-rid'); const act=e.target.getAttribute('data-ra'); if(!cid||!act) return; e.preventDefault(); const r=await fetch('/wp-json/svntex2/v1/products/0/reviews',{method:'POST',credentials:'include',headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({comment_id:parseInt(cid,10), action:act})}); const j=await r.json(); toast(j.ok?'Done':'Failed'); document.getElementById('prodRevLoad').click(); });
 
       const imgInput = document.getElementById('prodImage');
       imgInput.addEventListener('change', async (e)=>{
@@ -517,6 +560,13 @@
       const wList = document.getElementById('wList');
       async function loadWallet(){ const q = wUserId.value ? ('?user_id='+encodeURIComponent(wUserId.value)) : ''; const r = await fetch('/wp-json/svntex2/v1/wallet/transactions'+q, { credentials:'include', headers }); const j = await r.json(); const items = j.items || []; wList.innerHTML = items.map(x=>`<div class="list-item"><div>#${x.id} · u${x.user_id} · ${x.type} · ${x.category} · ${x.amount}</div><div class="meta">${x.created_at}</div></div>`).join('') || '<div class="muted">No transactions.</div>'; }
       document.getElementById('wLoad').addEventListener('click', (e)=>{ e.preventDefault(); loadWallet(); });
+      // Wallet Adjust quick form UI
+      try{
+        const wAdj = document.createElement('div'); wAdj.className='grid columns-3'; wAdj.style.maxWidth='840px'; wAdj.style.marginTop='10px';
+        wAdj.innerHTML = '<label>Adjust Amount<input id="wAdjAmt" type="number" step="0.01" min="0"></label><label>Direction<select id="wAdjDir"><option value="credit">Credit</option><option value="debit">Debit</option></select></label><div class="grid" style="grid-auto-flow:column;align-items:end"><button id="wAdjBtn">Apply</button></div>';
+        const wl = document.getElementById('wList'); wl.parentElement.insertBefore(wAdj, wl);
+        document.getElementById('wAdjBtn').addEventListener('click', async (e)=>{ e.preventDefault(); const uid=parseInt(wUserId.value||'0',10)||0; const amt=parseFloat(document.getElementById('wAdjAmt').value||'0')||0; const dir=document.getElementById('wAdjDir').value; if(!uid||!amt){ toast('User and amount required'); return; } const r=await fetch('/wp-json/svntex2/v1/wallet/adjust',{ method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ user_id:uid, amount:amt, direction:dir, category:'general', note:'panel' }) }); const j=await r.json(); toast(j.ok?'Adjusted':'Failed'); loadWallet(); });
+      }catch(e){}
 
       // Referrals
       const refList = document.getElementById('refList');
@@ -524,12 +574,39 @@
       document.getElementById('refLoad').addEventListener('click', (e)=>{ e.preventDefault(); loadReferrals(); });
       document.getElementById('refLink').addEventListener('click', async (e)=>{ e.preventDefault(); const ref = parseInt(document.getElementById('refReferrer').value,10)||0; const ree = parseInt(document.getElementById('refReferee').value,10)||0; if(!ref||!ree){ toast('IDs required'); return; } const r = await fetch('/wp-json/svntex2/v1/referrals/link', { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ referrer_id:ref, referee_id:ree }) }); const j = await r.json(); toast(j.ok?'Linked':'Not linked'); loadReferrals(); });
       document.getElementById('refQualify').addEventListener('click', async (e)=>{ e.preventDefault(); const ref = parseInt(document.getElementById('refReferrer').value,10)||0; const ree = parseInt(document.getElementById('refReferee').value,10)||0; const amt = parseFloat(document.getElementById('refAmount').value||'0')||0; if(!ref||!ree){ toast('IDs required'); return; } const r = await fetch('/wp-json/svntex2/v1/referrals/qualify', { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ referrer_id:ref, referee_id:ree, amount:amt }) }); const j = await r.json(); toast(j.ok?'Qualified':'Failed'); loadReferrals(); });
+      
+  // Vendors
+  const venList = document.getElementById('venList');
+  const venForm = document.getElementById('venForm');
+  function vm(t){ const el=document.getElementById('venMsg'); if(el) el.textContent=t; }
+  async function loadVendorsUI(){ if(!venList) return; venList.textContent='Loading...'; const r=await fetch('/wp-json/svntex2/v1/vendors',{credentials:'include',headers}); const j=await r.json(); const items=j.items||[]; venList.innerHTML = items.map(v=>`<div class="list-item"><div><a href="#" data-vid="${v.id}">#${v.id}</a> ${v.name}</div><div class="meta">${v.email||''} ${v.phone?('· '+v.phone):''}</div></div>`).join('') || '<div class="muted">No vendors.</div>'; }
+  if(venList){ await loadVendorsUI(); venList.addEventListener('click', async (e)=>{ const id=e.target.getAttribute('data-vid'); if(!id) return; e.preventDefault(); const r=await fetch('/wp-json/svntex2/v1/vendors/'+id,{credentials:'include',headers}); const v=await r.json(); venForm.id.value=v.id; venForm.name.value=v.name||''; venForm.email.value=v.email||''; venForm.phone.value=v.phone||''; venForm.notes.value=v.notes||''; vm(''); }); }
+  document.getElementById('venNew')?.addEventListener('click',(e)=>{ e.preventDefault(); venForm.reset(); venForm.id.value=''; vm(''); });
+  venForm?.addEventListener('submit', async (e)=>{ e.preventDefault(); vm('Saving...'); const data=Object.fromEntries(new FormData(venForm).entries()); const id=data.id; delete data.id; const url=id?('/wp-json/svntex2/v1/vendors/'+id):'/wp-json/svntex2/v1/vendors'; const r=await fetch(url,{method:'POST',credentials:'include',headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify(data)}); const j=await r.json(); vm(j.id?'Saved':'Failed'); loadVendorsUI(); });
+
+  // Support Admin
+  const supList = document.getElementById('supList');
+  document.getElementById('supLoad')?.addEventListener('click', async (e)=>{ e.preventDefault(); const r=await fetch('/wp-json/svntex2/v1/admin/support',{credentials:'include',headers}); const j=await r.json(); const items=j.items||[]; supList.innerHTML = items.map(t=>`<div class="list-item"><div>u${t.user_id} · ${t.subject}</div><div class="meta">${t.ts||''}</div><div class="muted" style="margin-top:6px">${(t.message||'').replace(/[<>]/g,'')}</div></div>`).join('') || '<div class="muted">No tickets.</div>'; });
+  document.getElementById('supClear')?.addEventListener('click', async (e)=>{ e.preventDefault(); if(!confirm('Clear all tickets?')) return; const r=await fetch('/wp-json/svntex2/v1/admin/support/clear',{method:'POST',credentials:'include',headers}); const j=await r.json(); if(j.ok){ supList.innerHTML='<div class="muted">No tickets.</div>'; toast('Cleared'); }
+  });
 
       // KYC Admin
       const kycList = document.getElementById('kycList');
       async function loadKyc(){ const r = await fetch('/wp-json/svntex2/v1/kyc', { credentials:'include', headers }); const j = await r.json(); const items = j.items || []; kycList.innerHTML = items.map(x=>`<div class="list-item"><div>User ${x.user_id} · ${x.status}</div><div><a href="#" data-kyc-user="${x.user_id}" data-kyc-status="approved">Approve</a> <a href="#" data-kyc-user="${x.user_id}" data-kyc-status="rejected">Reject</a></div></div>`).join('') || '<div class="muted">No submissions.</div>'; }
       document.getElementById('kycLoad').addEventListener('click', (e)=>{ e.preventDefault(); loadKyc(); });
       kycList.addEventListener('click', async (e)=>{ const uid = e.target.getAttribute('data-kyc-user'); const st = e.target.getAttribute('data-kyc-status'); if(!uid||!st) return; e.preventDefault(); const r = await fetch(`/wp-json/svntex2/v1/kyc/${uid}`, { method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ status:st }) }); const j = await r.json(); if(j && j.user_id){ toast('KYC '+st); loadKyc(); } else { toast('Failed'); } });
+
+  // Orders Admin
+  const ordList = document.getElementById('ordList');
+  const ordLoadBtn = document.getElementById('ordLoad'); if(ordLoadBtn){ ordLoadBtn.addEventListener('click', async (e)=>{ e.preventDefault(); await loadOrdersAdmin(); }); }
+  async function loadOrdersAdmin(){ const st = document.getElementById('ordStatus').value; const q = st? ('?status='+encodeURIComponent(st)) : ''; const r = await fetch('/wp-json/svntex2/v1/admin/orders'+q, { credentials:'include', headers }); const j = await r.json(); const items=j.items||[]; ordList.innerHTML = items.map(o=>`<div class="list-item"><div>#${o.id} · u${o.user_id} · ${o.status}</div><div class="meta">₹${Number(o.grand_total||0).toFixed(2)} · ${o.created_at}</div><div><a href="#" data-oid="${o.id}" data-st="processing">Processing</a> <a href="#" data-oid="${o.id}" data-st="shipped">Shipped</a> <a href="#" data-oid="${o.id}" data-st="delivered">Delivered</a></div></div>`).join('') || '<div class="muted">No orders.</div>'; }
+  if(ordList){ ordList.addEventListener('click', async (e)=>{ const id=e.target.getAttribute('data-oid'); const st=e.target.getAttribute('data-st'); if(!id||!st) return; e.preventDefault(); const r=await fetch('/wp-json/svntex2/v1/admin/orders/'+id,{ method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ status:st }) }); const j=await r.json(); toast(j.id?'Updated':'Failed'); loadOrdersAdmin(); }); }
+
+  // Withdrawals Admin
+  const wdAdminList = document.getElementById('wdAdminList');
+  const wdAdminLoad = document.getElementById('wdAdminLoad'); if(wdAdminLoad){ wdAdminLoad.addEventListener('click', async (e)=>{ e.preventDefault(); await loadWdAdmin(); }); }
+  async function loadWdAdmin(){ const st=document.getElementById('wdStatus').value; const q=st?('?status='+encodeURIComponent(st)) : ''; const r=await fetch('/wp-json/svntex2/v1/admin/withdrawals'+q,{ credentials:'include', headers }); const j=await r.json(); const items=j.items||[]; wdAdminList.innerHTML = items.map(w=>`<div class="list-item"><div>#${w.id} · u${w.user_id} · ${w.status}</div><div class="meta">₹${Number(w.amount||0).toFixed(2)}${w.net_amount?(' · Net ₹'+Number(w.net_amount).toFixed(2)) : ''} · ${w.requested_at||''}</div><div>${w.status==='requested'?`<a href="#" data-wid="${w.id}" data-act="approve">Approve</a> <a href="#" data-wid="${w.id}" data-act="reject">Reject</a>`:''}</div></div>`).join('') || '<div class="muted">No withdrawals.</div>'; }
+  if(wdAdminList){ wdAdminList.addEventListener('click', async (e)=>{ const id=e.target.getAttribute('data-wid'); const act=e.target.getAttribute('data-act'); if(!id||!act) return; e.preventDefault(); const note=prompt('Note (optional)',''); const r=await fetch('/wp-json/svntex2/v1/admin/withdrawals/'+id,{ method:'POST', credentials:'include', headers:{...headers,'Content-Type':'application/json'}, body: JSON.stringify({ action:act, admin_note: note||'' }) }); const j=await r.json(); toast(j.ok?'Updated':'Failed'); loadWdAdmin(); }); }
     })();
     </script>
   </body>
