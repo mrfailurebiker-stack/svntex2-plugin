@@ -251,6 +251,9 @@ add_action('rest_api_init', function(){
             $uid = get_current_user_id();
             $log = get_option('svntex2_support_log'); if(!is_array($log)) $log = [];
             $log[] = [ 'user_id'=>$uid, 'subject'=>$sub, 'message'=>$msg, 'ts'=>current_time('mysql') ];
+            // Cap to last 200 entries to avoid options table bloat
+            if (count($log) > 200) { $log = array_slice($log, -200); }
+            // Ensure not autoloaded
             update_option('svntex2_support_log', $log, false);
             return [ 'ok'=>true ];
         }
@@ -258,11 +261,11 @@ add_action('rest_api_init', function(){
     // Admin: Support tickets (view/clear)
     register_rest_route('svntex2/v1','/admin/support', [
         'methods' => 'GET','permission_callback' => 'svntex2_api_can_manage',
-        'callback' => function(){ $log = get_option('svntex2_support_log'); if(!is_array($log)) $log=[]; return [ 'items'=> $log ]; }
+    'callback' => function(){ $log = get_option('svntex2_support_log'); if(!is_array($log)) $log=[]; return [ 'items'=> $log ]; }
     ]);
     register_rest_route('svntex2/v1','/admin/support/clear', [
         'methods' => 'POST','permission_callback' => 'svntex2_api_can_manage',
-        'callback' => function(){ update_option('svntex2_support_log', [], false); return [ 'ok'=>true ]; }
+    'callback' => function(){ update_option('svntex2_support_log', [], false); return [ 'ok'=>true ]; }
     ]);
     register_rest_route('svntex2/v1','/kyc/(?P<user_id>\d+)', [
         'methods' => 'POST', 'permission_callback' => 'svntex2_api_can_manage',

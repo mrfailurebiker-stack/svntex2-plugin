@@ -140,5 +140,7 @@ function svntex2_do_login(){
   $auth = wp_signon([ 'user_login'=>$user->user_login, 'user_password'=>$pass, 'remember'=>$remember ], is_ssl());
   if ( is_wp_error($auth) ) { wp_send_json_error(['message'=>'Invalid credentials']); }
   wp_set_current_user($auth->ID);
-  wp_send_json_success(['redirect'=> home_url('/'.SVNTEX2_DASHBOARD_SLUG.'/') ]);
+  // Send target based on role
+  $dest = user_can($auth, 'manage_options') ? site_url('/admin-v2/panel.html') : site_url('/member-v2/app.html');
+  wp_send_json_success(['redirect'=> $dest ]);
 }

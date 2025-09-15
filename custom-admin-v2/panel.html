@@ -657,7 +657,7 @@
       document.getElementById('kycLoad')?.addEventListener('click', async ()=>{ const r=await fetch('/wp-json/svntex2/v1/kyc',{credentials:'include',headers}); const j=await r.json(); const box=document.getElementById('kycList'); const items=(j&&j.items)||[]; box.innerHTML = items.length? items.map(k=>`<div class="list-item">#${k.id} · U${k.user_id} · ${k.status} · ${k.created_at||''}</div>`).join('') : 'No submissions.'; });
 
       // Logout
-  var logoutEl=document.getElementById('logout'); if(logoutEl){ logoutEl.addEventListener('click', (e)=>{ e.preventDefault(); location.href = '/logout-handler.php'; }); }
+  var logoutEl=document.getElementById('logout'); if(logoutEl){ logoutEl.addEventListener('click', (e)=>{ e.preventDefault(); location.href = '/wp-admin/admin-post.php?action=svntex2_logout'; }); }
 
       // Settings: Payments
       const payForm = document.getElementById('payForm');

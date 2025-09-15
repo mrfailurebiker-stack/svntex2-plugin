@@ -77,6 +77,37 @@ function svntex_init() {
 add_action( 'init', 'svntex_init' );
 
 /**
+ * Redirect users after login to the correct SPA and keep non-admins out of wp-admin.
+ */
+add_filter('login_redirect', function($redirect_to, $request, $user){
+    if ( is_wp_error($user) || ! $user ) return $redirect_to;
+    if ( user_can($user, 'manage_options') ) {
+        return site_url('/admin-v2/panel.html');
+    }
+    return site_url('/member-v2/app.html');
+}, 10, 3);
+
+// Prevent non-admins from accessing wp-admin (except AJAX)
+add_action('admin_init', function(){
+    if ( ! current_user_can('edit_posts') && ! ( defined('DOING_AJAX') && DOING_AJAX ) ) {
+        wp_safe_redirect( site_url('/member-v2/app.html') );
+        exit;
+    }
+});
+
+// If a logged-in user hits the login page, send them to their SPA
+add_action('template_redirect', function(){
+    if ( is_user_logged_in() ) {
+        // Redirect from our shortcode login page slug
+        if ( is_page( SVNTEX2_LOGIN_SLUG ) ) {
+            if ( current_user_can('manage_options') ) wp_safe_redirect( site_url('/admin-v2/panel.html') );
+            else wp_safe_redirect( site_url('/member-v2/app.html') );
+            exit;
+        }
+    }
+});
+
+/**
  * One-time demo users seeding (requested):
  * - Admin: username nithin / password 1234
  * - Member: username detest / password 1234

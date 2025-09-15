@@ -184,4 +184,17 @@ function svntex2_run_monthly_distribution(){
     do_action('svntex2_profit_bonus_completed', $month, $pool, $eligible_count );
 }
 
+// Lightweight weekly maintenance: trim support logs and clean expired transients
+add_action('init', function(){
+    if (!wp_next_scheduled('svntex2_weekly_maintenance')) {
+        wp_schedule_event(time()+180, 'weekly', 'svntex2_weekly_maintenance');
+    }
+});
+add_action('svntex2_weekly_maintenance', function(){
+    // Trim support log to last 200 items
+    $log = get_option('svntex2_support_log'); if(is_array($log) && count($log) > 200){ $log = array_slice($log, -200); update_option('svntex2_support_log', $log, false); }
+    // Cleanup expired transients (WordPress auto-cleans, but we can trigger)
+    if ( function_exists('delete_expired_transients') ) { delete_expired_transients(); }
+});
+
 ?>
