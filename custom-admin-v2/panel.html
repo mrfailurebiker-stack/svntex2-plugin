@@ -355,7 +355,12 @@
       async function loadProducts(){
         pm(''); prodList.textContent = 'Loading...';
         const qs = new URLSearchParams();
-        if(prodSearch?.value){ qs.set('search', prodSearch.value.trim()); }
+        if(prodSearch?.value){
+          const raw = prodSearch.value.trim();
+          const idMatch = raw.replace(/^#/,'');
+          if(/^\d+$/.test(idMatch)) qs.set('id', idMatch);
+          else qs.set('search', raw);
+        }
         if(prodStatus?.value){ qs.set('status', prodStatus.value); }
         if(prodStock?.value){ qs.set('stock_status', prodStock.value); }
         if(prodCatFilter?.value){ qs.set('category', prodCatFilter.value); }
