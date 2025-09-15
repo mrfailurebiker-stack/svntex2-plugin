@@ -529,6 +529,8 @@
         data.is_featured = prodForm.querySelector('input[name="is_featured"]').checked ? 1 : 0;
         data.archived = prodForm.querySelector('input[name="archived"]').checked ? 1 : 0;
         data.approved = prodForm.querySelector('input[name="approved"]').checked ? 1 : 0;
+  // Gallery CSV -> array of ints
+  if (data.gallery) { data.gallery = String(data.gallery).split(',').map(s=>parseInt(s,10)).filter(Boolean); }
         // Numeric coercion
         ['mrp','tax_percent','company_profit','base_price','discount_price','stock_qty','low_stock_threshold','weight','length','width','height','vendor_id'].forEach(k=>{ if(data[k]!==undefined && data[k]!=='' ) data[k] = Number(data[k]); });
         const id = data.id; delete data.id;

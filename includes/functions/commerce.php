@@ -208,35 +208,47 @@ add_action('rest_api_init', function(){
         }
         return svntex2_commerce_checkout($address, $payment);
     },'permission_callback'=>$secure_cb ] ]);
-    // Payments create: prepare gateway order and attach to our pending order
+    // Payments create: prepare Razorpay order (supports address) and attach to our order
     register_rest_route('svntex2/v1','/payments/create', [ [ 'methods'=>'POST','callback'=>function($r){
-        $gateway = sanitize_key($r['gateway'] ?? 'razorpay'); // razorpay|phonepe|payu
+        $gateway = sanitize_key($r['gateway'] ?? 'razorpay'); // currently supports razorpay
         $amount = (float) ($r['amount'] ?? 0);
         if ($amount <= 0) return new WP_Error('bad_amount','Invalid amount',['status'=>400]);
-        // Create internal pending order if needed (no address means use placeholder)
         $totals = svntex2_commerce_cart_totals(); if (empty($totals['lines'])) return new WP_Error('empty_cart','Cart empty',['status'=>400]);
-        // Minimal address placeholder when using gateways directly before full address capture
-        $addr = [ 'name'=>'-', 'line1'=>'-', 'city'=>'-', 'zip'=>'-', 'country'=>'IN' ];
-        $res = svntex2_commerce_checkout($addr, [ 'method'=>$gateway, 'intent'=>'gateway'] );
-        if (is_wp_error($res)) return $res;
-        $order_id = (int)$res['order_id'];
-        // Simulate gateway order/create response payload (replace with SDK/server call)
-        $gateway_order_id = 'gw_'.wp_generate_password(12,false,false);
-        global $wpdb; $orders=$wpdb->prefix.'svntex_orders';
-        $meta = $wpdb->get_var($wpdb->prepare("SELECT meta FROM $orders WHERE id=%d", $order_id)); $obj = json_decode((string)$meta,true); if(!is_array($obj)) $obj=[];
-        $obj['gateway'] = [ 'name'=>$gateway, 'order_id'=>$gateway_order_id, 'amount'=>$amount, 'currency'=>'INR', 'status'=>'created' ];
+        // Address (use provided or minimal fallback)
+        $addr = [
+            'name'=>sanitize_text_field($r['name']??'-'), 'line1'=>sanitize_text_field($r['line1']??'-'), 'line2'=>sanitize_text_field($r['line2']??''),
+            'city'=>sanitize_text_field($r['city']??'-'), 'state'=>sanitize_text_field($r['state']??''), 'zip'=>sanitize_text_field($r['zip']??'-'), 'country'=>sanitize_text_field($r['country']??'IN'), 'phone'=>sanitize_text_field($r['phone']??'')
+        ];
+        $res = svntex2_commerce_checkout($addr, [ 'method'=>$gateway, 'intent'=>'gateway' ]);
+        if (is_wp_error($res)) return $res; $order_id = (int)$res['order_id'];
+
+        if ($gateway !== 'razorpay') return new WP_Error('not_implemented','Only razorpay supported now',['status'=>501]);
+        $key_id = get_option('svntex2_razorpay_key_id',''); $secret = get_option('svntex2_razorpay_secret',''); $enabled = (bool)get_option('svntex2_razorpay_enabled', false);
+        if (!$enabled || !$key_id || !$secret) return new WP_Error('gateway_not_configured','Razorpay not configured',['status'=>501]);
+        $payload = [ 'amount' => round($amount*100), 'currency'=>'INR', 'receipt'=>'ord_'.$order_id, 'payment_capture'=>1 ];
+        $args = [ 'headers'=> [ 'Authorization' => 'Basic '.base64_encode($key_id.':'.$secret), 'Content-Type'=>'application/json' ], 'body'=> wp_json_encode($payload), 'timeout'=>20 ];
+        $resp = wp_remote_post('https://api.razorpay.com/v1/orders', $args);
+        if (is_wp_error($resp)) return new WP_Error('gateway_error','Failed to create Razorpay order',['status'=>502]);
+        $code = (int) wp_remote_retrieve_response_code($resp); $body = json_decode( wp_remote_retrieve_body($resp), true );
+        if ($code<200 || $code>=300 || empty($body['id'])) return new WP_Error('gateway_error','Bad response from Razorpay',['status'=>502,'data'=>$body]);
+        $rzp_order_id = sanitize_text_field($body['id']);
+        global $wpdb; $orders=$wpdb->prefix.'svntex_orders'; $meta = $wpdb->get_var($wpdb->prepare("SELECT meta FROM $orders WHERE id=%d", $order_id)); $obj = json_decode((string)$meta,true); if(!is_array($obj)) $obj=[];
+        $obj['gateway'] = [ 'name'=>'razorpay', 'order_id'=>$order_id, 'rzp_order_id'=>$rzp_order_id, 'amount'=>$amount, 'currency'=>'INR', 'status'=>'created' ];
         $wpdb->update($orders,[ 'meta'=> wp_json_encode($obj) ],[ 'id'=>$order_id ]);
-        return [ 'order_id'=>$order_id, 'gateway'=>$gateway, 'gateway_order_id'=>$gateway_order_id, 'amount'=>$amount, 'currency'=>'INR' ];
+        return [ 'order_id'=>$order_id, 'gateway'=>'razorpay', 'rzp_order_id'=>$rzp_order_id, 'amount'=>$amount, 'currency'=>'INR', 'key_id'=>$key_id ];
     },'permission_callback'=>$secure_cb ] ]);
-    // Payments confirm: called from frontend after successful gateway payment; marks our order as paid
+    // Payments confirm: verify Razorpay signature and mark order paid
     register_rest_route('svntex2/v1','/payments/confirm', [ [ 'methods'=>'POST','callback'=>function($r){
+        $order_id=(int)$r['order_id']; $rzp_order_id=sanitize_text_field($r['razorpay_order_id']??''); $payment_id=sanitize_text_field($r['razorpay_payment_id']??''); $signature=sanitize_text_field($r['razorpay_signature']??'');
+        if(!$order_id || !$payment_id || !$signature || !$rzp_order_id) return new WP_Error('bad_request','order_id, razorpay_order_id, razorpay_payment_id, razorpay_signature required',['status'=>400]);
+        $key_id = get_option('svntex2_razorpay_key_id',''); $secret = get_option('svntex2_razorpay_secret',''); $enabled = (bool)get_option('svntex2_razorpay_enabled', false);
+        if (!$enabled || !$key_id || !$secret) return new WP_Error('gateway_not_configured','Razorpay not configured',['status'=>501]);
+        $expected = hash_hmac('sha256', $rzp_order_id.'|'.$payment_id, $secret);
+        if (!hash_equals($expected, $signature)) return new WP_Error('invalid_signature','Signature mismatch',['status'=>400]);
         global $wpdb; $orders=$wpdb->prefix.'svntex_orders';
-        $order_id=(int)$r['order_id']; $payment_id=sanitize_text_field($r['payment_id']??''); $signature=sanitize_text_field($r['signature']??'');
-        if(!$order_id || !$payment_id) return new WP_Error('bad_request','order_id and payment_id required',['status'=>400]);
-        // TODO: Verify signature using gateway secret (server-side). Skipped here.
         $meta = $wpdb->get_var($wpdb->prepare("SELECT meta FROM $orders WHERE id=%d", $order_id)); $obj = json_decode((string)$meta,true); if(!is_array($obj)) $obj=[];
         $obj['gateway'] = isset($obj['gateway'])? $obj['gateway'] : [];
-        $obj['gateway']['payment_id'] = $payment_id; $obj['gateway']['signature'] = $signature; $obj['gateway']['status']='paid';
+        $obj['gateway']['payment_id'] = $payment_id; $obj['gateway']['signature'] = $signature; $obj['gateway']['status']='paid'; $obj['gateway']['rzp_order_id'] = $rzp_order_id;
         $wpdb->update($orders,[ 'status'=>'paid', 'meta'=> wp_json_encode($obj) ],[ 'id'=>$order_id ]);
         return [ 'ok'=>true, 'order_id'=>$order_id, 'status'=>'paid' ];
     },'permission_callback'=>'__return_true' ] ]);

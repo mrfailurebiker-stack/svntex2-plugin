@@ -38,13 +38,17 @@
         </section>
         <section id="products" class="section hidden">
           <h2>Products</h2>
-          <div class="grid columns-4" style="align-items:end;max-width:980px">
+          <div class="grid columns-5" style="align-items:end;max-width:980px">
             <label>Search<input id="prodSearch" placeholder="Search products"></label>
             <label>Category<select id="prodCat"><option value="">All</option></select></label>
             <label>Availability<select id="prodAvail"><option value="">Any</option><option value="instock">In stock</option><option value="outofstock">Out of stock</option></select></label>
             <label>Sort<select id="prodSort"><option value="date">Newest</option><option value="title">Alphabetical</option><option value="price_asc">Price: Low to High</option><option value="price_desc">Price: High to Low</option></select></label>
+            <label>Price ₹<input id="minPrice" type="number" step="0.01" min="0" style="width:120px" placeholder="Min"> — <input id="maxPrice" type="number" step="0.01" min="0" style="width:120px" placeholder="Max"></label>
           </div>
-          <div class="grid" style="grid-auto-flow:column;gap:10px;margin:8px 0"><button id="prodApply">Apply</button></div>
+          <div class="grid" style="grid-auto-flow:column;gap:10px;margin:8px 0">
+            <button id="prodPrev" class="secondary">Prev</button><span id="prodPageInfo" class="muted"></span><button id="prodNext" class="secondary">Next</button>
+            <button id="prodApply">Apply</button>
+          </div>
           <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px" id="prodGrid">Loading...</div>
         </section>
         <section id="cart" class="section hidden">
@@ -58,7 +62,7 @@
             <label>State<input name="state" required></label>
             <label>PIN Code<input name="zip" required></label>
             <label>Phone<input name="phone" required></label>
-            <label>Payment<select name="payment_method"><option value="cod">Cash on delivery</option><option value="wallet">Wallet</option></select></label>
+            <label>Payment<select name="payment_method"><option value="cod">Cash on delivery</option><option value="wallet">Wallet</option><option value="online">Online (UPI/Card)</option></select></label>
             <div><button type="submit">Checkout</button></div>
             <div id="chkMsg" class="muted"></div>
           </form>
@@ -156,16 +160,21 @@
           grid.innerHTML = items.map(x=>`<div class="list-item" style="flex-direction:column;align-items:flex-start"><a href="/member-v2/product.html?id=${x.id}"><img src="${x.thumbnail_url||''}" alt="" style="width:100%;height:140px;object-fit:cover;border-radius:8px"></a><div style="margin-top:6px"><strong><a href="/member-v2/product.html?id=${x.id}" style="text-decoration:none;color:inherit">${x.title}</a></strong></div><div class="meta">₹${(x.price||0).toFixed(2)}</div></div>`).join('') || '<div class="muted">No items.</div>';
         }catch(e){ document.getElementById('homeGrid').textContent='Failed to load'; }
       }
-      async function loadCatalog(){
+    let cPage=1; const per=24;
+    async function loadCatalog(){
         try{
           const qs = new URLSearchParams();
           const s=document.getElementById('prodSearch')?.value; if(s) qs.set('search', s);
           const c=document.getElementById('prodCat')?.value; if(c) qs.set('category', c);
           const a=document.getElementById('prodAvail')?.value; if(a) qs.set('availability', a);
           const sort=document.getElementById('prodSort')?.value; if(sort) qs.set('sort', sort);
-          const r = await fetch('/wp-json/svntex2/v1/catalog?per_page=24'+(qs.toString()?('&'+qs.toString()):''));
-          const j = await r.json(); const items = j.items||[]; const grid = document.getElementById('prodGrid');
+      const minp=document.getElementById('minPrice')?.value; if(minp) qs.set('min_price', minp);
+      const maxp=document.getElementById('maxPrice')?.value; if(maxp) qs.set('max_price', maxp);
+      qs.set('per_page', String(per)); qs.set('page', String(cPage));
+      const r = await fetch('/wp-json/svntex2/v1/catalog'+(qs.toString()?('?'+qs.toString()):''));
+      const j = await r.json(); const items = j.items||[]; const total=j.total||0; const grid = document.getElementById('prodGrid');
           grid.innerHTML = items.map(x=>`<div class="list-item" style="flex-direction:column;align-items:flex-start"><a href="/member-v2/product.html?id=${x.id}"><img src="${x.thumbnail_url||''}" alt="" style="width:100%;height:160px;object-fit:cover;border-radius:8px"></a><div style="margin-top:6px"><strong><a href="/member-v2/product.html?id=${x.id}" style="text-decoration:none;color:inherit">${x.title}</a></strong></div><div class="meta">MRP ₹${(x.mrp||0).toFixed(2)} · Price ₹${(x.price||0).toFixed(2)}</div><div class="grid" style="grid-auto-flow:column;gap:8px;margin-top:6px"><a class="secondary" href="/member-v2/product.html?id=${x.id}" style="text-decoration:none;padding:.35rem .6rem;border:1px solid rgba(255,255,255,.3);border-radius:8px">View</a><button class="buyNow" data-id="${x.id}" style="padding:.35rem .6rem">Buy Now</button></div></div>`).join('') || '<div class="muted">No items.</div>';
+      const pi=document.getElementById('prodPageInfo'); if(pi){ const pages=Math.max(1, Math.ceil(total/per)); pi.textContent='Page '+cPage+' / '+pages; document.getElementById('prodPrev').disabled = (cPage<=1); document.getElementById('prodNext').disabled = (cPage>=pages); }
           // bind Buy Now
           grid.querySelectorAll('button.buyNow').forEach(btn=>{ btn.addEventListener('click', async ()=>{ const pid=btn.getAttribute('data-id'); if(!publicNonce) publicNonce = await getPublicNonce(); await fetch('/wp-json/svntex2/v1/cart/clear', { method:'POST', headers:{'X-SVNTeX2-Nonce': publicNonce} }); await fetch('/wp-json/svntex2/v1/cart/add', { method:'POST', headers:{'Content-Type':'application/json','X-SVNTeX2-Nonce': publicNonce }, body: JSON.stringify({ product_id: pid, variant_id: 0, qty: 1 }) }); location.hash='#cart'; document.getElementById('chkForm').scrollIntoView({behavior:'smooth'}); }); });
         }catch(e){ document.getElementById('prodGrid').textContent='Failed to load'; }
@@ -174,7 +183,9 @@
       try{
         const r=await fetch('/wp-json/wp/v2/svntex_category?per_page=100'); const cats=r.ok?await r.json():[]; const sel=document.getElementById('prodCat'); if(sel){ sel.innerHTML = '<option value="">All</option>'+cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join(''); }
       }catch(e){}
-      document.getElementById('prodApply')?.addEventListener('click', (e)=>{ e.preventDefault(); loadCatalog(); });
+  document.getElementById('prodApply')?.addEventListener('click', (e)=>{ e.preventDefault(); cPage=1; loadCatalog(); });
+  document.getElementById('prodPrev')?.addEventListener('click', (e)=>{ e.preventDefault(); if(cPage>1){ cPage--; loadCatalog(); }});
+  document.getElementById('prodNext')?.addEventListener('click', (e)=>{ e.preventDefault(); cPage++; loadCatalog(); });
 
       // Cart
       let publicNonce='';
@@ -221,19 +232,23 @@
         }catch(e){ document.getElementById('cartWrap').textContent='Failed to load'; }
       }
       const chkMsg = document.getElementById('chkMsg');
-      document.getElementById('chkForm').addEventListener('submit', async (e)=>{
+  document.getElementById('chkForm').addEventListener('submit', async (e)=>{
         e.preventDefault(); chkMsg.textContent='Placing order…'; if(!publicNonce) publicNonce = await getPublicNonce();
         const data = Object.fromEntries(new FormData(e.target).entries());
         if(data.payment_method==='online'){
           try{
             const totals = await fetch('/wp-json/svntex2/v1/cart').then(r=>r.json());
-            const create = await fetch('/wp-json/svntex2/v1/payments/create', { method:'POST', headers:{ 'Content-Type':'application/json','X-SVNTeX2-Nonce': publicNonce }, body: JSON.stringify({ gateway:'razorpay', amount: totals.grand_total }) });
+    const createBody = { gateway:'razorpay', amount: totals.grand_total, name:data.name, line1:data.line1, line2:data.line2, city:data.city, state:data.state, zip:data.zip, country:'IN', phone:data.phone };
+    const create = await fetch('/wp-json/svntex2/v1/payments/create', { method:'POST', headers:{ 'Content-Type':'application/json','X-SVNTeX2-Nonce': publicNonce }, body: JSON.stringify(createBody) });
             const cj = await create.json(); if(!create.ok){ chkMsg.textContent=(cj.error||'Gateway create failed'); return; }
-            // TODO: invoke real gateway checkout here; simulate immediate success
-            const fakePaymentId = 'pay_'+Math.random().toString(36).slice(2);
-            const conf = await fetch('/wp-json/svntex2/v1/payments/confirm', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ order_id: cj.order_id, payment_id: fakePaymentId }) });
-            const ok = await conf.json(); if(conf.ok && ok.ok){ chkMsg.textContent='Payment success. Order #'+cj.order_id; loadCart(); loadOrders(); }
-            else { chkMsg.textContent=(ok && ok.error)||'Payment confirm failed'; }
+    // If Razorpay configured, load its Checkout; else show error
+    if(!cj.key_id){ chkMsg.textContent='Online payment not available'; return; }
+    // Razorpay Checkout SDK must be included on the page in production; simulate without external load here.
+    // Simulate a successful payment for now by computing a matching signature with secret on server only. Instead, after SDK success, post fields as below:
+    const payment = { razorpay_order_id: cj.rzp_order_id, razorpay_payment_id: 'pay_'+Math.random().toString(36).slice(2), razorpay_signature: 'SIMULATED' };
+    const conf = await fetch('/wp-json/svntex2/v1/payments/confirm', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ order_id: cj.order_id, ...payment }) });
+    const ok = await conf.json(); if(conf.ok && ok.ok){ chkMsg.textContent='Payment success. Order #'+cj.order_id; loadCart(); loadOrders(); }
+    else { chkMsg.textContent=(ok && ok.error)||'Payment confirm failed'; }
           }catch(err){ chkMsg.textContent='Payment failed'; }
           return;
         }

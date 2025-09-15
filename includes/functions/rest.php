@@ -120,6 +120,26 @@ add_action('rest_api_init', function(){
         }
     ]);
 
+        // Profile for current user
+        register_rest_route('svntex2/v1','/me', [
+                [ 'methods'=>'GET', 'permission_callback'=>function(){ return is_user_logged_in(); },
+                    'callback'=>function(){ $u = wp_get_current_user(); return [ 'id'=>$u->ID, 'email'=>$u->user_email, 'first_name'=>get_user_meta($u->ID,'first_name',true), 'last_name'=>get_user_meta($u->ID,'last_name',true), 'meta'=>[ 'mobile'=>get_user_meta($u->ID,'mobile',true) ] ]; }
+                ],
+                [ 'methods'=>'POST', 'permission_callback'=>function(){ return is_user_logged_in(); },
+                    'callback'=>function(WP_REST_Request $r){ $u = wp_get_current_user(); $payload=[]; if(null!==$r->get_param('email')){ $email=sanitize_email($r->get_param('email')); if($email && $email!==$u->user_email && email_exists($email)) return new WP_REST_Response(['error'=>'Email already in use'],400); $payload['user_email']=$email; } if(null!==$r->get_param('first_name')) update_user_meta($u->ID,'first_name', sanitize_text_field($r->get_param('first_name')) ); if(null!==$r->get_param('last_name')) update_user_meta($u->ID,'last_name', sanitize_text_field($r->get_param('last_name')) ); if(null!==$r->get_param('mobile')) update_user_meta($u->ID,'mobile', sanitize_text_field($r->get_param('mobile')) ); if($payload){ $payload['ID']=$u->ID; $res=wp_update_user($payload); if(is_wp_error($res)) return new WP_REST_Response(['error'=>$res->get_error_message()],500); } return [ 'id'=>$u->ID ]; }
+                ],
+        ]);
+
+        // Admin payments config (Razorpay)
+        register_rest_route('svntex2/v1','/admin/payments/config', [
+                [ 'methods'=>'GET', 'permission_callback'=>'svntex2_api_can_manage',
+                    'callback'=>function(){ return [ 'razorpay'=> [ 'key_id'=> get_option('svntex2_razorpay_key_id',''), 'enabled'=> (bool)get_option('svntex2_razorpay_enabled', false ) ] ]; }
+                ],
+                [ 'methods'=>'POST', 'permission_callback'=>'svntex2_api_can_manage',
+                    'callback'=>function(WP_REST_Request $r){ $raz = (array)$r->get_param('razorpay'); if(isset($raz['key_id'])) update_option('svntex2_razorpay_key_id', sanitize_text_field($raz['key_id']), false); if(isset($raz['secret'])) update_option('svntex2_razorpay_secret', sanitize_text_field($raz['secret']), false); if(null!==$r->get_param('enabled')) update_option('svntex2_razorpay_enabled', (bool)$r->get_param('enabled'), false); return [ 'ok'=>true ]; }
+                ],
+        ]);
+
     // PB meta (stub for now)
     register_rest_route('svntex2/v1','/pb/meta', [
         'methods' => 'GET', 'permission_callback' => 'svntex2_api_can_manage',
