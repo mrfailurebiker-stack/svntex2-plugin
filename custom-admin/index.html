@@ -4,69 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SVNTeX Admin</title>
-  <link rel="stylesheet" href="admin.css" />
   </head>
   <body>
     <script>
-      // Enforce canonical host to ensure cookies/REST work (www) only on production domain
+      // Make Admin v2 the primary portal
       (function(){
-        var isProd = /(^|\.)svntex\.com$/i.test(location.hostname);
-        var onWww = /^www\./i.test(location.hostname);
-        if(isProd && !onWww){ location.replace('https://www.svntex.com/admin/'); }
+        var base = (location.hostname.replace(/^www\./,'')==='svntex.com') ? 'https://www.svntex.com' : '';
+        location.replace(base + '/admin-v2/');
       })();
-    </script>
-    <div class="login-wrap">
-      <div class="login-card">
-        <h1>SVNTeX Admin</h1>
-        <p class="muted">Sign in to manage SVNTeX.</p>
-        <div class="grid">
-          <label>Email or Username <input id="login_id" type="text" placeholder="you@example.com"/></label>
-          <label>Password <input id="password" type="password" placeholder="••••••••"/></label>
-          <button id="btnLogin">Login</button>
-          <div id="msg" class="muted" aria-live="polite"></div>
-        </div>
-      </div>
-    </div>
-    <script>
-    (function(){
-      const b=document.getElementById('btnLogin'); const msg=document.getElementById('msg');
-      // If already logged in, skip to panel
-      (async function precheck(){
-        try{
-          const r = await fetch('/wp-json/wp/v2/users/me', { credentials:'include' });
-          if(r.ok){ location.href='panel.html'; }
-        }catch(e){}
-      })();
-      async function getNonce(){
-        const r = await fetch('/wp-admin/admin-ajax.php?action=svntex2_get_login_nonce',{credentials:'include'});
-        const j = await r.json();
-        if(!j.success) throw new Error('nonce');
-        return j.data.nonce;
-      }
-      b.addEventListener('click', async ()=>{
-        msg.textContent='Signing in...';
-        try {
-          const nonce = await getNonce();
-          const fd = new FormData();
-          fd.append('action','svntex2_do_login');
-          fd.append('svntex2_login_nonce', nonce);
-          fd.append('login_id', document.getElementById('login_id').value);
-          fd.append('password', document.getElementById('password').value);
-          // Fetch admin-ajax on same origin
-          const r = await fetch('/wp-admin/admin-ajax.php',{ method:'POST', body: fd, credentials:'include' });
-          let j; const ct=r.headers.get('content-type')||'';
-          if(ct.includes('application/json')){ j = await r.json(); }
-          else { const t=await r.text(); try{ j=JSON.parse(t); }catch{ throw new Error('bad_response:'+t.slice(0,120)); } }
-          if(j.success){
-            // Send to canonical host
-            const dest = (location.hostname.replace(/^www\./,'')==='svntex.com') ? 'https://www.svntex.com/admin/panel.html' : '/admin/panel.html';
-            location.href = dest;
-          } else {
-            msg.textContent = (j.data && (j.data.message||j.data.error)) || 'Login failed';
-          }
-        } catch(e){ msg.textContent='Network error'; }
-      });
-    })();
     </script>
   </body>
 </html>

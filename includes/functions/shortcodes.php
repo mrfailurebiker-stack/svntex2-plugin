@@ -50,12 +50,13 @@ add_shortcode('svntex_landing', function(){
 // Dashboard shortcode
 add_shortcode('svntex_dashboard', function(){
   if ( ! is_user_logged_in() ) { wp_safe_redirect( home_url('/'.SVNTEX2_LOGIN_SLUG.'/') ); exit; }
-  // enqueue assets
-  wp_enqueue_style('svntex2-style');
-  wp_enqueue_script('svntex2-dashboard');
-  $file = SVNTEX2_PLUGIN_DIR . 'views/dashboard.php';
-  if ( file_exists( $file ) ) { ob_start(); include $file; return ob_get_clean(); }
-  return '<p>Dashboard view missing.</p>';
+  // Redirect dashboard to Member v2 app
+  $dest = site_url('/member-v2/app.html');
+  if ( preg_match('/(^|\.)svntex\.com$/i', $_SERVER['HTTP_HOST'] ?? '') && strpos($_SERVER['HTTP_HOST'],'www.')!==0 ) {
+    $dest = 'https://www.svntex.com/member-v2/app.html';
+  }
+  wp_safe_redirect( $dest );
+  exit;
 });
 
 // AJAX login handler
