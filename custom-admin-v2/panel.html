@@ -19,17 +19,17 @@
       <aside id="sidebar" class="sidebar">
         <div class="brand"><strong>SVNTeX Admin v2</strong><button id="btnToggle" class="burger" aria-label="Toggle menu" title="Toggle menu">☰</button></div>
         <nav>
-          <a href="#dashboard" class="active">Dashboard</a>
-          <a href="#users">Users</a>
-          <a href="#products">Products</a>
-          <a href="#orders">Orders</a>
-          <a href="#wallet">Wallet</a>
-          <a href="#referrals">Referrals</a>
-          <a href="#vendors">Vendors</a>
-          <a href="#support">Support</a>
-          <a href="#withdrawalsAdmin">Withdrawals</a>
-          <a href="#kyc">KYC</a>
-          <a href="#settings">Settings</a>
+          <a href="#dashboard" data-nav class="active">Dashboard</a>
+          <a href="#users" data-nav>Users</a>
+          <a href="#products" data-nav>Products</a>
+          <a href="#orders" data-nav>Orders</a>
+          <a href="#wallet" data-nav>Wallet</a>
+          <a href="#referrals" data-nav>Referrals</a>
+          <a href="#vendors" data-nav>Vendors</a>
+          <a href="#support" data-nav>Support</a>
+          <a href="#withdrawalsAdmin" data-nav>Withdrawals</a>
+          <a href="#kyc" data-nav>KYC</a>
+          <a href="#settings" data-nav>Settings</a>
           <a href="#logout" id="logout">Logout</a>
         </nav>
       </aside>
@@ -291,6 +291,12 @@
     <button id="globalMenuBtn" title="Menu" aria-label="Menu" style="position:fixed;left:12px;top:12px;z-index:9999;display:none;background:#0f172a;border:1px solid #23304d;color:#e5e7eb;border-radius:10px;padding:10px 12px;cursor:pointer">☰</button>
     <script>
     (async function(){
+      // Safety: if JS loads but router has issues, still navigate via anchors
+      Array.from(document.querySelectorAll('a[data-nav]')).forEach(a=>{
+        a.addEventListener('click', function(){
+          var h=a.getAttribute('href'); if(h&&h.startsWith('#')){ try{ history.replaceState(null,'',h); }catch(e){} }
+        });
+      });
       // Prime router early so navigation works even if later loads fail/are slow
       const sectionsPrime = Array.from(document.querySelectorAll('main .section'));
       const navLinksPrime = Array.from(document.querySelectorAll('aside nav a'));
