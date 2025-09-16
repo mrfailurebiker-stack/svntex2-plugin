@@ -12,7 +12,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy plugin via FTPS
+      - name: Prepare plugin package (plugin-dist)
+        run: |
+          set -e
+          rm -rf plugin-dist
+          mkdir -p plugin-dist
+          # Copy only plugin files (PHP bootstrap, includes, views, assets, scripts, docs)
+          rsync -a --prune-empty-dirs --delete \
+            --include='svntex2-plugin.php' \
+            --include='includes/***' \
+            --include='views/***' \
+            --include='assets/***' \
+            --include='scripts/***' \
+            --include='*.md' \
+            --include='.htaccess' \
+            --exclude='*' ./ plugin-dist/
+
+      - name: Deploy plugin via FTPS (plugin-dist)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
           server: 145.79.211.169
@@ -22,25 +38,13 @@ jobs:
           server-dir: /public_html/wp-content/plugins/svntex2-plugin/
           protocol: ftps
           port: 21
-          # Restrict local-dir to root but explicitly exclude SPA/static app folders and non-plugin assets
-          local-dir: ./
+          local-dir: ./plugin-dist/
           state-name: .ftp-deploy-sync-state.json
           exclude: |
             .git
-            .git/**
             **/.git*
-            **/.git*/**
-            **/.github/**
-            **/node_modules/**
             **/.DS_Store
             **/*.log
-            dev/**
-            docs/**
-            custom-admin-v2/**
-            custom-member-v2/**
-            custom-admin/**
-            custom-landing/**
-            legacy/**
 
       # Static landing deploy removed to let WP render the styled landing as the homepage
 
