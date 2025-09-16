@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -50,20 +51,7 @@ jobs:
 
       # Static landing deploy removed to let WP render the styled landing as the homepage
 
-      - name: Deploy custom admin portal (outside WP)
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
-        with:
-          server: 145.79.211.169
-          username: u271371274
-          password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: /public_html/admin/
-          protocol: ftps
-          port: 21
-          local-dir: ./custom-admin/
-          state-name: .ftp-deploy-sync-state-admin.json
-          exclude: |
-            **/.git*
-            **/.DS_Store
+  # Old custom-admin deploy removed (we only deploy admin-v2 and member-v2)
 
       - name: Deploy admin-v2 (preview, outside WP)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
@@ -79,6 +67,7 @@ jobs:
           exclude: |
             **/.git*
             **/.DS_Store
+          dangerous-clean-slate: true
 
       - name: Deploy member-v2 (preview, outside WP)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
@@ -94,3 +83,4 @@ jobs:
           exclude: |
             **/.git*
             **/.DS_Store
+          dangerous-clean-slate: true

@@ -113,6 +113,16 @@ add_action('template_redirect', function(){
     }
 });
 
+// Extra safety: immediately redirect right after successful login
+add_action('wp_login', function($user_login, $user){
+    if ( headers_sent() ) return; // can't redirect safely
+    if ( defined('DOING_AJAX') && DOING_AJAX ) return; // let AJAX handlers respond with JSON
+    if ( defined('REST_REQUEST') && REST_REQUEST ) return;
+    $dest = user_can($user, 'manage_options') ? site_url('/admin-v2/panel.html') : site_url('/member-v2/app.html');
+    wp_safe_redirect($dest);
+    exit;
+}, 10, 2);
+
 /**
  * One-time demo users seeding (requested):
  * - Admin: username nithin / password 1234
