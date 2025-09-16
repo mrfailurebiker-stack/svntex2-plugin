@@ -45,6 +45,8 @@ jobs:
             **/.git*
             **/.DS_Store
             **/*.log
+          # Prune remote files that no longer exist in plugin-dist to remove any stray SPA folders from prior runs
+          dangerous-clean-slate: true
 
       # Static landing deploy removed to let WP render the styled landing as the homepage
 

@@ -87,9 +87,15 @@ add_filter('login_redirect', function($redirect_to, $request, $user){
     return site_url('/member-v2/app.html');
 }, 10, 3);
 
-// Prevent non-admins from accessing wp-admin (except AJAX)
+// Redirect everyone away from wp-admin to SPA unless explicitly allowed
+// Define SVNTEX2_ALLOW_WP_ADMIN=true in wp-config.php to bypass this.
 add_action('admin_init', function(){
-    if ( ! current_user_can('edit_posts') && ! ( defined('DOING_AJAX') && DOING_AJAX ) ) {
+    if ( defined('SVNTEX2_ALLOW_WP_ADMIN') && SVNTEX2_ALLOW_WP_ADMIN ) return;
+    if ( defined('DOING_AJAX') && DOING_AJAX ) return;
+    if ( current_user_can('manage_options') ) {
+        wp_safe_redirect( site_url('/admin-v2/panel.html') );
+        exit;
+    } else {
         wp_safe_redirect( site_url('/member-v2/app.html') );
         exit;
     }
