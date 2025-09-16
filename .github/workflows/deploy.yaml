@@ -36,18 +36,17 @@ jobs:
           username: u271371274
           password: ${{ secrets.FTP_PASSWORD }}
           # Deploy into the WordPress plugin folder (Hostinger single-domain path)
-      server-dir: /domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin/
-          protocol: ftps
-          port: 21
-          local-dir: ./plugin-dist/
-          state-name: .ftp-deploy-sync-state.json
-          exclude: |
-            .git
-            **/.git*
-            **/.DS_Store
-            **/*.log
-          # Prune remote files that no longer exist in plugin-dist to remove any stray SPA folders from prior runs
-          dangerous-clean-slate: true
+        server-dir: /domains/svntex.com/public_html/wp-content/plugins/svntex2-plugin/
+        protocol: ftps
+        port: 21
+        local-dir: ./plugin-dist/
+        state-name: .ftp-deploy-sync-state.json
+        exclude: |
+          .git
+          **/.git*
+          **/.DS_Store
+          **/*.log
+        dangerous-clean-slate: true
 
       # Static landing deploy removed to let WP render the styled landing as the homepage
 
